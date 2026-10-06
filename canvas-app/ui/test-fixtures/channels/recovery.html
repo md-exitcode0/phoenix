@@ -1,0 +1,51 @@
+<!doctype html>
+<html data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Channel recovery checks</title>
+  <link rel="stylesheet" href="../../sidebar.css?channel-fixture=20260917-2">
+  <link rel="stylesheet" href="../../settings.css?channel-fixture=20260917-paging-visual-2">
+  <style>
+    body{padding:24px;color:var(--ink);background:var(--surface);overflow:auto}
+    main{max-width:850px;margin:24px auto}nav{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    h1{font-size:24px}main>p{font-size:13px;line-height:1.5;color:var(--ink-soft)}
+    #fixture-result{white-space:pre-wrap;font:12px monospace}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Channel recovery checks</h1>
+    <p>Synthetic fixture of the actual channel component. No credentials are saved and no messages leave this page.</p>
+    <nav>
+      <button type="button" class="button secondary" id="fixture-theme">Switch theme</button>
+      <button type="button" class="button secondary" data-scenario="capacity">Paused capacity</button>
+      <button type="button" class="button secondary" data-scenario="large">Large recovery</button>
+      <button type="button" class="button secondary" data-scenario="login">Saved login</button>
+      <button type="button" class="button secondary" id="fixture-checks">Run component checks</button>
+      <button type="button" class="button secondary" id="fixture-paged-checks">Run bounded API checks</button>
+    </nav>
+    <section id="channels"></section>
+    <pre id="fixture-result" role="status"></pre>
+  </main>
+  <div id="modalLayer" class="modal-layer" hidden></div>
+  <script src="fixture.js?channel-fixture=20260917-paging-visual-1"></script>
+  <script src="../../channels.js?channel-fixture=20260917-paging-visual-1"></script>
+  <script src="checks.js?channel-fixture=20260917-2"></script>
+  <script src="paged-checks.js?channel-fixture=20260917-paging-visual-3"></script>
+  <script>
+    ChannelFixture.scenario(new URLSearchParams(location.search).get('mode')||'capacity');
+    document.getElementById('fixture-theme').onclick=()=>document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';
+    document.querySelectorAll('[data-scenario]').forEach(button=>button.onclick=()=>ChannelFixture.scenario(button.dataset.scenario));
+    document.getElementById('fixture-checks').onclick=async()=>{
+      ChannelFixture.setPaged(false);
+      const result=await runChannelChecks();
+      document.getElementById('fixture-result').textContent=JSON.stringify(result,null,2);
+    };
+    document.getElementById('fixture-paged-checks').onclick=async()=>{
+      const result=await runPagedChannelChecks();
+      document.getElementById('fixture-result').textContent=JSON.stringify(result,null,2);
+    };
+  </script>
+</body>
+</html>

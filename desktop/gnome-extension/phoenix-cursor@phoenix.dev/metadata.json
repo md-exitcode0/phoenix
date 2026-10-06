@@ -1,0 +1,7 @@
+{
+  "uuid": "phoenix-cursor@phoenix.dev",
+  "name": "Phoenix Agent Cursor",
+  "description": "Phoenix agent desktop bridge: a separate, high-contrast ember cursor plus virtual input and screenshots, controlled over DBus (dev.phoenix.Cursor).",
+  "shell-version": ["45", "46", "47", "48", "49", "50"],
+  "url": "https://github.com/phoenix-agent"
+}

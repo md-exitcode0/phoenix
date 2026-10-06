@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {join,resolve} from 'node:path';
+import {evaluateCsvTool} from './lib/csv-acceptance.mjs';
+const [output,retainedWorkspace]=process.argv.slice(2);
+if(!output?.startsWith('/')||!retainedWorkspace?.startsWith('/'))throw Error('NEW absolute output and retained correct workspace required');
+await mkdir(output,{mode:0o700});
+const empty=join(output,'missing');await mkdir(empty);
+const missing=await evaluateCsvTool(empty,join(output,'missing-checks'));
+assert.equal(missing.passed,0);assert.equal(missing.evaluated,0);assert.equal(missing.artifactAvailable,false);
+const broken=join(output,'broken');await mkdir(broken);
+await writeFile(join(broken,'totals.py'),'import sys\nsys.stderr.write("always fails\\n")\nsys.exit(2)\n');
+const failed=await evaluateCsvTool(broken,join(output,'broken-checks'));
+assert.equal(failed.passed,0);assert.equal(failed.evaluated,4);assert.equal(failed.checks.filter(row=>row.status==='not_evaluated').length,11);
+const retained=await evaluateCsvTool(resolve(retainedWorkspace),join(output,'retained-checks'));
+assert.equal(retained.passed,15);assert.equal(retained.evaluated,15);
+await writeFile(join(output,'result.json'),JSON.stringify({missing,failed,retained},null,2));
+console.log('PASS: no false rejection passes for a missing or always-failing script; retained real artifact passes all15cases without a model call');

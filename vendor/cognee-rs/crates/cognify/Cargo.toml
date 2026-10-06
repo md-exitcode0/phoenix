@@ -1,0 +1,68 @@
+[package]
+name = "cognee-cognify"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Knowledge-graph extraction (cognify) — turn ingested data into a graph for cognee."
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+testing = ["cognee-storage/testing", "cognee-graph/testing", "cognee-vector/testing"]
+html-loader = ["cognee-ingestion/html-loader"]
+image-loader = ["cognee-ingestion/image-loader"]
+audio-loader = ["cognee-ingestion/audio-loader"]
+
+[dependencies]
+cognee-models = { path = "../models", version = "0.1.1" }
+cognee-storage = { path = "../storage", version = "0.1.1" }
+cognee-chunking = { path = "../chunking", version = "0.1.1" }
+cognee-core = { path = "../core", version = "0.1.1" }
+cognee-ingestion = { path = "../ingestion", version = "0.1.1" }
+cognee-llm = { path = "../llm", version = "0.1.1" }
+cognee-graph = { path = "../graph", version = "0.1.1" }
+cognee-utils = { path = "../utils", version = "0.1.1" }
+cognee-embedding = { path = "../embedding", version = "0.1.1" }
+cognee-vector = { path = "../vector", version = "0.1.1" }
+cognee-ontology = { path = "../ontology", version = "0.1.1" }
+cognee-database = { path = "../database", version = "0.1.1" }
+cognee-session = { path = "../session", version = "0.1.1" }
+
+chrono.workspace = true
+uuid = { workspace = true, features = ["v4"] }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+async-trait.workspace = true
+thiserror.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+schemars.workspace = true
+futures.workspace = true
+tracing.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+cognee-storage    = { path = "../storage", features = ["testing"] }
+cognee-embedding  = { path = "../embedding", features = ["onnx"] }
+cognee-graph      = { path = "../graph", features = ["testing", "ladybug"] }
+cognee-vector     = { path = "../vector", features = ["testing"] }
+cognee-database   = { path = "../database", features = ["sqlite"] }
+cognee-search     = { path = "../search" }
+cognee-delete     = { path = "../delete" }
+cognee-test-utils = { path = "../test-utils" }
+# `mock` enables the cassette record/replay clients (ReplayLlm/RecordingLlm) the
+# integration tests use to run offline against committed cassettes. Cargo unifies
+# this dev-dep with the mock-less [dependencies] entry into one test build, so
+# there is no double-trait-copy issue (that caveat is specific to cognee-llm's
+# own test target — see crates/llm/src/mock/recording.rs).
+cognee-llm        = { path = "../llm", features = ["mock"] }
+cognee-session    = { path = "../session", features = ["fs"] }
+dotenv.workspace = true
+tempfile.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

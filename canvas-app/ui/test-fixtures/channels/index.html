@@ -1,0 +1,21 @@
+<!doctype html><html data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Channel setup checks</title><link rel="stylesheet" href="../../sidebar.css"><link rel="stylesheet" href="../../settings.css"><style>body{padding:32px;color:var(--ink);background:var(--surface);overflow:auto}main{max-width:850px;margin:30px auto}nav{display:flex;gap:12px;align-items:center}h1{font-size:24px}</style></head><body><main><h1>Channel setup checks</h1><p>Local fixture. No credentials are saved and no messages leave this page.</p><nav><button class="button secondary" id="theme">Switch theme</button><label><input type="checkbox" id="fail">Simulate connection error</label><button class="button secondary" id="finish" hidden>Finish upload</button><button class="button secondary" id="recovery">Show interrupted reply</button></nav><section id="channels"></section></main><div id="modalLayer" class="modal-layer" hidden></div><script>
+const $=id=>document.getElementById(id);let connections=[];
+window.PhoenixUI={TAURI:true,state:{selected:{id:'phoenix'},view:{directory:{agents:[{agent_id:'phoenix',canonical_session_id:'agent-phoenix',display_name:'Phoenix'},{agent_id:'avery',canonical_session_id:'agent-avery',display_name:'Avery'}]}}},escapeHtml:s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),showModal(html){$('modalLayer').innerHTML=html;$('modalLayer').hidden=false;},closeModal(){$('modalLayer').hidden=true;$('modalLayer').innerHTML='';},async invoke(command,args){
+if(command!=='channels_command')throw Error('Unexpected command');
+if(args.action==='list')return structuredClone({connections,workspace:'/tmp/channel-fixture'});
+if(['check','start','remember'].includes(args.action)&&$('fail').checked)throw Error('503: service unavailable\nProvider diagnostic details '.repeat(60));
+if(args.action==='save'){const old=connections.find(r=>r.config.id===args.config.id);if(old)old.config=args.config;else connections.push({config:args.config,status:{running:false,delivery:{}}});return {id:args.config.id};}
+const row=connections.find(r=>r.config.id===args.id);if(!row)throw Error('Connection missing');
+if(args.action==='remember')row.status.saved_login=true;
+if(args.action==='forget')row.status.saved_login=false;
+if(args.action==='start'){row.status.running=true;row.desktop_worker=true;}
+if(args.action==='stop'){row.status.running=false;row.desktop_worker=false;}
+if(args.action==='remove')connections=connections.filter(r=>r!==row);
+if(['received','retry','acknowledge'].includes(args.action))row.status.delivery={};return {ok:true};}};
+</script><script src="../../channels.js?v=20260913-send-1"></script><script>
+if(new URLSearchParams(location.search).get('mode')==='sending'){
+connections=[{config:{id:'telegram',name:'My Telegram',platform:'telegram',agent_id:'avery',conversation_id:'123',allowed_user_ids:['456'],workspace:'/tmp/channel-fixture'},status:{running:true,delivery:{running:1,sending_replies:1,sending_images:1}}},{config:{id:'discord',name:'Project Discord',platform:'discord',agent_id:'phoenix',conversation_id:'789',allowed_user_ids:['456'],workspace:'/tmp/channel-fixture'},status:{running:true,delivery:{sending_replies:1,sending_images:0}}}];
+$('finish').hidden=false;$('finish').onclick=()=>{connections.forEach(row=>{row.status.delivery.sending_replies=0;row.status.delivery.sending_images=0;});PhoenixChannels.render($('channels'));};
+}
+PhoenixChannels.render($('channels'));$('theme').onclick=()=>document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';$('recovery').onclick=()=>{if(!connections.length)return;connections[0].status={running:false,delivery:{uncertain_replies:1,review_deliveries:[{id:'fixture_reply_1',state:'uncertain'}]}};connections[0].desktop_worker=false;PhoenixChannels.render($('channels'));};
+</script></body></html>

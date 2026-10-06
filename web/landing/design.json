@@ -1,0 +1,75 @@
+{
+  "action": "review_blueprint",
+  "page": {
+    "product": "Phoenix",
+    "category": "Desktop app with AI coworkers",
+    "audience": "People working with research, websites, code, files and apps on a computer",
+    "offer": "Keep the task, tools, files and named coworkers together in one desktop workspace",
+    "primary_action": "See how Phoenix works",
+    "sections": [
+      {
+        "id": "top",
+        "heading": "AI coworkers. On your computer.",
+        "body": ["Phoenix is a desktop app that helps you research, build websites, write code, and work with files and apps."],
+        "actions": [{"label": "See how Phoenix works", "target": "#tour"}],
+        "evidence": ["README.md:7-32; actual product captures in assets/provenance.json"],
+        "user_question": "What is Phoenix and why would I use it?",
+        "purpose": "Explain the literal product category and practical work before showing it.",
+        "dependencies": [],
+        "composition": "1280px contained, 60/40 split type and explanation, 100px maximum sans headline; a full-width real product screenshot follows. No scenic hero or invented dashboard chrome.",
+        "compact": "Stack title and explanation; preserve both in reading order. Keep task facts and the first CTA before the actual interface image.",
+        "motion": "First viewport is visible immediately. Hover motion is 1px; reduced motion disables it. No animated entrance hiding the main explanation."
+      },
+      {
+        "id": "capabilities",
+        "heading": "Not just an answer. A place to do the work.",
+        "body": ["Start from a task, not a list of tools. Phoenix brings the conversation, files, browser and coworkers together."],
+        "actions": [{"label": "Copy this brief", "target": "clipboard:example-brief"}],
+        "evidence": ["README.md:7-15; src/tools/mod.rs; existing coworker definitions"],
+        "user_question": "What could I actually ask it to do?",
+        "purpose": "Four practical examples, what each produces, and relevant coworkers. Explicitly not a running model.",
+        "dependencies": ["top"],
+        "composition": "40/60 task index and one changing brief panel, separated by 64px. A task list, not three generic feature cards.",
+        "compact": "Two-column task picker above the single brief panel; native keyboard tab/arrow behavior remains.",
+        "motion": "Selection updates content directly, with stable panel height; optional one-time heading entrance only when initially below the viewport."
+      },
+      {
+        "id": "team",
+        "heading": "Meet your other coworkers.",
+        "body": ["Talk to Phoenix to coordinate a task, or go straight to the coworker you need. Their roles make the work easier to follow."],
+        "evidence": ["README.md:17-32"],
+        "user_question": "Who does what?",
+        "purpose": "Explain persistent role identities without anthropomorphic capability promises or a fake customer roster.",
+        "dependencies": ["capabilities"],
+        "composition": "Narrow introduction beside a ruled two-column directory; selected coworker has an explicit description; other six roles are behind a native disclosure.",
+        "compact": "Introduction, directory, description and disclosure stack. Every role remains readable.",
+        "motion": "Small selected monogram tilt only; all content remains usable without motion."
+      },
+      {
+        "id": "control",
+        "heading": "Your computer. Your call.",
+        "body": ["Phoenix gives AI tools access to real work. That makes clear boundaries just as important as capability."],
+        "evidence": ["README.md:43-51,64-76; actual settings capture"],
+        "user_question": "What access does it have and where does my data go?",
+        "purpose": "Explain workspaces, provider choice and visible activity. Clearly disclose local-first is not offline AI.",
+        "dependencies": ["top"],
+        "composition": "Product control explanation beside a real settings capture. Definitions are readable rows, not decorative stats.",
+        "compact": "Explanation precedes the screenshot and explicit data-flow note; no hidden warning in a tooltip.",
+        "motion": "Static real image; minor one-time heading entrance with reduced-motion fallback."
+      },
+      {
+        "id": "questions",
+        "heading": "A few straight answers.",
+        "body": ["Phoenix is in development, with Linux as its current target. This page is a product preview."],
+        "actions": [{"label": "Read the release status", "target": "dialog:release-status"}],
+        "evidence": ["README.md:43,74-76; no public-release/signup endpoint configured for this page"],
+        "user_question": "Can I use it yet, and what should I expect?",
+        "purpose": "Direct answers about release, supported provider routes, permissions and reliability limitations. No invented download, price, date or waitlist.",
+        "dependencies": ["capabilities", "control"],
+        "composition": "Editorial left title plus five native details rows, each answering one question.",
+        "compact": "Single-column native disclosures, comfortable touch targets and visible focus.",
+        "motion": "No animated content hiding; native disclosure behavior."
+      }
+    ]
+  }
+}

@@ -1,0 +1,50 @@
+[package]
+name = "phoenix-desktop"
+version = "0.1.0"
+edition = "2021"
+description = "Phoenix — the desktop workspace for the Phoenix agent gateway."
+
+# Standalone crate on purpose: it talks to the gateway over the WS bridge and
+# the filesystem (~/.phoenix), never links the agent — GUI rebuilds must not
+# recompile the runtime, and the app stays a thin renderer of the same wire.
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+toml = "0.8"
+# Chain reordering edits config.toml IN PLACE — toml_edit preserves the
+# user's comments/formatting where a toml::Value round-trip would nuke them.
+toml_edit = "0.22"
+tauri-plugin-dialog = "2.7.1"
+# Unix detach (setsid + double-fork) so the gateway is not a desktop child / zombie.
+libc = "0.2"
+# Decode pasted/dropped image data URLs → bytes on disk (save_attachment).
+base64 = "0.22"
+# Lossless, display-sized wallpaper derivatives. Already linked transitively by
+# GTK/Tauri; declaring it directly adds no native runtime dependency.
+gdk-pixbuf = "0.18"
+# Stable collision-resistant cache keys (already present transitively).
+sha2 = "0.10"
+# Native voice lanes: credentials stay in Rust and never enter the webview or
+# a visible curl command line.
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "json", "multipart", "rustls"] }
+zeroize = "1"
+# Read-only canonical conversation-owner checks. The desktop remains a thin
+# shell: it queries only the two directory projection columns needed to bind a
+# requested transcript to the selected Canvas item.
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+[target.'cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd", target_os = "netbsd"))'.dependencies]
+webkit2gtk = { version = "=2.0", features = ["v2_40"] }
+gtk = "0.18"
+gdkx11 = "0.18"
+x11 = { version = "2.21", features = ["xlib"] }
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[profile.release]
+strip = true

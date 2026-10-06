@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-font="apfel">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Phoenix — Character studio</title>
+  <link rel="stylesheet" href="theme.css?v=20260918-porcelain-graphite">
+  <link rel="stylesheet" href="sidekick-studio.css?v=20260920-models">
+  <script defer src="sidekicks-bundle.js?v=20260920-models"></script>
+  <script defer src="sidekick-studio.js?v=20260920-models"></script>
+  <link rel="stylesheet" href="components.css?v=20260926a">
+  <script src="components.js?v=20260926a" defer></script>
+</head>
+<body>
+  <header class="studio-header">
+    <div class="studio-brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="m16 3 11 6.5v13L16 29 5 22.5v-13Z M5 9.5 16 16l11-6.5 M16 16v13 M16 3v13"/></svg>
+      <span>Phoenix <span class="brand-divider">/</span> <strong>Character studio</strong></span>
+    </div>
+    <div class="surface-choice" role="group" aria-label="Workbench surface">
+      <button type="button" data-surface="light" aria-pressed="true">Light</button>
+      <button type="button" data-surface="dark" aria-pressed="false">Dark</button>
+    </div>
+  </header>
+
+  <main class="studio-layout">
+    <aside class="model-library" aria-labelledby="library-title">
+      <div class="section-heading"><span class="eyebrow">Collection / 04</span><h1 id="library-title">Sidekicks</h1></div>
+      <p class="library-intro">A little character, from every angle.</p>
+      <div class="model-grid" role="group" aria-label="Select a character">
+        <button class="model-card" type="button" data-select-model="ember" aria-pressed="true" aria-label="Select Ember">
+          <span class="model-number">01</span>
+          <canvas class="phoenix-sidekick" data-sidekick="ember" data-color="#e55732" data-expression="bright" data-sidekick-static="true" width="128" height="128" aria-hidden="true"></canvas>
+          <span class="model-card-name">Ember <span aria-hidden="true">↗</span></span>
+        </button>
+        <button class="model-card" type="button" data-select-model="cinder" aria-pressed="false" aria-label="Select Cinder">
+          <span class="model-number">02</span>
+          <canvas class="phoenix-sidekick" data-sidekick="cinder" data-color="#7d8c9c" data-expression="bright" data-sidekick-static="true" width="128" height="128" aria-hidden="true"></canvas>
+          <span class="model-card-name">Cinder <span aria-hidden="true">↗</span></span>
+        </button>
+        <button class="model-card" type="button" data-select-model="kiln" aria-pressed="false" aria-label="Select Kiln">
+          <span class="model-number">03</span>
+          <canvas class="phoenix-sidekick" data-sidekick="kiln" data-color="#c49b62" data-expression="bright" data-sidekick-static="true" width="128" height="128" aria-hidden="true"></canvas>
+          <span class="model-card-name">Kiln <span aria-hidden="true">↗</span></span>
+        </button>
+        <button class="model-card" type="button" data-select-model="wisp" aria-pressed="false" aria-label="Select Wisp">
+          <span class="model-number">04</span>
+          <canvas class="phoenix-sidekick" data-sidekick="wisp" data-color="#84aa9f" data-expression="bright" data-sidekick-static="true" width="128" height="128" aria-hidden="true"></canvas>
+          <span class="model-card-name">Wisp <span aria-hidden="true">↗</span></span>
+        </button>
+      </div>
+      <div class="mesh-note">
+        <span class="eyebrow">Made in code</span>
+        <h2>Fully modeled in 3D.</h2>
+        <p>Each sidekick is built from procedural meshes. Inspect its shape, change its expression, and take the geometry with you.</p>
+      </div>
+    </aside>
+
+    <section class="preview-column" aria-labelledby="selected-name">
+      <div class="viewport-panel">
+        <header class="viewport-header">
+          <div class="selected-title"><span id="selected-number">01</span><h2 id="selected-name">Ember</h2></div>
+          <span class="mesh-badge"><span aria-hidden="true"></span> Live mesh</span>
+        </header>
+        <div class="character-viewport">
+          <canvas id="selected-model" class="phoenix-sidekick" data-sidekick="ember" data-color="#e55732" data-expression="bright" data-sidekick-interactive="true" data-sidekick-rotate="true" width="800" height="680" tabindex="0" role="img" aria-label="Ember 3D model. Drag or use arrow keys to rotate." aria-describedby="rotation-help"></canvas>
+          <span class="axis-hint" aria-hidden="true"><span>Y</span><i></i><span>X</span></span>
+        </div>
+        <div class="viewport-footer">
+          <p id="rotation-help">Drag to rotate <span>·</span> Arrow keys to turn</p>
+          <div class="viewport-actions">
+            <button type="button" id="reset-view" title="Reset rotation (Home)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8a7 7 0 1 1 .8 6 M3 3v5h5"/></svg><span>Reset</span></button>
+            <button type="button" id="toggle-motion" aria-pressed="false" title="Pause motion (Space)"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 4v12 M13 4v12"/></svg><span>Pause</span></button>
+          </div>
+        </div>
+      </div>
+
+      <section class="native-panel" aria-labelledby="native-title">
+        <header><h2 id="native-title">At actual size</h2><p id="native-framing-note">Portrait crop at 24, 32 and 48 px.</p></header>
+        <div class="native-grid">
+          <div class="native-example"><div class="native-frame"><canvas class="phoenix-sidekick native-canvas" data-native-size="24" data-sidekick="ember" data-color="#e55732" data-expression="bright" data-sidekick-static="true" width="24" height="24" style="--native-size:24px" role="img" aria-label="Ember at 24 pixels"></canvas></div><span>24 px</span></div>
+          <div class="native-example"><div class="native-frame"><canvas class="phoenix-sidekick native-canvas" data-native-size="32" data-sidekick="ember" data-color="#e55732" data-expression="bright" data-sidekick-static="true" width="32" height="32" style="--native-size:32px" role="img" aria-label="Ember at 32 pixels"></canvas></div><span>32 px</span></div>
+          <div class="native-example"><div class="native-frame"><canvas class="phoenix-sidekick native-canvas" data-native-size="48" data-sidekick="ember" data-color="#e55732" data-expression="bright" data-sidekick-static="true" width="48" height="48" style="--native-size:48px" role="img" aria-label="Ember at 48 pixels"></canvas></div><span>48 px</span></div>
+          <div class="native-example"><div class="native-frame"><canvas class="phoenix-sidekick native-canvas" data-native-size="96" data-sidekick="ember" data-color="#e55732" data-expression="bright" data-sidekick-static="true" width="96" height="96" style="--native-size:96px" role="img" aria-label="Ember at 96 pixels"></canvas></div><span>96 px</span></div>
+        </div>
+      </section>
+    </section>
+
+    <aside class="inspector" aria-labelledby="inspector-title">
+      <div class="section-heading"><span class="eyebrow">Workbench</span><h2 id="inspector-title">Make an expression.</h2></div>
+      <fieldset class="control-block expression-control"><legend>Expression</legend>
+        <div class="expression-grid">
+          <button type="button" data-expression-choice="bright" aria-pressed="true">Bright</button>
+          <button type="button" data-expression-choice="joy" aria-pressed="false">Joy</button>
+          <button type="button" data-expression-choice="calm" aria-pressed="false">Calm</button>
+          <button type="button" data-expression-choice="curious" aria-pressed="false">Curious</button>
+          <button type="button" data-expression-choice="mischief" aria-pressed="false">Mischief</button>
+          <button type="button" data-expression-choice="sleepy" aria-pressed="false">Sleepy</button>
+        </div>
+      </fieldset>
+      <fieldset class="control-block"><legend>Character color</legend>
+        <div class="color-control"><input type="color" id="character-color" value="#e55732" aria-label="Choose character color"><label for="color-hex" class="sr-only">Character hex color</label><input id="color-hex" type="text" value="#e55732" maxlength="7" pattern="#[0-9a-fA-F]{6}" spellcheck="false" autocomplete="off"><button id="reset-color" type="button" aria-label="Restore this character’s color" title="Restore character color">↺</button></div>
+      </fieldset>
+      <div class="control-block view-options">
+        <label class="toggle-line" for="wireframe"><span>Wireframe<small>Inspect the mesh topology</small></span><input class="ph-switch" type="checkbox" id="wireframe"></label>
+        <label class="toggle-line" for="auto-rotate"><span>Turntable<small>Rotate the selected character</small></span><input class="ph-switch" type="checkbox" id="auto-rotate" checked></label>
+        <p id="motion-note" class="motion-note">Motion stays gentle. Space pauses it.</p>
+      </div>
+      <section class="geometry-details" aria-labelledby="geometry-title">
+        <h3 id="geometry-title">Model details</h3>
+        <dl><div><dt>Meshes</dt><dd id="mesh-count">—</dd></div><div><dt>Triangles</dt><dd id="triangle-count">—</dd></div><div><dt>Materials</dt><dd id="material-count">—</dd></div></dl>
+        <span class="geometry-format">Procedural geometry / PBR materials</span>
+      </section>
+      <div class="export-panel">
+        <button type="button" id="export-model" class="export-button"><span>Export .glb</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v11 M6 9l4 4 4-4 M3 14v3h14v-3"/></svg></button>
+        <p>Includes the selected mesh, materials and expression pose.</p>
+      </div>
+      <p id="studio-status" class="studio-status" role="status" aria-live="polite">Preparing the meshes…</p>
+      <button type="button" id="retry-preview" class="retry-button" hidden>Retry 3D preview</button>
+    </aside>
+  </main>
+  <footer class="studio-footer"><span>Phoenix sidekicks</span><span>Procedural meshes · Interactive 3D · GLB export</span></footer>
+  <noscript><p class="script-notice">Enable JavaScript to build and inspect the procedural 3D characters.</p></noscript>
+</body>
+</html>

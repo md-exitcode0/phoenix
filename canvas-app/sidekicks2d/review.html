@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Phoenix 2D sidekick review</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background:#f4f0e9; color:#272321; }
+    * { box-sizing:border-box; }
+    body { margin:0; padding:32px; }
+    header { max-width:1200px; margin:0 auto 24px; }
+    h1 { margin:0 0 7px; font-size:25px; }
+    header p { margin:0; color:#736b64; font-size:13px; }
+    main { max-width:1200px; margin:auto; display:grid; gap:18px; grid-template-columns:repeat(2,minmax(0,1fr)); }
+    section { background:#fbf9f5; border-radius:18px; padding:18px; box-shadow:0 7px 28px rgba(48,39,31,.07); }
+    .head { display:flex; justify-content:space-between; gap:12px; align-items:baseline; margin-bottom:15px; }
+    .head strong { font-size:15px; }
+    .head span { color:#8a7f76; font-size:11px; }
+    .sizes { display:flex; min-height:112px; align-items:flex-end; justify-content:space-around; gap:14px; padding:10px 6px 4px; background:#272321; border-radius:13px; }
+    .sample { display:grid; justify-items:center; align-content:end; gap:7px; color:#bcb1a7; font-size:10px; }
+    .sample i { display:block; }
+    .sample svg { display:block; width:100%; height:100%; overflow:visible; }
+    .states { margin-top:12px; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:7px; }
+    .state { min-width:0; display:grid; place-items:center; gap:5px; padding:8px 4px; border-radius:10px; background:#f1ece5; color:#756c65; font-size:9px; text-align:center; }
+    .state i { width:42px; height:42px; display:block; }
+    .state svg { width:100%; height:100%; display:block; overflow:visible; }
+    .clean { margin-top:12px; display:flex; align-items:center; gap:12px; color:#756c65; font-size:11px; }
+    .clean i { width:52px; height:52px; display:block; flex:0 0 52px; }
+    .clean svg { width:100%; height:100%; display:block; overflow:visible; }
+    @media (max-width:850px) { main { grid-template-columns:1fr; } body { padding:18px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Phoenix procedural fire forms</h1>
+    <p>Combined acceptance surface. Exact CSS size ladder plus eye-state stress and clean-vs-fiery comparison.</p>
+  </header>
+  <main id="grid"></main>
+  <script type="module">
+    import { FAMILIES } from './runtime.mjs';
+    const eyes = ['round','spark','slit','visor','closed'];
+    const sizes = [24,32,48,96];
+    const grid = document.querySelector('#grid');
+    let uid = 0;
+    for (const family of FAMILIES) {
+      const section = document.createElement('section');
+      const render = (options) => family.render({color:'#e55732', fiery:true, expression:'focused', eyeStyle:'slit', uid:`review-${family.id}-${uid++}`, ...options});
+      section.innerHTML = `
+        <div class="head"><strong>${family.label}</strong><span>${family.id}</span></div>
+        <div class="sizes">${sizes.map(size => `<div class="sample"><i style="width:${size}px;height:${size}px">${render({})}</i><span>${size}px</span></div>`).join('')}</div>
+        <div class="states">${eyes.map((eyeStyle,index) => `<div class="state"><i>${render({eyeStyle,expression:['bright','joy','curious','mischief','determined'][index]})}</i><span>${eyeStyle}</span></div>`).join('')}</div>
+        <div class="clean"><i>${render({fiery:false,eyeStyle:'visor',expression:'calm'})}</i><span>Clean form · visor · calm</span></div>
+      `;
+      grid.append(section);
+    }
+  </script>
+</body>
+</html>

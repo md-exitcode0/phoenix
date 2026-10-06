@@ -1,0 +1,63 @@
+[package]
+name = "cognee-search"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Context retrieval (search) over the cognee knowledge graph and vector store."
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+telemetry = ["cognee-telemetry/telemetry"]
+
+[dependencies]
+cognee-embedding = { path = "../embedding", version = "0.1.1" }
+cognee-database = { path = "../database", version = "0.1.1" }
+cognee-graph = { path = "../graph", version = "0.1.1" }
+cognee-llm = { path = "../llm", version = "0.1.1" }
+cognee-session = { path = "../session", version = "0.1.1", features = ["sea-orm-store"] }
+cognee-telemetry = { path = "../telemetry", version = "0.1.1" }
+cognee-utils = { path = "../utils", version = "0.1.1" }
+cognee-vector = { path = "../vector", version = "0.1.1" }
+
+async-trait.workspace = true
+indexmap = "2"
+regex = "1"
+tokio = { workspace = true, features = ["sync"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+chrono.workspace = true
+schemars.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+uuid = { workspace = true, features = ["serde", "v4"] }
+
+[dev-dependencies]
+cognee-core      = { path = "../core" }
+cognee-database  = { path = "../database" }
+cognee-embedding  = { path = "../embedding", features = ["onnx"] }
+cognee-graph      = { path = "../graph", features = ["testing", "ladybug"] }
+cognee-vector     = { path = "../vector", features = ["testing"] }
+cognee-models     = { path = "../models" }
+cognee-storage    = { path = "../storage" }
+cognee-ingestion  = { path = "../ingestion" }
+cognee-cognify    = { path = "../cognify" }
+cognee-ontology   = { path = "../ontology" }
+cognee-delete     = { path = "../delete" }
+# `mock` enables cassette record/replay (ReplayLlm/RecordingLlm) for the
+# integration tests — see crates/cognify/Cargo.toml for the unification note.
+cognee-llm        = { path = "../llm", features = ["mock"] }
+cognee-session    = { path = "../session", features = ["fs"] }
+cognee-test-utils = { path = "../test-utils" }
+dotenv.workspace = true
+serial_test.workspace = true
+tempfile.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

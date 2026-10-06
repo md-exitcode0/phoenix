@@ -1,0 +1,2401 @@
+{
+  "definitions": [
+    {
+      "key": "appearance.theme",
+      "section": "Appearance",
+      "label": "Theme",
+      "description": "Use Phoenix in light, dark, or system-matched mode.",
+      "keywords": [
+        "appearance",
+        "theme"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "light",
+            "label": "Light"
+          },
+          {
+            "value": "dark",
+            "label": "Dark"
+          },
+          {
+            "value": "system",
+            "label": "System"
+          }
+        ]
+      },
+      "default": "light",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.motion",
+      "section": "Appearance",
+      "label": "Motion",
+      "description": "Controls interface and agent activity animation intensity.",
+      "keywords": [
+        "appearance",
+        "motion"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "full",
+            "label": "Full"
+          },
+          {
+            "value": "reduced",
+            "label": "Reduced"
+          },
+          {
+            "value": "minimal",
+            "label": "Minimal"
+          }
+        ]
+      },
+      "default": "full",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.interface_scale",
+      "section": "Appearance",
+      "label": "Interface scale",
+      "description": "Scales the full desktop interface.",
+      "keywords": [
+        "appearance",
+        "interface",
+        "scale"
+      ],
+      "control": {
+        "kind": "number",
+        "min": 0.8,
+        "max": 1.4,
+        "step": 0.05
+      },
+      "default": 1.0,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.font",
+      "section": "Appearance",
+      "label": "Interface font",
+      "description": "Phoenix uses Apfel Grotezk throughout the interface.",
+      "keywords": [
+        "appearance",
+        "font"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "apfel",
+            "label": "Apfel Grotezk"
+          }
+        ]
+      },
+      "default": "apfel",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.background",
+      "section": "Appearance",
+      "label": "Background",
+      "description": "Selects the subtle Phoenix background treatment.",
+      "keywords": [
+        "appearance",
+        "background"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "phoenix",
+            "label": "Phoenix"
+          },
+          {
+            "value": "mountains",
+            "label": "Mountains"
+          },
+          {
+            "value": "none",
+            "label": "None"
+          }
+        ]
+      },
+      "default": "phoenix",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.coworker_icon_style",
+      "section": "Appearance",
+      "label": "Coworker fire",
+      "description": "Every coworker uses the same fire, tinted with their color.",
+      "keywords": [
+        "appearance",
+        "coworker",
+        "icon",
+        "style"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "flame_crests",
+            "label": "Rising fire"
+          },
+          {
+            "value": "bird_family",
+            "label": "Winged fire"
+          },
+          {
+            "value": "character_glyphs",
+            "label": "Split crest"
+          }
+        ]
+      },
+      "default": "flame_crests",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.stage_fire",
+      "section": "Appearance",
+      "label": "Conversation fire",
+      "description": "Washes the conversation with the same ember field as the company rail.",
+      "keywords": [
+        "appearance",
+        "stage",
+        "fire"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "full",
+            "label": "Full"
+          },
+          {
+            "value": "low",
+            "label": "Low"
+          },
+          {
+            "value": "off",
+            "label": "Off"
+          }
+        ]
+      },
+      "default": "full",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.icon_flicker",
+      "section": "Appearance",
+      "label": "Fire motion",
+      "description": "Idle flicker on coworker fire. Transform-only so it stays on the compositor.",
+      "keywords": [
+        "appearance",
+        "icon",
+        "flicker"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "on",
+            "label": "Alive"
+          },
+          {
+            "value": "off",
+            "label": "Still"
+          }
+        ]
+      },
+      "default": "on",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.type_size",
+      "section": "Appearance",
+      "label": "Type size",
+      "description": "Scales settings and conversation type without zooming the window.",
+      "keywords": [
+        "appearance",
+        "type",
+        "size"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "small",
+            "label": "Small"
+          },
+          {
+            "value": "regular",
+            "label": "Regular"
+          },
+          {
+            "value": "large",
+            "label": "Large"
+          }
+        ]
+      },
+      "default": "regular",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.rail_weight",
+      "section": "Appearance",
+      "label": "Prompt rail",
+      "description": "How loud the left prompt markers are.",
+      "keywords": [
+        "appearance",
+        "rail",
+        "weight"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "bold",
+            "label": "Bold"
+          },
+          {
+            "value": "regular",
+            "label": "Quiet"
+          }
+        ]
+      },
+      "default": "bold",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.composer_glow",
+      "section": "Appearance",
+      "label": "Composer focus",
+      "description": "Warm ember ring when the composer is focused.",
+      "keywords": [
+        "appearance",
+        "composer",
+        "glow"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "ember",
+            "label": "Ember"
+          },
+          {
+            "value": "quiet",
+            "label": "Quiet"
+          }
+        ]
+      },
+      "default": "ember",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.reduce_transparency",
+      "section": "Appearance",
+      "label": "Reduce transparency",
+      "description": "Uses opaque surfaces and disables backdrop blur.",
+      "keywords": [
+        "appearance",
+        "reduce",
+        "transparency"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": false,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.grain",
+      "section": "Appearance",
+      "label": "Film grain",
+      "description": "Adds a very subtle surface texture. Off by default: the overlay can paint a black tile on WebKitGTK.",
+      "keywords": [
+        "appearance",
+        "grain"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": false,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.conversation_view",
+      "section": "Appearance",
+      "label": "Conversation detail",
+      "description": "Compact keeps the thread scannable and folds code out of the way. Detailed shows the agent's edits inline as syntax-highlighted code.",
+      "keywords": [
+        "appearance",
+        "conversation",
+        "view"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "compact",
+            "label": "Compact"
+          },
+          {
+            "value": "detailed",
+            "label": "Detailed"
+          }
+        ]
+      },
+      "default": "compact",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.density",
+      "section": "Appearance",
+      "label": "Density",
+      "description": "How tight the company rail, settings rows, and composer chrome sit.",
+      "keywords": [
+        "appearance",
+        "density"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "comfortable",
+            "label": "Comfortable"
+          },
+          {
+            "value": "compact",
+            "label": "Compact"
+          }
+        ]
+      },
+      "default": "comfortable",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.radius",
+      "section": "Appearance",
+      "label": "Corners",
+      "description": "Rounded or sharp edges on cards, the composer, and menus.",
+      "keywords": [
+        "appearance",
+        "radius"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "sharp",
+            "label": "Sharp"
+          },
+          {
+            "value": "soft",
+            "label": "Soft"
+          },
+          {
+            "value": "round",
+            "label": "Round"
+          }
+        ]
+      },
+      "default": "soft",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.sidebar_fire",
+      "section": "Appearance",
+      "label": "Sidebar fire",
+      "description": "Warm wash behind the company rail.",
+      "keywords": [
+        "appearance",
+        "sidebar",
+        "fire"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "full",
+            "label": "Full"
+          },
+          {
+            "value": "low",
+            "label": "Low"
+          },
+          {
+            "value": "off",
+            "label": "Off"
+          }
+        ]
+      },
+      "default": "full",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.contrast",
+      "section": "Appearance",
+      "label": "Contrast",
+      "description": "Ink strength against the paper.",
+      "keywords": [
+        "appearance",
+        "contrast"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "soft",
+            "label": "Soft"
+          },
+          {
+            "value": "standard",
+            "label": "Standard"
+          },
+          {
+            "value": "high",
+            "label": "High"
+          }
+        ]
+      },
+      "default": "standard",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.feed",
+      "section": "Appearance",
+      "label": "Conversation width",
+      "description": "How wide the thread sits in the stage.",
+      "keywords": [
+        "appearance",
+        "feed"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "narrow",
+            "label": "Narrow"
+          },
+          {
+            "value": "regular",
+            "label": "Regular"
+          },
+          {
+            "value": "wide",
+            "label": "Wide"
+          }
+        ]
+      },
+      "default": "regular",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "appearance.accent",
+      "section": "Appearance",
+      "label": "Accent",
+      "description": "The ember color used for fire, checks, and focus.",
+      "keywords": [
+        "appearance",
+        "accent"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "ember",
+            "label": "Ember"
+          },
+          {
+            "value": "gold",
+            "label": "Gold"
+          },
+          {
+            "value": "rose",
+            "label": "Rose"
+          },
+          {
+            "value": "copper",
+            "label": "Copper"
+          }
+        ]
+      },
+      "default": "ember",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "sidebar.width",
+      "section": "General",
+      "label": "Sidebar width",
+      "description": "Default expanded width; the sidebar remains directly resizable.",
+      "keywords": [
+        "sidebar",
+        "width"
+      ],
+      "control": {
+        "kind": "number",
+        "min": 272.0,
+        "max": 432.0,
+        "step": 8.0
+      },
+      "default": 336,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "sidebar.prompt_rail_count",
+      "section": "General",
+      "label": "Visible prompt markers",
+      "description": "How many recent user prompts appear in conversation navigation at once.",
+      "keywords": [
+        "sidebar",
+        "prompt",
+        "rail",
+        "count"
+      ],
+      "control": {
+        "kind": "number",
+        "min": 4.0,
+        "max": 10.0,
+        "step": 1.0
+      },
+      "default": 6,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "conversation.initial_visible_turns",
+      "section": "General",
+      "label": "Recent turns on open",
+      "description": "Render this many recent user turns immediately. Older turns stay complete and load smoothly when you scroll upward.",
+      "keywords": [
+        "conversation",
+        "initial",
+        "visible",
+        "turns"
+      ],
+      "control": {
+        "kind": "number",
+        "min": 5.0,
+        "max": 50.0,
+        "step": 1.0
+      },
+      "default": 5,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "composer.default_permission",
+      "section": "Composer",
+      "label": "Default access",
+      "description": "Default access for new messages; per-message changes remain sticky per agent.",
+      "keywords": [
+        "composer",
+        "default",
+        "permission"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "talk",
+            "label": "Talk"
+          },
+          {
+            "value": "workspace",
+            "label": "Workspace"
+          },
+          {
+            "value": "full_access",
+            "label": "Full access"
+          }
+        ]
+      },
+      "default": "workspace",
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "composer.show_context_usage",
+      "section": "Composer",
+      "label": "Show context usage",
+      "description": "Shows live model context usage beside the context-window slider.",
+      "keywords": [
+        "composer",
+        "show",
+        "context",
+        "usage"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "composer.show_reasoning",
+      "section": "Composer",
+      "label": "Show reasoning",
+      "description": "Shows model reasoning when the provider exposes it.",
+      "keywords": [
+        "composer",
+        "show",
+        "reasoning"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "composer.send_shortcut",
+      "section": "Composer",
+      "label": "Send shortcut",
+      "description": "Keyboard shortcut used to send a message.",
+      "keywords": [
+        "composer",
+        "send",
+        "shortcut"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "enter",
+            "label": "Enter"
+          },
+          {
+            "value": "cmd_enter",
+            "label": "Cmd/Ctrl + Enter"
+          }
+        ]
+      },
+      "default": "enter",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "agents.collaboration_enabled",
+      "section": "Agents & Groups",
+      "label": "Agent collaboration",
+      "description": "Allows coworkers to delegate and talk to one another.",
+      "keywords": [
+        "agents",
+        "collaboration",
+        "enabled"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "agents.volume_workers_enabled",
+      "section": "Agents & Groups",
+      "label": "Volume workers",
+      "description": "Enables temporary workers for independent batch items. Workers inherit the caller's permission mode and receive isolated terminal, desktop, and browser contexts; they clean themselves up when done or cancelled.",
+      "keywords": [
+        "agents",
+        "volume",
+        "workers",
+        "enabled"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "agents.volume_worker_limit",
+      "section": "Agents & Groups",
+      "label": "Default worker concurrency",
+      "description": "Default parallelism when a batch does not choose its own. An explicit batch can use all of its independent items; Phoenix imposes no fixed worker-count ceiling.",
+      "keywords": [
+        "agents",
+        "volume",
+        "worker",
+        "limit"
+      ],
+      "control": {
+        "kind": "number",
+        "min": 1.0,
+        "max": 4294967295.0,
+        "step": 1.0
+      },
+      "default": 8,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "agents.volume_workers_enabled",
+          "equals": true,
+          "reason": "Turn on volume workers first."
+        }
+      ]
+    },
+    {
+      "key": "agents.outside_group_approval",
+      "section": "Agents & Groups",
+      "label": "Approve outside-group calls",
+      "description": "Ask once before a group calls a coworker outside the group.",
+      "keywords": [
+        "agents",
+        "outside",
+        "group",
+        "approval"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "agents.collaboration_enabled",
+          "equals": true,
+          "reason": "Turn on agent collaboration first."
+        }
+      ]
+    },
+    {
+      "key": "agents.read_group_transcript",
+      "section": "Agents & Groups",
+      "label": "Read group transcript",
+      "description": "Pinged coworkers receive the relevant group transcript by default.",
+      "keywords": [
+        "agents",
+        "read",
+        "group",
+        "transcript"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "agents.collaboration_enabled",
+          "equals": true,
+          "reason": "Turn on agent collaboration first."
+        }
+      ]
+    },
+    {
+      "key": "agents.model_assignment",
+      "section": "Models & Providers",
+      "label": "Agent model policy",
+      "description": "Whether coworkers inherit the company model or use individual assignments.",
+      "keywords": [
+        "agents",
+        "model",
+        "assignment"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "inherit",
+            "label": "Company default"
+          },
+          {
+            "value": "individual",
+            "label": "Per agent"
+          }
+        ]
+      },
+      "default": "individual",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "models.fallback_enabled",
+      "section": "Models & Providers",
+      "label": "Automatic fallbacks",
+      "description": "Try connected accounts with the selected model first, then explicitly configured provider backups.",
+      "keywords": [
+        "models",
+        "fallback",
+        "enabled"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "permissions.action_review",
+      "section": "Permissions",
+      "label": "Adaptive action review",
+      "description": "Reviews every tool at the shared runtime boundary. Shadow records anomalies without blocking; Enforce blocks only high-confidence dangerous actions. Existing exact-action approvals remain authoritative.",
+      "keywords": [
+        "permissions",
+        "action",
+        "review"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "shadow",
+            "label": "Shadow"
+          },
+          {
+            "value": "enforce",
+            "label": "Enforce"
+          },
+          {
+            "value": "off",
+            "label": "Off"
+          }
+        ]
+      },
+      "default": "shadow",
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "permissions.shell_isolation",
+      "section": "Permissions",
+      "label": "Workspace shell isolation",
+      "description": "Runs Workspace-mode shell commands in an OS sandbox that hides user homes, mounts only the project and private build caches writable, and separates process, IPC, and host identity namespaces. Full Access intentionally runs outside this boundary.",
+      "keywords": [
+        "permissions",
+        "shell",
+        "isolation"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "auto",
+            "label": "Automatic"
+          },
+          {
+            "value": "require",
+            "label": "Require sandbox"
+          },
+          {
+            "value": "off",
+            "label": "Off"
+          }
+        ]
+      },
+      "default": "auto",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "permissions.login_import",
+      "section": "Permissions",
+      "label": "Cookie import approval",
+      "description": "Automatically copies portable site sessions from the active browser. Device-bound sessions are never copied.",
+      "keywords": [
+        "permissions",
+        "login",
+        "import"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "ask",
+            "label": "Ask once"
+          },
+          {
+            "value": "allow",
+            "label": "Allow"
+          },
+          {
+            "value": "deny",
+            "label": "Deny"
+          }
+        ]
+      },
+      "default": "allow",
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "permissions.account_creation",
+      "section": "Permissions",
+      "label": "Account creation approval",
+      "description": "Lets agents create free website accounts automatically. Paid plans always require fresh approval.",
+      "keywords": [
+        "permissions",
+        "account",
+        "creation"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "ask",
+            "label": "Ask"
+          },
+          {
+            "value": "allow_free",
+            "label": "Allow free accounts"
+          },
+          {
+            "value": "deny",
+            "label": "Deny"
+          }
+        ]
+      },
+      "default": "allow_free",
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "permissions.external_send",
+      "section": "Permissions",
+      "label": "External sends",
+      "description": "Requires approval before sending email, messages, or publishing externally.",
+      "keywords": [
+        "permissions",
+        "external",
+        "send"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "ask",
+            "label": "Ask"
+          },
+          {
+            "value": "allow",
+            "label": "Allow"
+          },
+          {
+            "value": "deny",
+            "label": "Deny"
+          }
+        ]
+      },
+      "default": "ask",
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "permissions.external_delete",
+      "section": "Permissions",
+      "label": "External deletions",
+      "description": "Controls approval before deleting, removing, revoking, or trashing data in connected services.",
+      "keywords": [
+        "permissions",
+        "external",
+        "delete"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "ask",
+            "label": "Ask"
+          },
+          {
+            "value": "allow",
+            "label": "Allow"
+          },
+          {
+            "value": "deny",
+            "label": "Deny"
+          }
+        ]
+      },
+      "default": "ask",
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "permissions.purchases",
+      "section": "Permissions",
+      "label": "Purchases and paid plans",
+      "description": "Monetary actions require explicit approval.",
+      "keywords": [
+        "permissions",
+        "purchases"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "always_ask",
+            "label": "Always ask"
+          },
+          {
+            "value": "deny",
+            "label": "Deny"
+          }
+        ]
+      },
+      "default": "always_ask",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "browser.enabled",
+      "section": "Browser & Accounts",
+      "label": "Browser tools",
+      "description": "Allows coworkers to use their private managed browser profiles.",
+      "keywords": [
+        "browser",
+        "enabled"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "browser.suspend_after_seconds",
+      "section": "Browser & Accounts",
+      "label": "Suspend idle browsers",
+      "description": "Persistent coworker browsers stay open until the gateway stops. Set a nonzero value only to opt into idle suspension.",
+      "keywords": [
+        "browser",
+        "suspend",
+        "after",
+        "seconds"
+      ],
+      "control": {
+        "kind": "number",
+        "min": 0.0,
+        "max": 86400.0,
+        "step": 60.0
+      },
+      "default": 0,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "browser.enabled",
+          "equals": true,
+          "reason": "Turn on browser tools first."
+        }
+      ]
+    },
+    {
+      "key": "browser.profile_source",
+      "section": "Browser & Accounts",
+      "label": "Managed browser profile source",
+      "description": "Chooses Phoenix's durable private profile or an existing Chromium profile source.",
+      "keywords": [
+        "browser",
+        "profile",
+        "source"
+      ],
+      "control": {
+        "kind": "text",
+        "max_length": 512
+      },
+      "default": "",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "browser.enabled",
+          "equals": true,
+          "reason": "Turn on browser tools first."
+        }
+      ]
+    },
+    {
+      "key": "browser.cookie_import_source",
+      "section": "Browser & Accounts",
+      "label": "Cookie import source",
+      "description": "Selects the installed browser used for portable sessions. Automatic follows the browser used most recently.",
+      "keywords": [
+        "browser",
+        "cookie",
+        "import",
+        "source"
+      ],
+      "control": {
+        "kind": "select",
+        "options": [
+          {
+            "value": "auto",
+            "label": "Automatic (recommended)"
+          },
+          {
+            "value": "none",
+            "label": "None"
+          },
+          {
+            "value": "chrome",
+            "label": "Chrome"
+          },
+          {
+            "value": "chromium",
+            "label": "Chromium"
+          },
+          {
+            "value": "brave",
+            "label": "Brave"
+          },
+          {
+            "value": "firefox",
+            "label": "Firefox"
+          },
+          {
+            "value": "zen",
+            "label": "Zen"
+          },
+          {
+            "value": "edge",
+            "label": "Edge"
+          },
+          {
+            "value": "librewolf",
+            "label": "LibreWolf"
+          },
+          {
+            "value": "floorp",
+            "label": "Floorp"
+          },
+          {
+            "value": "waterfox",
+            "label": "Waterfox"
+          },
+          {
+            "value": "vivaldi",
+            "label": "Vivaldi"
+          },
+          {
+            "value": "opera",
+            "label": "Opera"
+          }
+        ]
+      },
+      "default": "auto",
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "browser.enabled",
+          "equals": true,
+          "reason": "Turn on browser tools first."
+        }
+      ]
+    },
+    {
+      "key": "browser.headless",
+      "section": "Browser & Accounts",
+      "label": "Headless managed browser",
+      "description": "Runs background coworker browsers without a separate operating-system window.",
+      "keywords": [
+        "browser",
+        "headless"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "browser.enabled",
+          "equals": true,
+          "reason": "Turn on browser tools first."
+        }
+      ]
+    },
+    {
+      "key": "browser.attach_port",
+      "section": "Advanced",
+      "label": "Browser attach port",
+      "description": "CDP port used only when attaching to a compatible running Chromium browser.",
+      "keywords": [
+        "browser",
+        "attach",
+        "port"
+      ],
+      "control": {
+        "kind": "number",
+        "min": 1.0,
+        "max": 65535.0,
+        "step": 1.0
+      },
+      "default": 9222,
+      "advanced": true,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "browser.binary",
+      "section": "Advanced",
+      "label": "Custom Chromium binary",
+      "description": "Optional absolute path to a compatible browser binary; empty uses autodetection.",
+      "keywords": [
+        "browser",
+        "binary"
+      ],
+      "control": {
+        "kind": "text",
+        "max_length": 4096
+      },
+      "default": "",
+      "advanced": true,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "browser.auto_solve_captcha",
+      "section": "Browser & Accounts",
+      "label": "Automatic CAPTCHA handling",
+      "description": "Lets the managed stealth browser attempt supported challenges.",
+      "keywords": [
+        "browser",
+        "auto",
+        "solve",
+        "captcha"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "browser.enabled",
+          "equals": true,
+          "reason": "Turn on browser tools first."
+        }
+      ]
+    },
+    {
+      "key": "browser.account_creation",
+      "section": "Browser & Accounts",
+      "label": "Agent-created accounts",
+      "description": "Enables the create-account path when policy permits it.",
+      "keywords": [
+        "browser",
+        "account",
+        "creation"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "browser.enabled",
+          "equals": true,
+          "reason": "Turn on browser tools first."
+        }
+      ]
+    },
+    {
+      "key": "browser.automatic_2fa_handoff",
+      "section": "Browser & Accounts",
+      "label": "Automatic 2FA handoff",
+      "description": "Lets an agent request a verification code from the relevant coworker.",
+      "keywords": [
+        "browser",
+        "automatic",
+        "2fa",
+        "handoff"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "memory.enabled",
+      "section": "Memory",
+      "label": "Long-term memory",
+      "description": "Keeps Phoenix and coworkers grounded in durable memory.",
+      "keywords": [
+        "memory",
+        "enabled"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "memory.group_transcript_learning",
+      "section": "Memory",
+      "label": "Learn from group decisions",
+      "description": "Allows the librarian to retain durable decisions from group transcripts.",
+      "keywords": [
+        "memory",
+        "group",
+        "transcript",
+        "learning"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "memory.enabled",
+          "equals": true,
+          "reason": "Turn on long-term memory first."
+        }
+      ]
+    },
+    {
+      "key": "workflows.enabled",
+      "section": "Workflows & Routines",
+      "label": "Saved workflows",
+      "description": "Allows coworkers to match and run taught workflows.",
+      "keywords": [
+        "workflows",
+        "enabled"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "workflows.auto_run",
+      "section": "Workflows & Routines",
+      "label": "Run trusted workflows automatically",
+      "description": "Runs healthy trusted routines without re-teaching each step.",
+      "keywords": [
+        "workflows",
+        "auto",
+        "run"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "workflows.enabled",
+          "equals": true,
+          "reason": "Turn on saved workflows first."
+        }
+      ]
+    },
+    {
+      "key": "workflows.share_by_default",
+      "section": "Workflows & Routines",
+      "label": "Share new workflows",
+      "description": "New taught workflows default to company scope instead of the current coworker.",
+      "keywords": [
+        "workflows",
+        "share",
+        "by",
+        "default"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": false,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "workflows.enabled",
+          "equals": true,
+          "reason": "Turn on saved workflows first."
+        }
+      ]
+    },
+    {
+      "key": "workflows.failure_quarantine",
+      "section": "Workflows & Routines",
+      "label": "Quarantine failing workflows",
+      "description": "Marks repeatedly failing routines obsolete and asks what to do next.",
+      "keywords": [
+        "workflows",
+        "failure",
+        "quarantine"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "workflows.enabled",
+          "equals": true,
+          "reason": "Turn on saved workflows first."
+        }
+      ]
+    },
+    {
+      "key": "schedules.enabled",
+      "section": "Schedules",
+      "label": "Scheduled work",
+      "description": "Allows coworkers to create and run recurring or delayed work.",
+      "keywords": [
+        "schedules",
+        "enabled"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "notifications.enabled",
+      "section": "Notifications",
+      "label": "Notifications",
+      "description": "Enables Phoenix attention and completion notifications.",
+      "keywords": [
+        "notifications",
+        "enabled"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "notifications.system",
+      "section": "Notifications",
+      "label": "System notifications",
+      "description": "Uses the operating system notification service when supported.",
+      "keywords": [
+        "notifications",
+        "system"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": false,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "notifications.enabled",
+          "equals": true,
+          "reason": "Turn on notifications first."
+        }
+      ]
+    },
+    {
+      "key": "notifications.attention",
+      "section": "Notifications",
+      "label": "Attention requests",
+      "description": "Notifies when a coworker needs an answer, approval, login, or other input.",
+      "keywords": [
+        "notifications",
+        "attention"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "notifications.enabled",
+          "equals": true,
+          "reason": "Turn on notifications first."
+        }
+      ]
+    },
+    {
+      "key": "notifications.completions",
+      "section": "Notifications",
+      "label": "Finished work",
+      "description": "Notifies when the coworker you are talking to finishes a turn.",
+      "keywords": [
+        "notifications",
+        "completions"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "notifications.enabled",
+          "equals": true,
+          "reason": "Turn on notifications first."
+        }
+      ]
+    },
+    {
+      "key": "notifications.coworkers",
+      "section": "Notifications",
+      "label": "Coworker updates",
+      "description": "Notifies when a delegated coworker finishes or needs attention.",
+      "keywords": [
+        "notifications",
+        "coworkers"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "notifications.enabled",
+          "equals": true,
+          "reason": "Turn on notifications first."
+        }
+      ]
+    },
+    {
+      "key": "notifications.sound",
+      "section": "Notifications",
+      "label": "Notification sound",
+      "description": "Plays a subtle sound when enabled events occur.",
+      "keywords": [
+        "notifications",
+        "sound"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": false,
+      "advanced": false,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "notifications.enabled",
+          "equals": true,
+          "reason": "Turn on notifications first."
+        }
+      ]
+    },
+    {
+      "key": "notifications.sidebar_badges",
+      "section": "Notifications",
+      "label": "Sidebar badges",
+      "description": "Shows unread and attention badges on coworkers and groups.",
+      "keywords": [
+        "notifications",
+        "sidebar",
+        "badges"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "notifications.enabled",
+          "equals": true,
+          "reason": "Turn on notifications first."
+        }
+      ]
+    },
+    {
+      "key": "voice.enabled",
+      "section": "Voice",
+      "label": "Voice input",
+      "description": "Enables dictation and voice controls in the composer.",
+      "keywords": [
+        "voice",
+        "enabled"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "voice.replies",
+      "section": "Voice",
+      "label": "Spoken replies",
+      "description": "Allows the current coworker to read replies aloud.",
+      "keywords": [
+        "voice",
+        "replies"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": false,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": [
+        {
+          "key": "voice.enabled",
+          "equals": true,
+          "reason": "Turn on voice first."
+        }
+      ]
+    },
+    {
+      "key": "security.vault_auto_lock_minutes",
+      "section": "Security",
+      "label": "Vault auto-lock",
+      "description": "Locks decrypted credential access after inactivity; zero disables auto-lock.",
+      "keywords": [
+        "security",
+        "vault",
+        "auto",
+        "lock",
+        "minutes"
+      ],
+      "control": {
+        "kind": "number",
+        "min": 0.0,
+        "max": 1440.0,
+        "step": 5.0
+      },
+      "default": 30,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "security.reveal_requires_password",
+      "section": "Security",
+      "label": "Password before reveal",
+      "description": "Requires the master password before revealing stored credentials.",
+      "keywords": [
+        "security",
+        "reveal",
+        "requires",
+        "password"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "prompts.allow_overlays",
+      "section": "Prompts",
+      "label": "Prompt customization",
+      "description": "Allows user-owned prompt overlays in .phoenix/prompts.",
+      "keywords": [
+        "prompts",
+        "allow",
+        "overlays"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": false,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "advanced.tool_receipts",
+      "section": "Advanced",
+      "label": "Detailed tool receipts",
+      "description": "Keeps expandable exact tool calls and bounded outputs in the activity journal.",
+      "keywords": [
+        "advanced",
+        "tool",
+        "receipts"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": true,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "advanced.index_after_task",
+      "section": "Advanced",
+      "label": "Reindex after coding tasks",
+      "description": "Refreshes the codebase index once after a successful coding task.",
+      "keywords": [
+        "advanced",
+        "index",
+        "after",
+        "task"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": true,
+      "advanced": true,
+      "agent_override": true,
+      "group_override": true,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "efficiency.weekly_input_budget_millions",
+      "section": "Advanced",
+      "label": "7-day input planning budget",
+      "description": "Local provider-input budget in millions of tokens. This bounds Phoenix replay; it is not a vendor quota percentage because subscription units are dynamic and unpublished.",
+      "keywords": [
+        "efficiency",
+        "weekly",
+        "input",
+        "budget",
+        "millions"
+      ],
+      "control": {
+        "kind": "number",
+        "min": 1.0,
+        "max": 200.0,
+        "step": 1.0
+      },
+      "default": 20,
+      "advanced": true,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "efficiency.weekly_warning_percent",
+      "section": "Advanced",
+      "label": "Usage warning",
+      "description": "Warns when Phoenix's local seven-day input estimate reaches this share of the planning budget.",
+      "keywords": [
+        "efficiency",
+        "weekly",
+        "warning",
+        "percent"
+      ],
+      "control": {
+        "kind": "number",
+        "min": 10.0,
+        "max": 100.0,
+        "step": 5.0
+      },
+      "default": 70,
+      "advanced": true,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    },
+    {
+      "key": "efficiency.weekly_hard_stop",
+      "section": "Advanced",
+      "label": "Enforce 7-day hard stop",
+      "description": "Stops new provider rounds after the local planning budget is reached. Off by default because provider subscriptions do not publish a stable token-to-quota conversion.",
+      "keywords": [
+        "efficiency",
+        "weekly",
+        "hard",
+        "stop"
+      ],
+      "control": {
+        "kind": "toggle"
+      },
+      "default": false,
+      "advanced": true,
+      "agent_override": false,
+      "group_override": false,
+      "requires_restart": false,
+      "dependencies": []
+    }
+  ],
+  "destinations": [
+    {
+      "id": "agents",
+      "label": "Coworkers",
+      "description": "Create, configure, pin, archive, restore, and permanently delete coworkers.",
+      "section": "Agents & Groups",
+      "route": "settings/agents",
+      "keywords": [
+        "agent",
+        "coworker",
+        "archive",
+        "trash",
+        "delete"
+      ],
+      "advanced": false
+    },
+    {
+      "id": "groups",
+      "label": "Groups",
+      "description": "Create groups, choose members, and configure group collaboration.",
+      "section": "Agents & Groups",
+      "route": "settings/groups",
+      "keywords": [
+        "team",
+        "members",
+        "transcript",
+        "collaboration"
+      ],
+      "advanced": false
+    },
+    {
+      "id": "models",
+      "label": "Models",
+      "description": "Choose models, reasoning, context limits, and per-coworker lanes.",
+      "section": "Models & Providers",
+      "route": "settings/models",
+      "keywords": [
+        "llm",
+        "reasoning",
+        "context",
+        "agent model"
+      ],
+      "advanced": false
+    },
+    {
+      "id": "providers",
+      "label": "Providers & fallbacks",
+      "description": "Manage provider accounts, fallback order, and compaction policy without exposing credentials.",
+      "section": "Models & Providers",
+      "route": "settings/providers",
+      "keywords": [
+        "api",
+        "account",
+        "fallback",
+        "custom model",
+        "local model"
+      ],
+      "advanced": false
+    },
+    {
+      "id": "credentials",
+      "label": "Credentials",
+      "description": "Unlock the encrypted vault, manage scoped website credentials, and reveal only with the master password.",
+      "section": "Security",
+      "route": "settings/credentials",
+      "keywords": [
+        "password",
+        "vault",
+        "login",
+        "secret",
+        "recovery key"
+      ],
+      "advanced": false
+    },
+    {
+      "id": "browser_profiles",
+      "label": "Browser profiles",
+      "description": "Manage the company account email, private coworker browsers, cookies, imports, website sessions, and saved accounts.",
+      "section": "Browser & Accounts",
+      "route": "settings/browser-profiles",
+      "keywords": [
+        "email",
+        "account email",
+        "chrome",
+        "cookie",
+        "login",
+        "site",
+        "profile"
+      ],
+      "advanced": false
+    },
+    {
+      "id": "prompts",
+      "label": "Prompts",
+      "description": "Inspect and edit Phoenix and coworker prompt overlays separately from generated core prompts.",
+      "section": "Prompts",
+      "route": "settings/prompts",
+      "keywords": [
+        "system prompt",
+        "instructions",
+        "guidelines",
+        "persona"
+      ],
+      "advanced": false
+    },
+    {
+      "id": "routines",
+      "label": "Routines & taught workflows",
+      "description": "Review, share, correct, reroute, archive, and retire learned work.",
+      "section": "Workflows & Routines",
+      "route": "settings/routines",
+      "keywords": [
+        "teach agent",
+        "workflow",
+        "skill",
+        "recording",
+        "failure"
+      ],
+      "advanced": false
+    },
+    {
+      "id": "schedules",
+      "label": "Schedules",
+      "description": "Create and manage recurring work, notifications, pause state, and owners.",
+      "section": "Schedules",
+      "route": "settings/schedules",
+      "keywords": [
+        "cron",
+        "recurring",
+        "daily",
+        "automation"
+      ],
+      "advanced": false
+    },
+    {
+      "id": "notifications",
+      "label": "Notifications",
+      "description": "Configure desktop alerts, sounds, badges, and completion or attention events.",
+      "section": "Notifications",
+      "route": "settings/notifications",
+      "keywords": [
+        "linux",
+        "system",
+        "sound",
+        "badge",
+        "alert"
+      ],
+      "advanced": false
+    },
+    {
+      "id": "memory",
+      "label": "Memory",
+      "description": "Inspect company and coworker memory health, indexing, retention, and sharing boundaries.",
+      "section": "Memory",
+      "route": "settings/memory",
+      "keywords": [
+        "librarian",
+        "indexer",
+        "recall",
+        "knowledge",
+        "thread"
+      ],
+      "advanced": false
+    },
+    {
+      "id": "appearance",
+      "label": "Appearance",
+      "description": "Choose light or dark mode, typography, density, motion, background, and sidebar size.",
+      "section": "Appearance",
+      "route": "settings/appearance",
+      "keywords": [
+        "theme",
+        "white",
+        "dark",
+        "font",
+        "fire",
+        "animation"
+      ],
+      "advanced": false
+    },
+    {
+      "id": "voice",
+      "label": "Voice",
+      "description": "Choose voice input, spoken replies, devices, and voice behavior.",
+      "section": "Voice",
+      "route": "settings/voice",
+      "keywords": [
+        "microphone",
+        "speech",
+        "audio"
+      ],
+      "advanced": false
+    },
+    {
+      "id": "data",
+      "label": "Data & storage",
+      "description": "Inspect local Phoenix data, artifact storage, snapshots, exports, archives, and retention.",
+      "section": "General",
+      "route": "settings/data",
+      "keywords": [
+        ".phoenix",
+        "backup",
+        "export",
+        "artifact",
+        "30 days"
+      ],
+      "advanced": false
+    },
+    {
+      "id": "skills",
+      "label": "Skills",
+      "description": "Installed playbooks from skills.sh \u2014 the crafts Phoenix follows instead of improvising.",
+      "section": "Skills",
+      "route": "settings/skills",
+      "keywords": [
+        "skills.sh",
+        "playbook",
+        "skill",
+        "install"
+      ],
+      "advanced": false
+    },
+    {
+      "id": "composio",
+      "label": "Composio",
+      "description": "Consumer key and connected apps Phoenix can act through.",
+      "section": "Composio",
+      "route": "settings/composio",
+      "keywords": [
+        "gmail",
+        "github",
+        "notion",
+        "slack",
+        "composio"
+      ],
+      "advanced": false
+    },
+    {
+      "id": "mcp",
+      "label": "MCP",
+      "description": "Local and remote MCP servers the company can call.",
+      "section": "MCP",
+      "route": "settings/mcp",
+      "keywords": [
+        "mcp",
+        "stdio",
+        "server",
+        "t3mp3st"
+      ],
+      "advanced": false
+    },
+    {
+      "id": "integrations",
+      "label": "Integrations",
+      "description": "Manage Composio and local MCP connections, permissions, and routing.",
+      "section": "Advanced",
+      "route": "settings/integrations",
+      "keywords": [
+        "linear",
+        "plugin"
+      ],
+      "advanced": true
+    },
+    {
+      "id": "relationships",
+      "label": "Coworker relationships",
+      "description": "Edit durable trust and collaboration patterns between visible coworkers.",
+      "section": "Advanced",
+      "route": "settings/relationships",
+      "keywords": [
+        "trust",
+        "bonds",
+        "collaboration",
+        "handoff",
+        "coworker relationship"
+      ],
+      "advanced": true
+    },
+    {
+      "id": "diagnostics",
+      "label": "Diagnostics",
+      "description": "Inspect runtime health, provider status, browser lifecycle, indexes, and logs.",
+      "section": "Advanced",
+      "route": "settings/diagnostics",
+      "keywords": [
+        "logs",
+        "health",
+        "debug",
+        "performance",
+        "failure"
+      ],
+      "advanced": true
+    }
+  ],
+  "guide": [
+    {
+      "title": "Choose what agents may do",
+      "description": "Use Permissions for sends, logins, accounts, and purchases. Browser & Accounts controls how those approved actions run.",
+      "section": "Permissions",
+      "search_terms": [
+        "approval",
+        "login",
+        "purchase"
+      ]
+    },
+    {
+      "title": "Assign models and fallbacks",
+      "description": "Models & Providers owns company and per-agent model choices, provider accounts, reasoning, and fallback order.",
+      "section": "Models & Providers",
+      "search_terms": [
+        "model",
+        "provider",
+        "fallback"
+      ]
+    },
+    {
+      "title": "Manage learned work",
+      "description": "Workflows & Routines contains taught browser routines, sharing, trust, and failure quarantine. Schedules contains recurring work.",
+      "section": "Workflows & Routines",
+      "search_terms": [
+        "routine",
+        "teach",
+        "schedule"
+      ]
+    },
+    {
+      "title": "Protect accounts",
+      "description": "Security configures vault behavior. Credentials are managed through the vault action and never appear in settings data.",
+      "section": "Security",
+      "search_terms": [
+        "vault",
+        "credential",
+        "password"
+      ]
+    },
+    {
+      "title": "Tune each coworker",
+      "description": "Open an agent profile for scoped overrides. Unset values inherit the company setting automatically.",
+      "section": "Agents & Groups",
+      "search_terms": [
+        "agent",
+        "coworker",
+        "override"
+      ]
+    }
+  ],
+  "provenance": {
+    "source": "src/settings.rs",
+    "sha256": "61f8a6fdbf1d9e91707ae3fa82649b835a1043c78b9483f0e0d794e6f6a653d5",
+    "method": "Static balanced Rust catalog extraction, not compiled/runtime acceptance",
+    "count": 75,
+    "destinations": 20
+  }
+}

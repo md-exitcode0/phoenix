@@ -1,0 +1,58 @@
+/* ── 2026-10-06 polish pass ─────────────────────────────────────────── */
+
+/* Rooms: teammates speak as themselves. */
+#conversationFeed .team-work-block[hidden]{display:none!important}
+#conversationFeed .member-message .message-content>header strong{color:color-mix(in srgb,var(--speaker,var(--ember)) 70%,var(--ink))}
+
+/* One name per answer: the work header above an answer is gone; the arrow
+   lives on the answer's own header and folds the work open. */
+#conversationFeed .work-cluster:not(.team-work-row)>.group-work-agent{display:none!important}
+#conversationFeed .work-cluster.work-folded{display:none!important}
+#conversationFeed .message-content>header{display:flex;align-items:center;gap:8px}
+#conversationFeed .answer-work-toggle{display:inline-flex;align-items:center;gap:3px;height:22px;padding:0 7px 0 8px;border-radius:999px;color:var(--ink-faint);font-size:11px;font-weight:500;line-height:1;transition:background .15s ease,color .15s ease}
+#conversationFeed .answer-work-toggle:hover{background:var(--hover);color:var(--ink-soft)}
+#conversationFeed .answer-work-toggle svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s var(--ease,ease)}
+#conversationFeed .answer-work-toggle[aria-expanded="true"] svg{transform:rotate(180deg)}
+
+/* Recovered tool failures are noise: once a later step succeeded or the
+   turn settled, the failed attempt stays out of the conversation. */
+#conversationFeed .work-tool.failed:has(~ .work-tool:not(.failed):not(.running)),
+#conversationFeed .work-cluster.settled .work-tool.failed{display:none}
+
+/* Mention picker */
+.mention-picker:not(.slash-picker){width:300px;max-height:320px;padding:6px;border:1px solid var(--line);border-radius:14px;background:var(--surface-raised);box-shadow:0 18px 48px rgba(28,22,18,.16),0 2px 6px rgba(28,22,18,.06)}
+.mention-picker .mention-picker-head{padding:6px 10px 6px;color:var(--ink-faint);font-size:11px;font-weight:600;letter-spacing:.02em}
+.mention-picker button{height:44px;gap:10px;padding:0 10px;border-radius:10px;color:var(--ink)}
+.mention-picker button .mini-avatar{flex:0 0 28px;width:28px;height:28px;display:grid;place-items:center}
+.mention-picker button .mini-avatar svg{width:28px;height:28px}
+.mention-picker button>span:last-child{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.mention-picker strong{font-size:13px;font-weight:600;color:var(--ink)!important;line-height:1.2}
+.mention-picker small{margin-top:1px;font-size:11px;color:var(--ink-faint);line-height:1.2;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.mention-picker button:hover,.mention-picker button.active,.mention-picker button.selected{background:color-mix(in srgb,var(--ember) 9%,var(--surface-raised));color:var(--ink)}
+.mention-picker .mention-everyone-icon{border-radius:50%;background:color-mix(in srgb,var(--ember) 14%,var(--surface));color:var(--ember);font-size:14px;font-weight:700}
+.mention-picker .mention-everyone{opacity:1}
+.mention-picker .mention-everyone+button{margin-top:2px}
+
+/* Review: a calm empty state, centred in the pane. */
+#inspectionChangesList:has(> .review-empty){display:flex;align-items:center;justify-content:center}
+.inspection-empty.review-empty{display:flex;flex-direction:column;align-items:center;gap:0;padding:40px 32px}
+.review-empty-mark{width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:var(--surface);border:1px solid var(--line);color:var(--ink-faint)}
+.review-empty-mark svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+.inspection-empty.review-empty strong{margin-top:14px;font-size:15px;font-weight:600}
+.inspection-empty.review-empty small{max-width:300px;margin-top:6px;font-size:12.5px}
+#reviewDiffStats[hidden]{display:none!important}
+.review-files-pane{border-left:1px solid var(--line)}
+.review-filter{height:34px;flex-basis:34px;border:1px solid var(--line);background:var(--bg)}
+
+/* Collapsed rail logo: smaller, inside the top band, centred in the rail,
+   never sitting on the header's bottom border. */
+body.sidebar-collapsed .sidebar-wake{top:var(--chrome)!important;left:calc((var(--sidebar-rail-width,56px) - 28px) / 2)!important;width:28px!important;height:var(--workspace-rail-height,34px)!important;place-items:center;transform:none}
+body.sidebar-collapsed .sidebar-wake .phoenix-raster-logo{width:18px!important;height:18px!important;display:block}
+.inspection-browser-tabs .browser-owner-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;height:24px;margin-right:4px;padding:0 9px 0 3px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);font-size:11px;font-weight:600;white-space:nowrap}
+.inspection-browser-tabs .browser-owner-chip svg{width:18px;height:18px;flex:0 0 18px;stroke:none}
+
+/* Keep the answer's explicit work toggle authoritative in all MonoCode views. */
+:root[data-skin="monocode"][data-conversation-view] body #conversationFeed .work-cluster.work-folded{display:none!important}
+:root[data-skin="monocode"][data-conversation-view] body #conversationFeed .work-cluster.group-work-expanded:not(.work-folded){display:block!important}
+:root[data-skin="monocode"][data-conversation-view] body #conversationFeed .work-cluster.group-work-expanded:not(.work-folded)>.work-trace{display:block!important}
+:root[data-skin="monocode"][data-conversation-view] body #conversationFeed .work-cluster:not(.team-work-row)>.group-work-agent{display:none!important}

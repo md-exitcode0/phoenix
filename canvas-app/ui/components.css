@@ -1,0 +1,162 @@
+/* Phoenix shared components. Loaded last so every screen uses one look.
+
+   Switch — beUI's motion switch: a 48x28 track, a 20px thumb with a heavy,
+   no-wobble slide, a squish toward its destination while pressed, a small
+   shake when a disabled switch is pressed, and the logo gradient when on.
+   Three markups share it: .ph-switch (button[role=switch] or checkbox input),
+   the hidden-input + .ember-check-box pair, and the settings .ember-toggle. */
+:root{
+  --switch-on:linear-gradient(135deg,#e66100 0%,#f08a0b 55%,#f5c211 100%);
+  --switch-off:color-mix(in srgb,var(--ink-faint,#8a8580) 55%,transparent);
+  --switch-thumb:#fff;
+  --switch-ease:cubic-bezier(.22,1,.36,1);
+}
+
+/* Track */
+.ph-switch,
+.ember-check-box,
+.settings-view .ember-toggle,
+input.onboarding-switch{
+  position:relative!important;box-sizing:border-box!important;
+  width:48px!important;height:28px!important;min-height:28px!important;flex:0 0 48px!important;
+  display:inline-block!important;padding:0!important;margin:0;
+  border:0!important;border-radius:999px!important;
+  background:var(--switch-off)!important;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.18)!important;
+  cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;
+  transition:background .2s ease,box-shadow .2s ease!important;
+}
+/* On: the logo gradient */
+.ph-switch[aria-checked="true"],input.ph-switch:checked,
+.ember-check-input:checked+.ember-check-box,
+.settings-view .ember-toggle.on,
+input.onboarding-switch:checked{
+  background:var(--switch-on)!important;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.12),0 2px 10px color-mix(in srgb,#e66100 28%,transparent)!important;
+}
+
+/* Thumb (a pseudo-element, or the settings toggle's inner span) */
+.ph-switch::after,
+.ember-check-box::after,
+input.onboarding-switch::after,
+.settings-view .ember-toggle .ember-check-box{
+  content:""!important;position:absolute!important;top:4px!important;left:4px!important;
+  display:block!important;width:20px!important;height:20px!important;min-width:0!important;min-height:20px!important;max-height:20px!important;
+  margin:0!important;padding:0!important;opacity:1!important;flex:none!important;
+  border:0!important;border-radius:999px!important;background:var(--switch-thumb)!important;
+  box-shadow:0 2px 5px rgba(0,0,0,.22),0 0 0 .5px rgba(0,0,0,.06)!important;
+  transform:translateX(0);transform-origin:left center;
+  transition:transform .42s var(--switch-ease),width .18s var(--switch-ease),left .18s var(--switch-ease)!important;
+}
+.settings-view .ember-toggle .ember-check-box::after{display:none!important}
+input.onboarding-switch::before{display:none!important}
+.ph-switch[aria-checked="true"]::after,input.ph-switch:checked::after,
+.ember-check-input:checked+.ember-check-box::after,
+input.onboarding-switch:checked::after,
+.settings-view .ember-toggle.on .ember-check-box{transform:translateX(20px)!important}
+/* The old checkmark glyph inside .ember-check-box goes; the thumb says it. */
+.ember-check-box>svg{display:none!important}
+
+/* Press: squish, stretching toward where the thumb is going */
+.ph-switch.pressed:not(:disabled)::after,
+.ember-check-label.pressed .ember-check-input:not(:disabled)+.ember-check-box::after,
+input.onboarding-switch.pressed:not(:disabled)::after,
+.settings-view .ember-toggle.pressed:not(:disabled) .ember-check-box{width:24px!important}
+.ph-switch[aria-checked="true"].pressed::after,input.ph-switch:checked.pressed::after,
+.ember-check-label.pressed .ember-check-input:checked+.ember-check-box::after,
+input.onboarding-switch:checked.pressed::after,
+.settings-view .ember-toggle.on.pressed .ember-check-box{left:0!important}
+
+/* Disabled: dim, and shake when pressed */
+.ph-switch:disabled,input.ph-switch:disabled,.ember-check-input:disabled+.ember-check-box,
+.settings-view .ember-toggle:disabled,input.onboarding-switch:disabled{opacity:.6;cursor:not-allowed}
+.switch-shake::after,.switch-shake .ember-check-box,.switch-shake+.ember-check-box::after{animation:switch-shake .6s .2s ease}
+@keyframes switch-shake{0%,100%{translate:0}25%{translate:-2px}50%{translate:2px}75%{translate:-1px}}
+
+/* Keyboard focus */
+.ph-switch:focus-visible,input.onboarding-switch:focus-visible,
+.ember-check-input:focus-visible+.ember-check-box,.settings-view .ember-toggle:focus-visible{
+  outline:2px solid color-mix(in srgb,#e66100 70%,transparent)!important;outline-offset:3px!important;
+}
+
+@media (prefers-reduced-motion:reduce){
+  .ph-switch::after,.ember-check-box::after,input.onboarding-switch::after,.settings-view .ember-toggle .ember-check-box{transition:none!important}
+  .switch-shake::after,.switch-shake .ember-check-box,.switch-shake+.ember-check-box::after{animation:none}
+}
+
+/* Dropdowns and drop-ups — beUI Select. The panel opens flush against its
+   trigger, then springs away (bouncy gap) while its near corners round; rows
+   fade and unblur in sequence. The trigger's facing edge flattens then rounds
+   and its trailing chevron flips. Menus are rows, never columns. */
+/* `backwards` fill: the clip only exists while opening, so the finished panel keeps its own rounded corners and shadow. */
+.popover.select-panel{animation:select-panel-open .42s cubic-bezier(.34,1.26,.64,1) backwards!important}
+.popover.select-panel-bottom{transform-origin:top center;--select-gap:-6px}
+.popover.select-panel-top{transform-origin:bottom center;--select-gap:6px}
+@keyframes select-panel-open{
+  0%{opacity:0;clip-path:inset(0 0 100% 0 round 12px);translate:0 var(--select-gap)}
+  35%{opacity:1;translate:0 var(--select-gap)}
+  100%{opacity:1;clip-path:inset(-24px -24px -24px -24px round 12px);translate:0 0}
+}
+.popover.select-panel-top{animation-name:select-panel-open-top!important}
+@keyframes select-panel-open-top{
+  0%{opacity:0;clip-path:inset(100% 0 0 0 round 12px);translate:0 var(--select-gap)}
+  35%{opacity:1;translate:0 var(--select-gap)}
+  100%{opacity:1;clip-path:inset(-24px -24px -24px -24px round 12px);translate:0 0}
+}
+.select-row-in{animation:select-row-in .32s cubic-bezier(.16,1,.3,1) both}
+@keyframes select-row-in{from{opacity:0;translate:0 -6px;filter:blur(3px)}to{opacity:1;translate:0 0;filter:blur(0)}}
+.select-trigger-bottom{animation:select-trigger-bottom .6s cubic-bezier(.16,1,.3,1)}
+.select-trigger-top{animation:select-trigger-top .6s cubic-bezier(.16,1,.3,1)}
+@keyframes select-trigger-bottom{0%,40%{border-bottom-left-radius:0;border-bottom-right-radius:0}}
+@keyframes select-trigger-top{0%,40%{border-top-left-radius:0;border-top-right-radius:0}}
+.select-trigger-open>svg:last-child,.select-trigger-open .select-chevron{transform:rotate(180deg);transition:transform .4s cubic-bezier(.34,1.56,.64,1)}
+:is(button,[role="button"])>svg:last-child{transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+@media (prefers-reduced-motion:reduce){.popover.select-panel,.select-row-in,.select-trigger-bottom,.select-trigger-top{animation:none!important}}
+/* A native <select> stays behind its menu-select trigger as the form value. */
+select.ph-select-native{position:absolute!important;width:1px!important;height:1px!important;margin:0!important;padding:0!important;border:0!important;opacity:0!important;pointer-events:none!important;clip-path:inset(50%)!important}
+.ph-select-trigger{min-width:0;display:inline-flex;align-items:center;justify-content:space-between;gap:8px;height:34px;padding:0 10px;border:1px solid var(--control-line,var(--line));border-radius:8px;background:var(--control-bg,var(--surface-raised,var(--surface)));color:var(--ink);font:inherit;font-size:13px;text-align:left;cursor:pointer}
+.ph-select-trigger>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ph-select-trigger svg{width:14px;height:14px;flex:0 0 14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-faint)}
+.ph-select-trigger:disabled{opacity:.55;cursor:not-allowed}
+label>.ph-select-trigger{width:100%}
+
+/* Animated avatar marks (avatar-morph.js). The mark fills its avatar slot. */
+svg.morph-avatar{display:block;width:100%;height:100%;overflow:visible}
+.avatar-studio .avatar-morph-controls{display:grid;gap:12px}
+.avatar-studio[data-avatar-mode="custom"] .avatar-morph-controls{display:none}
+.avatar-studio[data-avatar-mode="custom"] .avatar-custom-controls{display:grid}
+.avatar-morph-grid{display:flex;flex-direction:column;gap:6px}
+.avatar-morph-choice{display:flex;align-items:center;gap:12px;min-height:64px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink-soft);text-align:left;cursor:pointer;transition:border-color .15s ease,background .15s ease}
+.avatar-morph-choice:hover{background:var(--hover)}
+.avatar-morph-choice.selected{border-color:color-mix(in srgb,var(--ember) 60%,var(--line));background:color-mix(in srgb,var(--ember) 7%,var(--surface));color:var(--ink)}
+.avatar-morph-demo{width:48px;height:48px;flex:0 0 48px;display:grid;place-items:center}
+.avatar-morph-choice strong{font-size:13px;font-weight:620}
+.avatar-gradient-row{display:flex;flex-wrap:wrap;gap:8px}
+.avatar-gradient-swatch{position:relative;width:30px;height:30px;padding:0;border:0;border-radius:999px;background:var(--swatch);cursor:pointer;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12);transition:transform .15s cubic-bezier(.34,1.56,.64,1)}
+.avatar-gradient-swatch:hover{transform:scale(1.08)}
+.avatar-gradient-swatch.selected{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--ink)}
+.avatar-gradient-swatch.custom{display:grid;place-items:center;background:conic-gradient(from 90deg,#e85600,#ffd23d,#32a687,#1699c5,#9062e8,#e3589f,#e85600);color:#fff;font-size:16px;font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.avatar-gradient-custom{display:flex;flex-direction:column;gap:6px}
+.avatar-gradient-custom[hidden]{display:none}
+.avatar-gradient-custom label{display:flex;align-items:center;gap:10px;color:var(--ink-soft);font-size:12px}
+.avatar-gradient-custom input[type=color]{width:34px;height:26px;padding:0;border:1px solid var(--line);border-radius:7px;background:none;cursor:pointer}
+
+/* Containers that were sized for the old 16px checkbox. */
+.member-picker-row{grid-template-columns:48px 34px minmax(0,1fr)!important;gap:12px!important}
+.onboarding-coworker{height:auto!important;min-height:40px;gap:8px!important;padding:6px 10px 6px 6px!important}
+.ember-check-label{gap:10px}
+
+/* Settings pickers — beUI Tabs (pill). Rounded-full card track, ink pill
+   that glides without overshoot, inverted label copy clipped to the pill. */
+.ph-tabs{position:relative!important;isolation:isolate;display:inline-flex!important;align-items:center;gap:4px!important;padding:4px!important;border:0!important;border-radius:999px!important;background:var(--surface-raised,var(--surface))!important;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--line) 70%,transparent)!important;overflow-x:auto;scrollbar-width:none;max-width:100%}
+.ph-tabs::-webkit-scrollbar{display:none}
+.ph-tabs .ph-tab-pill{position:absolute;left:0;top:0;z-index:0;border-radius:999px;background:var(--ink);pointer-events:none;transition:transform .5s cubic-bezier(.22,1,.36,1),width .5s cubic-bezier(.22,1,.36,1),height .5s cubic-bezier(.22,1,.36,1),opacity .15s}
+.ph-tabs .ph-tab{position:relative!important;z-index:1;flex:1 1 auto;min-height:0!important;padding:6px 14px!important;border:0!important;border-radius:999px!important;background:transparent!important;box-shadow:none!important;color:var(--ink-faint)!important;font-size:13px!important;font-weight:500!important;white-space:nowrap;cursor:pointer;transition:color .15s}
+.ph-tabs .ph-tab:hover{color:var(--ink)!important}
+.ph-tabs .ph-tab:focus-visible{outline:2px solid color-mix(in srgb,var(--ember) 60%,transparent);outline-offset:1px}
+.ph-tabs .ph-tab-label{position:absolute;inset:0;display:inline-flex;align-items:center;justify-content:center;gap:inherit;padding:inherit;color:var(--surface);pointer-events:none;clip-path:inset(0 100% 0 0)}
+.ph-tabs .ph-tab-label *{color:inherit!important}
+.ph-tabs .ph-tab-label.pinned{inset:auto;margin:0!important;padding:0;box-sizing:border-box}
+.ph-tabs .ph-tab>span:not(.ph-tab-label),.ph-tabs .ph-tab em{font-style:normal;background:none!important}
+@media (prefers-reduced-motion:reduce){.ph-tabs .ph-tab-pill{transition:none}}
+.ph-tabs .ph-tab::before,.ph-tabs .ph-tab::after{content:none!important;display:none!important}.ph-tabs .ph-tab{border-bottom:0!important;text-decoration:none!important;box-shadow:none!important}

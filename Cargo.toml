@@ -1,0 +1,158 @@
+[package]
+name = "phoenix_agent"
+version = "0.1.0"
+edition = "2021"
+description = "Phoenix agent runtime"
+authors = ["Phoenix"]
+license = "PolyForm-Strict-1.0.0"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# HTTP client for LLM APIs
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "blocking", "multipart"], default-features = false }
+
+# Serialization
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+toml = "0.8"
+toml_edit = "0.22"
+# Direct handle on a transitive dep (tokio/reqwest already pull it): lets the
+# WS bridge set SO_REUSEADDR before bind so a restarted gateway reclaims its
+# port during TIME_WAIT instead of leaving the canvas unable to connect.
+socket2 = "0.6"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+# Unix detach (setsid + double-fork) for gateway spawn — already transitive; direct for pre_exec.
+libc = "0.2"
+
+# Async traits
+async-trait = "0.1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# File watching (for curation)
+notify = "7"
+notify-debouncer-mini = "0.4"
+
+# Embedded design-skill reference library (prompts/frontend/hallmark)
+include_dir = "0.7"
+
+# Path helpers
+directories = "5"
+
+# UUID generation
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Markdown parsing (for knowledge base)
+pulldown-cmark = "0.10"
+
+# YAML frontmatter for memory metadata (trust receipts)
+serde_yaml = "0.9"
+
+# HTML generation (for output)
+ammonia = "4"
+
+# Glob pattern matching
+glob = "0.3"
+
+# Async streaming
+futures-util = "0.3"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+rustyline = { version = "14", features = ["custom-bindings"] }
+dialoguer = { version = "0.11", features = ["fuzzy-select"] }
+console = "0.15"
+open = "5"
+url = "2"
+tiny_http = "0.12"
+base64 = "0.22"
+# Screenshot downscale for the vision sidecar (decode PNG, resize, re-encode
+# JPEG). Deliberately minimal: default features off, just the two codecs.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+sha2 = "0.10"
+rand = "0.8"
+urlencoding = "2"
+unicode-segmentation = "1.13"
+
+# Local credential vault: Argon2id derives a wrapping key from the user's
+# master password; AES-256-GCM authenticates both wrapped data keys and vault
+# records. Secret buffers are cleared when they leave scope.
+argon2 = "0.5"
+aes-gcm = "0.10"
+zeroize = { version = "1", features = ["derive"] }
+# Gateway authentication compares fixed-size bearer tokens without leaking the
+# first mismatching byte through ordinary short-circuit string equality. This
+# crate is already present transitively through the crypto stack; naming it
+# directly does not add another implementation to the binary.
+subtle = "2"
+
+# Chromium cookie decryption (Chrome/Brave/Edge login porting): AES-128-CBC
+# with a PBKDF2-HMAC-SHA1 key, matching Chromium's os_crypt v10/v11 scheme.
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc"] }
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+hmac = "0.12"
+sha1 = "0.10"
+
+# CodeGraph: symbol index storage + AST extraction.
+# 0.32 pins libsqlite3-sys 0.30 to match cognee's sqlx-sqlite (both link the
+# native sqlite3; only one version may). Bumped for the cognee integration.
+rusqlite = { version = "0.32", features = ["bundled"] }
+tree-sitter = "0.22"
+tree-sitter-rust = "0.21"
+headless_chrome = "1.0.21"
+# unstable-rendered-line-info: exact wrapped height for feed scroll math
+ratatui = { version = "0.29", features = ["unstable-rendered-line-info"] }
+crossterm = { version = "0.28", features = ["event-stream"] }
+# skill_install clones into a self-cleaning temp dir
+tempfile = "3"
+
+# Cognee memory engine (vendored, brute-force store — no LanceDB/Arrow). Behind
+# the default `cognee` feature; disable with --no-default-features for a
+# cmake-free lean build that falls back to the file-tier librarian.
+# `onnx-dynamic` gives local BGE-Small embeddings that dlopen the system
+# libonnxruntime (present on this machine) — token-free, offline recall. The
+# configured chat provider (opencode Zen / codex) does not serve /embeddings,
+# so local ONNX is the only real vector source.
+cognee-lib = { path = "vendor/cognee-rs/crates/lib", default-features = false, features = ["sqlite", "ladybug", "tiktoken", "onnx-dynamic"], optional = true }
+cognee-bindings-common = { path = "vendor/cognee-rs/crates/bindings-common", optional = true }
+tokio-tungstenite = "0.29.0"
+
+[features]
+default = ["cognee"]
+# Cognee is the go-to memory backend. Needs `cmake` at build time (blake3).
+cognee = ["dep:cognee-lib", "dep:cognee-bindings-common"]
+
+[dev-dependencies]
+tempfile = "3"
+tokio-test = "0.4"
+
+[[bin]]
+name = "phoenix"
+path = "src/main.rs"
+
+[[bin]]
+name = "phoenix-test"
+path = "src/bin/provider_tester.rs"
+
+[lib]
+name = "phoenix_agent"
+path = "src/lib.rs"
+
+# Vendored headless_chrome 1.0.21 with the transport self-destruct patches
+# (grep "PHOENIX PATCH" in vendor/headless_chrome). The stock crate closes or
+# panics its own CDP websocket on: browser-events idle timeout, a late method
+# response, a dead event listener, and unknown call ids — the root of every
+# "browser silently died mid-run" incident, including the lost Discord login.
+[patch.crates-io]
+headless_chrome = { path = "vendor/headless_chrome" }

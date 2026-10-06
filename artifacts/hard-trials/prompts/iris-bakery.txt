@@ -1,0 +1,1 @@
+Design and build a one-page website for "Kornblume", a small neighbourhood sourdough bakery and café in Edmonton that opens at 7am. People need to see what's fresh today, opening hours, where it is, and be able to pre-order a loaf for pickup. It should feel warm and local, not corporate. Static HTML/CSS/JS in this workspace; use real food photography if the design needs images.

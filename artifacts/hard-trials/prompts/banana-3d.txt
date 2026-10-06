@@ -1,0 +1,1 @@
+Build a hyper-realistic banana in Blender. Get real reference photos first so the shape, color and surface are right. Render a hero shot and a turntable contact sheet, and save the .blend file and renders in this workspace. I want it to look like a photograph.

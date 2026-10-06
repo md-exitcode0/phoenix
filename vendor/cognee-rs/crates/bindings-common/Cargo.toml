@@ -1,0 +1,54 @@
+[package]
+name = "cognee-bindings-common"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Shared facade (HandleState, CogneeServices, SdkError, wire helpers) consumed by the Python / JS / C API cognee bindings."
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+authors.workspace = true
+# Not published to crates.io: this is an internal facade consumed only by the
+# Python / JS / C API binding crates (none of which are crates.io crates), so
+# it does not need to ship independently. release-plz skips publish=false.
+publish = false
+
+# NOT a default member of the root workspace but IS a workspace member
+# so `cargo check --all-targets` at the root covers it.
+
+[lints]
+workspace = true
+
+[features]
+# Default features mirror the cognee bindings (full): visualization plus all
+# engine features. A slim embedded build can override with
+# --no-default-features --features sqlite,testing. The former `cloud` feature
+# was lifted to closed `cognee-bindings-cloud` per T15a / plan §6.1.
+default = [
+    "visualization",
+    "ladybug",
+    "onnx",
+    "hf-tokenizer",
+    "tiktoken",
+    "sqlite",
+    "testing",
+]
+visualization = ["cognee-lib/visualization"]
+ladybug       = ["cognee-lib/ladybug"]
+onnx          = ["cognee-lib/onnx"]
+hf-tokenizer  = ["cognee-lib/hf-tokenizer"]
+tiktoken      = ["cognee-lib/tiktoken"]
+sqlite        = ["cognee-lib/sqlite"]
+testing       = ["cognee-lib/testing"]
+
+[dependencies]
+cognee-lib = { path = "../lib", version = "0.1.1", default-features = false }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+thiserror  = { workspace = true }
+uuid       = { workspace = true }
+tokio      = { workspace = true }
+async-trait = { workspace = true }
+base64      = { workspace = true }

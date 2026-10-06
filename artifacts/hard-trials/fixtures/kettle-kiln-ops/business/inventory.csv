@@ -1,0 +1,8 @@
+sku,name,price,on_hand_start_of_week,supplier_lead_days,reorder_moq
+KK-MUG-12,Speckled stoneware mug 12oz,28.00,180,21,48
+KK-MUG-16,Tall latte mug 16oz,32.00,120,21,48
+KK-BWL-SM,Ramen bowl small,36.00,70,28,48
+KK-PLT-10,Dinner plate 10in,30.00,90,28,48
+KK-VAS-BUD,Bud vase,24.00,70,14,48
+KK-TPT-1L,Teapot 1L,78.00,40,35,48
+KK-GFT-SET,Gift set: 2 mugs + pour-over,88.00,45,21,48

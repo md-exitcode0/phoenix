@@ -1,0 +1,12 @@
+{
+  "name": "phoenix-sidekicks",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Procedural, editable 3D coworker characters for Phoenix",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test models.test.mjs"
+  },
+  "dependencies": { "three": "0.186.0" }
+}

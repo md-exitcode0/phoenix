@@ -1,0 +1,93 @@
+/* Native Fluffies. Changes stay in Configure; accepted chat artwork is unchanged. */
+.fluffy-token{position:relative;display:inline-grid;place-items:center;width:100%;height:100%;isolation:isolate}
+.fluffy-token>img,.fluffy-token>canvas{grid-area:1/1;width:100%;height:100%;object-fit:contain;border-radius:0}
+.fluffy-token>[hidden],.fluffy-hero>[hidden]{display:none!important}
+.company-row .agent-avatar:has(.fluffy-token){width:var(--avatar);height:var(--avatar);overflow:visible;background:none;box-shadow:none}
+.fluffy-hero{grid-row:2;display:grid;place-items:center;height:128px;min-height:0;pointer-events:none;align-self:start}
+.fluffy-hero>img,.fluffy-hero>canvas{grid-area:1/1;width:112px;height:112px;object-fit:contain}
+#conversationStage.has-fluffy{grid-template-rows:60px 128px minmax(0,1fr)}
+#conversationStage.has-fluffy .conversation-body{grid-row:3}
+#conversationStage.has-fluffy #conversationFeed{padding-top:12px}
+.avatar-studio .avatar-mode-tabs{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.avatar-mode-tabs button{min-height:44px;height:auto;font-size:12px}
+.avatar-fluffy-controls{display:none;gap:20px}
+.avatar-studio[data-avatar-mode="fluffy"] .avatar-fluffy-controls{display:grid}
+.avatar-studio[data-avatar-mode="fluffy"] :is(.avatar-morph-controls,.avatar-custom-controls){display:none!important}
+.avatar-studio[data-avatar-mode="fluffy"] .avatar-studio-preview>i{width:148px;height:148px;flex-basis:148px}
+.fluffy-studio-mirror{width:148px;height:148px}
+.fluffy-shapes,.fluffy-palette,.fluffy-previews{margin:0;padding:0;border:0;min-width:0}
+.fluffy-shapes legend,.fluffy-palette legend,.fluffy-previews legend{padding:0;margin-bottom:10px;font-size:13px;font-weight:600;color:var(--ink-soft)}
+.fluffy-shape-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.fluffy-shape-grid button{display:grid;place-items:center;gap:8px;min-width:0;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink-soft);font-size:12px}
+.fluffy-shape-grid img{width:120px;height:120px;max-width:100%;object-fit:contain}
+.fluffy-shape-grid button.selected{border-color:var(--ink-faint);background:var(--surface-raised);color:var(--ink)}
+.fluffy-shape-grid button:hover:not(:disabled){background:var(--hover)}
+.fluffy-shape-grid button:disabled,.fluffy-palette-grid button:disabled{opacity:.45;cursor:default}
+.fluffy-shape-grid button:focus-visible,.fluffy-palette-grid button:focus-visible,.fluffy-preview-grid button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.fluffy-palette-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,112px));gap:7px}
+.fluffy-palette-grid button{min-width:0;min-height:102px;display:grid;place-items:center;gap:4px;padding:5px 4px 9px;border:1px solid transparent;border-radius:9px;color:var(--ink-soft);font-size:12px;background:transparent}
+.fluffy-palette-grid img{width:76px;height:76px;object-fit:contain}
+.fluffy-palette-grid button:hover{background:var(--hover);color:var(--ink)}
+.fluffy-palette-grid button.selected{border-color:var(--line-strong);background:var(--surface-raised);color:var(--ink);box-shadow:var(--shadow-sm)}
+.fluffy-palette-status{font-size:12px;line-height:1.5;color:var(--ink-faint);margin:8px 0 0}
+.fluffy-preview-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.fluffy-preview-grid button{min-width:0;display:grid;grid-template-rows:136px auto;gap:6px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);text-align:left;color:var(--ink-soft)}
+.fluffy-preview-grid button:hover{background:var(--hover);border-color:var(--line-strong)}
+.fluffy-preview-grid button.playing{background:var(--surface-raised);border-color:var(--ink-faint)}
+.fluffy-preview-picture{position:relative;display:grid;place-items:center;min-width:0}
+.fluffy-preview-picture img,.fluffy-preview-picture canvas{grid-area:1/1;width:136px;height:136px;max-width:100%;object-fit:contain}
+.fluffy-live-preview{position:absolute;inset:0;margin:auto;z-index:1;background:var(--surface-raised)}
+.fluffy-preview-caption{display:flex;align-items:center;justify-content:space-between;gap:7px;font-size:12px}
+.fluffy-preview-caption svg{width:16px;height:16px;fill:currentColor;opacity:.65}
+.fluffy-preview-help{margin:0;color:var(--ink-faint);font-size:12px;line-height:1.5}
+.fluffy-editor-error{font-size:12px;color:var(--danger)}
+.avatar-studio:has(.avatar-fluffy-controls){background:var(--surface-muted)}
+#editForm:has(.avatar-fluffy-controls) .avatar-studio{padding:20px;border-radius:12px}
+.modal:has(.avatar-fluffy-controls){width:min(980px,calc(100vw - 40px));max-height:calc(100dvh - 40px)}
+.modal:has(.avatar-fluffy-controls) .modal-body{min-height:0;overflow:auto}
+.modal:has(.avatar-fluffy-controls) .modal-header{padding-bottom:16px}
+@media(max-width:620px){
+ #conversationStage.has-fluffy{grid-template-rows:48px 88px minmax(0,1fr)}
+ .fluffy-hero{height:88px}
+ .fluffy-hero>canvas,.fluffy-hero>img{width:80px;height:80px}
+ .modal:has(.avatar-fluffy-controls){width:calc(100vw - 20px);max-height:calc(100dvh - 24px)}
+ .modal:has(.avatar-fluffy-controls) .modal-header{padding:16px 14px 12px}
+ .modal:has(.avatar-fluffy-controls) .modal-body{padding-inline:14px}
+ #editForm:has(.avatar-fluffy-controls) .avatar-studio{padding:12px}
+ .fluffy-shape-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .fluffy-shape-grid img{width:100px;height:100px}
+ .fluffy-shape-grid button{padding:8px}
+ .fluffy-palette-grid{grid-template-columns:repeat(auto-fit,minmax(72px,1fr));gap:5px}
+ .fluffy-palette-grid button{min-height:88px;font-size:11px;padding:3px 0 6px}
+ .fluffy-palette-grid img{width:62px;height:62px}
+ .fluffy-preview-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .fluffy-preview-grid button{grid-template-rows:110px auto;padding:7px}
+ .fluffy-preview-picture img,.fluffy-preview-picture canvas{width:110px;height:110px}
+ .avatar-studio[data-avatar-mode="fluffy"] .avatar-studio-preview>i,.fluffy-studio-mirror{width:104px;height:104px;flex-basis:104px}
+}
+/* Override the later MonoCode compact-dialog rules only for this editor. */
+#modalLayer .modal:has(.avatar-fluffy-controls){width:min(980px,calc(100vw - 40px));max-width:980px}
+#modalLayer #editForm .fluffy-preview-grid button{grid-template-rows:136px auto;padding:10px}
+#modalLayer #editForm .fluffy-preview-picture{height:136px}
+#modalLayer #editForm .fluffy-preview-picture :is(img,canvas){width:136px;height:136px}
+#modalLayer #editForm .avatar-mode-tabs button{min-height:44px}
+#modalLayer:has(.avatar-fluffy-controls) .modal-footer .button{min-height:44px}
+#modalLayer #editForm .avatar-studio{padding:20px;gap:14px}
+#modalLayer .avatar-fluffy-controls .fluffy-preview-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+#modalLayer .avatar-fluffy-controls .fluffy-preview-grid button{grid-template-rows:136px auto;padding:10px}
+#modalLayer .fluffy-preview-picture img,#modalLayer .fluffy-preview-picture canvas{width:136px;height:136px}
+#modalLayer .fluffy-shape-grid img{width:120px;height:120px}
+#modalLayer .fluffy-palette-grid img{width:76px;height:76px}
+@media(max-width:620px){
+ #modalLayer .modal:has(.avatar-fluffy-controls){width:calc(100vw - 20px);max-width:calc(100vw - 20px)}
+ #modalLayer #editForm .fluffy-preview-grid button{grid-template-rows:110px auto;padding:7px}
+ #modalLayer #editForm .fluffy-preview-picture{height:110px}
+ #modalLayer #editForm .fluffy-preview-picture :is(img,canvas){width:110px;height:110px}
+ #modalLayer #editForm .avatar-studio{padding:12px}
+ #modalLayer .fluffy-shape-grid img{width:100px;height:100px}
+ #modalLayer .fluffy-palette-grid img{width:62px;height:62px}
+ #modalLayer .avatar-fluffy-controls .fluffy-preview-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ #modalLayer .avatar-fluffy-controls .fluffy-preview-grid button{grid-template-rows:110px auto;padding:7px}
+ #modalLayer .fluffy-preview-picture img,#modalLayer .fluffy-preview-picture canvas{width:110px;height:110px}
+}
+@media(prefers-reduced-motion:reduce){.fluffy-token,.fluffy-hero,.fluffy-live-preview{animation:none;transition:none}}

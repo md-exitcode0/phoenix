@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Phoenix | MonoCode V4</title>
+  <script src="backend-bootstrap.js"></script>
+  <script src="review-bootstrap.js"></script>
+  <link rel="stylesheet" href="sidebar.css?v=20260920-modal-stability">
+  <link rel="stylesheet" href="conversation.css?v=20260929a">
+  <link rel="stylesheet" href="desktop-viewer.css?v=20260926a">
+  <link rel="stylesheet" href="settings.css?v=20260918-settings-redesign">
+  <link rel="stylesheet" href="onboarding.css?v=20260927b">
+  <link rel="stylesheet" href="command-palette.css?v=20260904b">
+  <link rel="stylesheet" href="terminal-bundle.css?v=20260904b">
+  <link rel="stylesheet" href="theme.css?v=20260918-porcelain-graphite">
+  <link rel="stylesheet" href="sidekicks.css?v=20260921-fireforms-final3">
+  <link rel="stylesheet" href="components.css?v=20260926f">
+  <link rel="stylesheet" href="agent-components.css?v=20260930-repair">
+  <link rel="stylesheet" href="calm-chat.css?v=1">
+  <link rel="stylesheet" href="fluffies.css">
+  <link rel="stylesheet" href="monocode.css">
+  <link rel="stylesheet" href="monocode-corrections.css">
+  <link rel="stylesheet" href="screenshot-repairs.css">
+  <link rel="stylesheet" href="room-polish.css">
+</head>
+<body>
+  <div class="window-chrome" data-tauri-drag-region>
+    <span class="chrome-drag" data-tauri-drag-region></span>
+    <div class="chrome-controls">
+      <button type="button" id="winMin" aria-label="Minimize" title="Minimize"><svg viewBox="0 0 12 12"><path d="M2.5 6h7"/></svg></button>
+      <button type="button" id="winMax" aria-label="Maximize" title="Maximize"><svg viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" rx="1"/></svg></button>
+      <button type="button" id="winClose" class="chrome-close" aria-label="Close" title="Close"><svg viewBox="0 0 12 12"><path d="M3 3l6 6M9 3 3 9"/></svg></button>
+    </div>
+  </div>
+  <div id="appShell" class="app-shell">
+    <aside id="companySidebar" class="company-sidebar" aria-label="Phoenix company">
+      <div class="fire-field" aria-hidden="true"></div>
+
+      <header class="sidebar-header">
+        <button id="sidebarToggle" class="phoenix-brand" type="button" aria-label="Collapse sidebar" title="Collapse sidebar (Ctrl+\\)">
+          <img class="phoenix-mark phoenix-raster-logo" data-phoenix-logo src="assets/phoenix_logo.svg" alt="">
+          <span class="brand-copy"><strong>Phoenix</strong><small>your company</small></span>
+          <svg class="collapse-glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="m12.5 5-5 5 5 5"/></svg>
+        </button>
+      </header>
+
+      <div class="sidebar-tools">
+        <label class="search-box" for="companySearch">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.7" cy="8.7" r="5.1"/><path d="m12.6 12.6 3.6 3.6"/></svg>
+          <input id="companySearch" type="search" autocomplete="off" placeholder="Search your company">
+          <kbd>⌘K</kbd>
+        </label>
+        <button id="filterButton" class="icon-button filter-button" type="button" aria-label="Filter company" aria-expanded="false" title="Filter company">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5h13M6 10h8M8.2 15h3.6"/></svg>
+        </button>
+      </div>
+      <nav id="sidebarActions" class="sidebar-actions" aria-label="Company setup">
+        <button type="button" data-company-action="create-agent">Create an agent</button>
+        <button type="button" data-company-action="create-group">Create a group</button>
+        <button type="button" data-company-action="workflows">Workflows &amp; crons</button>
+        <button type="button" data-company-action="connections">Connections &amp; skills</button>
+        <button type="button" data-company-action="memory">Memory</button>
+      </nav>
+
+      <div id="sidebarList" class="sidebar-list" aria-live="polite"></div>
+
+      <footer class="sidebar-footer">
+        <button id="settingsButton" class="settings-button" type="button" aria-label="Settings" title="Settings">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8.4 2.7h3.2l.5 2a6.2 6.2 0 0 1 1.4.8l2-.6 1.6 2.8-1.5 1.4v1.7l1.5 1.4-1.6 2.8-2-.6a6.2 6.2 0 0 1-1.4.8l-.5 2H8.4l-.5-2a6.2 6.2 0 0 1-1.4-.8l-2 .6-1.6-2.8 1.5-1.4V9.1L2.9 7.7l1.6-2.8 2 .6a6.2 6.2 0 0 1 1.4-.8l.5-2Z"/><circle cx="10" cy="10" r="2.2"/></svg>
+          <span>Settings</span>
+          <kbd>⌘,</kbd>
+        </button>
+        <button id="profileButton" class="theme-toggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode"><svg class="theme-icon theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2m-7.07-2.93 1.41-1.41M17.66 6.34l1.41-1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg><svg class="theme-icon theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></button>
+      </footer>
+      <div id="sidebarResize" class="sidebar-resize" role="separator" aria-orientation="vertical" aria-label="Resize sidebar"></div>
+    </aside>
+
+    <button id="sidebarWake" class="sidebar-wake" type="button" aria-label="Open sidebar" title="Open sidebar (Ctrl+\\)">
+      <img class="phoenix-raster-logo" data-phoenix-logo src="assets/phoenix_logo.svg" alt="">
+    </button>
+
+    <main id="conversationStage" class="conversation-stage">
+      <div class="stage-fire" aria-hidden="true"></div>
+      <header id="conversationHeader" class="conversation-header">
+        <div id="stageAvatar" class="stage-avatar"></div>
+        <span><strong id="stageName">Phoenix</strong><small id="stageRole">Chief of Staff</small></span>
+        <button id="stageMore" type="button" aria-label="Coworker options"><svg viewBox="0 0 20 20"><circle cx="4" cy="10" r="1"/><circle cx="10" cy="10" r="1"/><circle cx="16" cy="10" r="1"/></svg></button>
+        <span class="header-spacer"></span>
+        <div id="stagePanelToggles" class="stage-panel-toggles" role="group" aria-label="Panels">
+          <button id="terminalToggle" class="stage-panel-button terminal-toggle" type="button" aria-label="Toggle terminal" title="Toggle bottom panel (Ctrl+J)" aria-expanded="false" aria-controls="termPanel">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4.8 6.2 3.7 3.8-3.7 3.8M10.4 14h4.8"/></svg>
+          </button>
+          <button id="stageSidebarButton" class="stage-panel-button" type="button" aria-label="Toggle workspace sidebar" title="Toggle sidebar (Ctrl+B)" aria-expanded="false" aria-controls="inspectionSidebar">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3.75" width="14" height="12.5" rx="2.6"/><path d="M12.25 3.75v12.5"/></svg>
+          </button>
+        </div>
+        <button id="teachAgentButton" class="teach-agent-button" type="button">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><g transform="translate(0 1.9)"><path d="M3 5.5 10 3l7 2.5-7 2.7-7-2.7Z"/><path d="M5 7.2v4.5c2.8 2 7.2 2 10 0V7.2M17 5.5v6"/></g></svg>
+          <span>Teach agent</span>
+        </button>
+      </header>
+      <div id="conversationBody" class="conversation-body">
+        <button id="workingElsewhereBanner" class="working-elsewhere-banner" type="button" hidden></button>
+        <section id="conversationFeed" class="conversation-feed" aria-live="polite" aria-label="Conversation"></section>
+        <nav id="conversationPromptRail" class="conversation-prompt-rail" aria-label="Your recent prompts" hidden></nav>
+        <button id="jumpLatest" class="jump-latest" type="button" hidden>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5"/></svg><span>Back to latest</span>
+        </button>
+        <div id="composerFade" class="composer-fade" hidden></div>
+      </div>
+
+      
+
+      <section id="composerZone" class="composer-zone">
+        <div id="approvalStack" class="approval-stack"></div>
+
+        <details id="queueBlock" class="status-block queue-block" hidden>
+          <summary><span class="queue-count" id="queueCount">1</span><span><strong>Queued</strong><small id="queuePreview"></small></span><svg viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg></summary>
+          <div id="queueList" class="queue-list"></div>
+        </details>
+
+        <details id="taskBlock" class="status-block task-block" hidden>
+          <summary class="td-trigger"><span class="td-head-icon" aria-hidden="true"><svg class="td-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg><svg class="td-done" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="currentColor"/><path d="M7.5 12.25 10.5 15.25 16.75 8.75" fill="none" stroke="#fff" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" pathLength="1"/></svg></span><strong id="taskHeadline" class="td-title">To-dos</strong><small id="taskProgress" class="td-count"></small><svg class="td-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <ol id="taskList" class="task-list td-list-items" aria-live="polite"></ol>
+        </details>
+
+        <div id="mentionPicker" class="mention-picker" hidden></div>
+        <div id="slashPicker" class="mention-picker slash-picker" hidden aria-label="Slash commands"></div>
+        <form id="composer" class="composer" autocomplete="off">
+          <div id="attachmentTray" class="attachment-tray" aria-hidden="true"></div>
+          <div id="composerCommentPopover" class="composer-comment-popover" role="tooltip" hidden></div>
+          <div id="mentionTray" class="composer-mention-tray" hidden aria-label="Mentioned coworkers"></div>
+          <div id="composerInput" role="textbox" aria-label="Message" aria-multiline="true" contenteditable="true" spellcheck="true" data-placeholder="Ask Phoenix anything"></div>
+          <div class="composer-toolbar">
+            <div id="attachmentMenu" class="plain-attachment-control">
+              <button id="attachButton" class="composer-tool square-tool plain-attachment-button" type="button" aria-label="Add attachment" title="Add attachment"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4.6v10.8M4.6 10h10.8"/></svg></button>
+            </div>
+            <input id="attachmentInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" multiple hidden>
+            <details id="composerOptions" class="composer-options">
+              <summary aria-label="Conversation options: model, context, reasoning and prompt stash" aria-controls="composerOptionsPanel" aria-expanded="false">Options<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m5 6 3 3 3-3"/></svg></summary>
+              <div id="composerOptionsPanel" class="composer-options-panel" role="group" aria-label="Conversation settings">
+                <strong class="composer-options-heading">Conversation settings</strong>
+            <button id="modelButton" class="composer-tool selector-tool" type="button" aria-label="Choose model">
+              <span id="composerProviderIcon"></span><strong id="composerModel">Model</strong><svg viewBox="0 0 16 16"><path d="m5 6 3 3 3-3"/></svg>
+            </button>
+            <div id="contextControl" class="composer-liquid-control goo-trigger" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false" aria-label="Context window">
+              <span class="composer-liquid-copy"><small>Context</small><strong id="composerContext">Context</strong></span>
+              <span class="composer-liquid-track" aria-hidden="true"><i id="contextRangeFill"></i></span>
+              <input id="contextRange" type="range" min="8192" max="8192" step="1" value="8192" aria-label="Context window">
+              <button id="contextButton" class="composer-liquid-detail" type="button" aria-label="Context window usage"><span id="contextPercent">—</span><em>%</em></button>
+            </div>
+            <div id="reasoningControl" class="composer-liquid-control goo-trigger" role="button" tabindex="0" aria-haspopup="dialog" aria-expanded="false" aria-label="Reasoning effort">
+              <span class="composer-liquid-copy"><small>Reasoning</small><strong id="composerReasoning">High</strong></span>
+              <span class="composer-liquid-track" aria-hidden="true"><i id="reasoningRangeFill"></i></span>
+              <input id="reasoningRange" type="range" min="0" max="1" step="1" value="1" aria-label="Reasoning effort">
+            </div>
+            <span id="composerTokens" class="composer-token-count" hidden></span>
+            <button id="stashButton" class="composer-tool square-tool stash-button" type="button" aria-label="Stash prompt" title="Stash this prompt · empty box opens the stash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg><b class="stash-count" hidden></b></button>
+              </div>
+            </details>
+            <button id="permissionButton" class="composer-tool selector-tool permission-tool" type="button" aria-label="Choose access">
+              <svg viewBox="0 0 20 20"><rect x="4" y="8" width="12" height="9" rx="2"/><path d="M7 8V6a3 3 0 0 1 6 0v2"/></svg><strong id="composerPermission">Workspace</strong><svg viewBox="0 0 16 16"><path d="m5 6 3 3 3-3"/></svg>
+            </button>
+            <span class="toolbar-spacer"></span>
+            <button id="voiceButton" class="composer-tool square-tool" type="button" aria-label="Voice input" title="Voice input">
+              <svg viewBox="0 0 20 20"><path d="M10 3a2.5 2.5 0 0 0-2.5 2.5v4a2.5 2.5 0 0 0 5 0v-4A2.5 2.5 0 0 0 10 3Z"/><path d="M5 9.5a5 5 0 0 0 10 0M10 14.5V18M7.5 18h5"/></svg>
+            </button>
+            <button id="sendButton" class="send-button" type="submit" aria-label="Send message">
+              <span id="sendLabel" class="send-label">Send</span>
+              <canvas id="sendOrb" class="send-orb" aria-hidden="true" hidden></canvas>
+              <svg class="send-glyph" viewBox="0 0 20 20"><path d="M10 15V5M6 9l4-4 4 4"/></svg>
+              <svg class="stop-glyph" viewBox="0 0 20 20"><rect x="6" y="6" width="8" height="8" rx="1.5"/></svg>
+            </button>
+          </div>
+        </form>
+      </section>
+    </main>
+    <section id="termPanel" class="term-panel" hidden aria-label="Terminal panel">
+      <div id="termResize" class="term-resize" role="separator" aria-orientation="horizontal" aria-label="Resize terminal"></div>
+      <header class="term-head">
+        <div id="termTabs" class="term-tabs" role="tablist" aria-label="Terminal tabs"></div>
+        <button id="termNewTab" class="term-new-tab" type="button" aria-label="New terminal" title="New terminal"><span aria-hidden="true">+</span></button>
+        <button id="termClose" type="button" aria-label="Close terminal" title="Close bottom panel"><span aria-hidden="true">×</span></button>
+      </header>
+      <div id="termScreen" class="term-screen" tabindex="0" aria-label="Terminal"></div>
+    </section>
+  </div>
+
+  <aside id="inspectionSidebar" class="inspection-sidebar" aria-label="Activity sidebar" aria-hidden="true">
+    <header class="inspection-tabbar" aria-label="Workspace bar">
+      <div id="inspectionTabStrip" class="inspection-tab-strip" role="tablist" aria-label="Workspace panels">
+        <button id="inspectionReviewTab" aria-controls="inspectionChangesPanel" type="button" role="tab" class="inspection-tab review-tab" data-inspection-tab="changes" aria-selected="true" tabindex="0"><span class="review-tab-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><rect x="3.5" y="3.5" width="13" height="13" rx="3.5"/><path d="M10 6.9v4.2M7.9 9h4.2M7.9 13.4h4.2"/></svg></span><span>Review</span><i id="inspectionChangesCount">0</i></button>
+        <div id="inspectionBrowserTabs" class="inspection-browser-tabs">
+          <button id="inspectionBrowserTab" type="button" role="tab" class="inspection-tab browser-page-tab" data-inspection-tab="browser" aria-selected="false" tabindex="-1" hidden><span class="browser-tab-fallback" aria-hidden="true"><img class="phoenix-raster-logo" data-phoenix-logo src="assets/phoenix_logo.svg" alt=""></span><strong id="browserTabTitle">New tab</strong><span class="browser-tab-close" aria-hidden="true">×</span></button>
+        </div>
+        <div id="inspectionImageTabs" class="inspection-image-tabs"></div>
+        <button id="inspectionDesktopTab" aria-controls="inspectionDesktopPanel" type="button" role="tab" class="inspection-tab" data-inspection-tab="desktop" aria-selected="false" tabindex="-1"><span>Desktop</span></button>
+        <button id="inspectionSourcesTab" type="button" role="tab" class="inspection-tab sources-page-tab" data-inspection-tab="sources" aria-selected="false" tabindex="-1" hidden><span class="sources-tab-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5"/><path d="M10 3.5c-3.6 4.3-3.6 8.7 0 13M10 3.5c3.6 4.3 3.6 8.7 0 13M4 7.9h12M4 12.1h12"/></svg></span><span>Sources</span><i id="inspectionSourcesCount">0</i></button>
+        <button id="browserNewTab" class="inspection-new-tab" type="button" aria-label="New browser tab" title="New tab"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 5.2v9.6M5.2 10h9.6"/></svg></button>
+      </div>
+      <div id="inspectionPanelControls" class="inspection-panel-controls" role="group" aria-label="Workspace controls">
+        <button id="inspectionExpandButton" class="inspection-toggle inspection-expand" type="button" aria-label="Expand workspace" title="Expand workspace" aria-pressed="false" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path class="expand-out" d="M7.3 3.5H3.5v3.8M12.7 16.5h3.8v-3.8"/><path class="expand-in" d="M3.5 7.3h3.8V3.5M16.5 12.7h-3.8v3.8"/></svg></button>
+      </div>
+    </header>
+    <div class="inspection-toolbar">
+      <div class="inspection-toolbar-view desktop-workspace-toolbar" data-inspection-toolbar="desktop" hidden>
+        <select id="desktopWorkspacePicker" aria-label="Agent desktop" disabled></select>
+        <span id="desktopWorkspaceStatus" class="desktop-workspace-status" role="status"></span>
+      </div>
+      <div id="inspectionReviewToolbar" class="inspection-toolbar-view" data-inspection-toolbar="changes">
+        <button id="reviewTurnPicker" type="button"><strong>Agent edits</strong><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6.2 8.4 3.8 3.8 3.8-3.8"/></svg></button>
+        <span id="reviewDiffStats" class="review-diff-stats"><b>+0</b><i>−0</i></span>
+        <span class="inspection-toolbar-spacer"></span>
+        <span id="reviewWorkspaceLabel" class="review-workspace-label"></span>
+      </div>
+      <div id="inspectionBrowserToolbar" class="inspection-toolbar-view browser-side-toolbar" data-inspection-toolbar="browser" hidden>
+        <button type="button" class="browser-nav-button" data-browser-action="back" aria-label="Back"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 10H4.9m0 0 4.4-4.4M4.9 10l4.4 4.4"/></svg></button>
+        <button type="button" class="browser-nav-button" data-browser-action="forward" aria-label="Forward"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 10h10.6m0 0-4.4-4.4M15.1 10l-4.4 4.4"/></svg></button>
+        <button type="button" class="browser-nav-button browser-reload-button" data-browser-action="reload" aria-label="Reload"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15.7 11.1a5.8 5.8 0 1 1-1.6-4.7"/><path d="M15.6 4.2v3.6H12"/></svg></button>
+        <label class="browser-address-shell"><span class="browser-tune-icon" aria-hidden="true"><i></i><i></i></span><input id="browserAddress" value="" placeholder="Search or type a URL" aria-label="Browser address" spellcheck="false" autocomplete="off"><span class="browser-open-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="m7.8 12.2 6-6M8.4 6.2H14v5.6"/></svg></span></label>
+        <span id="browserTeachingBadge" class="browser-teaching-badge" hidden><i></i> Teaching</span>
+        <button id="browserExtensions" class="browser-settings-button browser-extensions-button" type="button" aria-label="Extensions" title="Extensions"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 3.8h2.2a1.6 1.6 0 1 1 3.2 0H15a1.2 1.2 0 0 1 1.2 1.2v2.4a1.6 1.6 0 1 1 0 3.2V13a1.2 1.2 0 0 1-1.2 1.2h-2.4a1.6 1.6 0 1 0-3.2 0H7A1.2 1.2 0 0 1 5.8 13v-2.2a1.6 1.6 0 1 0 0-3.2V5A1.2 1.2 0 0 1 7 3.8Z"/></svg></button>
+        <div id="browserExtensionsMenu" class="browser-settings-menu browser-extensions-menu" hidden></div>
+        <button id="browserSettings" class="browser-settings-button" type="button" aria-label="Browser settings" title="Browser settings"><svg viewBox="0 0 20 20" aria-hidden="true" class="icon-dots"><circle cx="10" cy="4.9" r="1.15"/><circle cx="10" cy="10" r="1.15"/><circle cx="10" cy="15.1" r="1.15"/></svg></button>
+        <div id="browserSettingsMenu" class="browser-settings-menu" hidden></div>
+        <div id="teachingTopbar" class="teaching-topbar" hidden>
+          <span class="teaching-status"><i></i><span><strong id="teachingStatusTitle">Showing the workflow</strong><small><b id="teachingLatestStep">Ready for your first action</b><em id="teachingStepCount">0 actions learned</em></small></span></span>
+          <button id="cancelTeaching" class="button secondary" type="button">Cancel</button>
+          <button id="finishTeaching" class="button primary" type="button">Finish</button>
+        </div>
+      </div>
+      <div id="inspectionImageToolbar" class="inspection-toolbar-view" data-inspection-toolbar="image" hidden></div>
+      <div id="inspectionSourcesToolbar" class="inspection-toolbar-view" data-inspection-toolbar="sources" hidden><strong>Sources</strong><span id="inspectionSourcesLabel">Conversation images</span></div>
+    </div>
+    <div class="inspection-content">
+      <section id="inspectionBrowserPanel" role="tabpanel" class="inspection-panel inspection-browser-panel" data-inspection-panel="browser" hidden>
+        <div class="inspection-empty"><canvas class="matrix-orb" data-matrix-orb data-size="110" data-state="idle" aria-hidden="true"></canvas><strong>The private browser will appear here</strong><small>Open a login, teaching flow, or browser task to follow it without leaving the conversation.</small></div>
+      </section>
+      <section id="inspectionChangesPanel" role="tabpanel" aria-labelledby="inspectionReviewTab" class="inspection-panel inspection-changes-panel" data-inspection-panel="changes">
+        <div class="review-layout">
+          <div id="inspectionChangesList" class="inspection-changes-list"></div>
+          <aside class="review-files-pane" aria-label="Workspace files">
+            <div class="review-resizer" role="separator" aria-orientation="vertical" aria-label="Resize file tree" tabindex="0"></div>
+            <label class="review-filter"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9.1" cy="9.1" r="4.6"/><path d="m12.5 12.5 3.1 3.1"/></svg><input id="reviewFilter" type="search" placeholder="Filter files…" aria-label="Filter workspace files"></label>
+            <div id="reviewFileTree" class="review-file-tree"></div>
+          </aside>
+        </div>
+      </section>
+      <section id="inspectionImagePanel" role="tabpanel" class="inspection-panel inspection-image-panel" data-inspection-panel="image" hidden>
+        <div id="inspectionImageEmpty" class="inspection-empty"><span class="inspection-empty-image"><i></i></span><strong>Open an image from the conversation</strong><small>Attached, downloaded, and generated images stay beside the thread for reference.</small></div>
+        <figure id="inspectionImageFigure" hidden>
+          <div class="inspection-image-workspace">
+            <div id="inspectionImageStage" class="inspection-image-stage">
+              <div id="inspectionImageActions" class="image-focus-actions" aria-label="Image actions">
+                <button id="imageCommentToggle" type="button" aria-pressed="false">Comment</button>
+                <button id="imageRemoveTab" type="button">Remove</button>
+                <button id="imageResizeToggle" type="button" aria-pressed="false">Actual size</button>
+              </div>
+              <div id="imageCommentInstruction" class="image-comment-instruction" hidden><span id="imageCommentTotal">0 comments</span><button id="imageCommentSend" type="button" disabled>Send</button><button id="imageCommentCancel" type="button" aria-label="Remove all comments">×</button></div>
+              <div id="inspectionImageCanvas" class="inspection-image-canvas"><img id="inspectionImage" alt=""><span id="inspectionImageLoading">Loading image…</span><div id="imageCommentPins" class="image-comment-pins"></div><label id="imageCommentEditor" class="image-comment-editor" hidden><input id="imageCommentText" type="text" autocomplete="off" placeholder="Comment at this point"><button id="imageCommentSave" type="button" aria-label="Save comment to composer" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15.8V4.2M4.8 9.4 10 4.2l5.2 5.2"/></svg></button></label></div>
+            </div>
+          </div>
+        </figure>
+      </section>
+      <section id="inspectionSourcesPanel" role="tabpanel" class="inspection-panel inspection-sources-panel" data-inspection-panel="sources" hidden>
+        <div id="inspectionSourcesGrid" class="inspection-sources-grid"></div>
+      </section>
+      <section id="inspectionDesktopPanel" role="tabpanel" aria-labelledby="inspectionDesktopTab" class="inspection-panel inspection-desktop-panel" data-inspection-panel="desktop" hidden>
+        <div id="desktopObservationStage" class="desktop-observation-stage"><img id="desktopObservationImage" alt="" hidden><p id="desktopObservationEmpty" class="desktop-observation-empty">An agent’s screen will appear here when it opens an app.</p><div id="desktopConnecting" class="desktop-connecting" hidden><svg class="desktop-connecting-ring" width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="12" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="2"/><circle cx="13" cy="13" r="12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-dasharray="21.1 54.3"/></svg><span>Connecting to agent’s screen</span></div><button id="desktopFullscreen" class="desktop-fullscreen-button" type="button" aria-label="Full screen" title="Full screen"><svg class="df-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg><svg class="df-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button><svg id="desktopCursor" class="desktop-cursor" width="30" height="30" viewBox="0 0 24 24" fill="#111318" stroke="#fff" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true" hidden><path d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z"/></svg></div>
+        <footer id="desktopObservationCaption" class="desktop-observation-caption">Latest observation</footer>
+      </section>
+    </div>
+  </aside>
+
+  <div id="inspectionResize" class="inspection-resize" role="separator" aria-orientation="vertical" aria-label="Resize activity sidebar" tabindex="0"></div>
+
+  <section id="browserOverlay" class="browser-overlay" hidden aria-label="Agent browser">
+    <div class="mountain-blur" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="embedded-browser">
+      <span id="browserOwner" hidden></span>
+      <div id="browserViewport" class="browser-viewport" tabindex="0" aria-label="Interactive website frame">
+        <canvas id="browserCanvas" aria-label="Live agent browser" hidden></canvas>
+        <img id="browserFrame" alt="Live agent browser" hidden>
+        <div id="browserEmpty" class="browser-empty"><span class="browser-empty-mark"></span><strong>Private agent browser</strong><small>The live website appears here when the agent opens a page.</small></div>
+        <span id="browserGhostCursor" class="browser-ghost-cursor" aria-hidden="true"><i></i></span>
+        <aside id="browserDownloadShelf" class="browser-download-shelf" hidden aria-live="polite">
+          <span class="browser-download-icon" aria-hidden="true">↓</span>
+          <span class="browser-download-copy"><strong id="browserDownloadName">Downloading…</strong><small id="browserDownloadStatus">Saving to Phoenix Downloads</small></span>
+          <button id="browserDownloadOpen" type="button">Open</button>
+          <button id="browserDownloadReveal" type="button" aria-label="Show downloaded file in its folder">Show file</button>
+          <button id="browserDownloadDismiss" class="browser-download-dismiss" type="button" aria-label="Dismiss download">×</button>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <section id="settingsView" class="settings-view" hidden aria-label="Settings"></section>
+  <section id="onboardingView" class="onboarding-view" hidden aria-label="Welcome to Phoenix"></section>
+
+  <div id="menuLayer" class="menu-layer" hidden></div>
+  <div id="modalLayer" class="modal-layer" hidden></div>
+  <div id="toastRegion" class="toast-region" aria-live="polite"></div>
+
+  <template id="sectionTemplate">
+    <section class="company-section">
+      <header><span class="section-title"></span><span class="section-count"></span><button class="section-toggle" type="button" aria-label="Collapse section"><svg viewBox="0 0 16 16"><path d="m4 6 4 4 4-4"/></svg></button></header>
+      <div class="section-items"></div>
+    </section>
+  </template>
+
+  <script src="fluid-orb.js?v=20260926a"></script>
+  <script src="matrix-orb.js?v=20260926a"></script>
+  <script src="components.js?v=20260928a"></script>
+  <script src="terminal-bundle.js?v=20260904b"></script>
+  <script src="sidekicks2d-bundle.js?v=20260921-fireforms-final3"></script>
+  <script src="agent-kit.js?v=20260929a"></script>
+  <script src="avatar-morphs.js?v=20260926b"></script>
+  <script src="avatar-morph.js?v=20260926a"></script>
+  <script src="fluffy-family.js"></script>
+  <script src="fluffy-preferences.js"></script>
+  <script src="fluffy-fixture.js"></script>
+  <script src="fluffy-activity.js"></script>
+  <script src="fluffy-native-player.js"></script>
+  <script src="fluffy-view.js"></script>
+  <script src="sidebar.js?v=20260929a"></script>
+  <script src="provider-setup.js?v=20260917-provider-recovery-2"></script>
+  <script src="desktop-viewer.js?v=20260926b"></script>
+  <script src="conversation.js?v=20260930-repair"></script>
+  <script src="channels.js?v=20260927e"></script>
+  <script src="docs.js?v=20260928a"></script>
+  <script src="review-settings.js"></script>
+  <script src="settings.js?v=20260927d"></script>
+  <script src="view.js?v=20260926a"></script>
+  <script src="command-palette.js?v=20260904b"></script>
+  <script src="onboarding.js?v=20260927b"></script>
+  <script src="monocode.js"></script>
+  <script src="cursor-motion.js"></script>
+  <script type="module" src="conversation-motion.mjs"></script>
+</body>
+</html>

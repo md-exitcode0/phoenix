@@ -1,0 +1,11 @@
+{
+  "author": "Evan-Amos",
+  "title": "Banana-Single.jpg",
+  "source": "https://commons.wikimedia.org/wiki/File:Banana-Single.jpg",
+  "download": "https://upload.wikimedia.org/wikipedia/commons/8/8a/Banana-Single.jpg",
+  "license": "CC BY-SA 3.0",
+  "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+  "changes": "none",
+  "sha256": "fe23c58652b3da3471fd86bf333aa27b45f2d9238ad03b42f4dfc795acf3954c",
+  "purpose": "Real photograph for a subsequent reference-guided repair test; not injected into the current autonomous run, not a generated result."
+}

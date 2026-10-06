@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Phoenix native services</title>
+</head>
+<body>
+<script>
+"use strict";
+
+(() => {
+  const query = new URLSearchParams(location.search);
+  const port = Number(query.get("port"));
+  const token = query.get("token") || "";
+  const events = ["term-data", "term-exit", "provider-device-auth"];
+  let socket = null;
+  let retry = 150;
+
+  function send(value, connection = socket) {
+    if (connection && connection === socket && connection.readyState === WebSocket.OPEN) {
+      connection.send(JSON.stringify(value));
+    }
+  }
+
+  async function connect() {
+    if (!Number.isInteger(port) || port < 1024 || port > 65535 || token.length < 24) return;
+    const connection = new WebSocket(`ws://127.0.0.1:${port}/rust?token=${encodeURIComponent(token)}`);
+    socket = connection;
+    connection.onopen = () => { if (socket === connection) retry = 150; };
+    connection.onmessage = async (event) => {
+      if (socket !== connection || connection.readyState !== WebSocket.OPEN) return;
+      let message;
+      try { message = JSON.parse(event.data); } catch { return; }
+      if (message.type !== "invoke" || !Number.isSafeInteger(message.id)) return;
+      try {
+        const value = await window.__TAURI__.core.invoke(message.command, message.args || {});
+        send({ type: "result", id: message.id, ok: true, value }, connection);
+      } catch (error) {
+        send({ type: "result", id: message.id, ok: false, error: String(error?.message || error) }, connection);
+      }
+    };
+    connection.onclose = () => {
+      if (socket !== connection) return;
+      socket = null;
+      const delay = retry;
+      retry = Math.min(3000, Math.round(retry * 1.7));
+      setTimeout(connect, delay);
+    };
+  }
+
+  for (const name of events) {
+    window.__TAURI__.event.listen(name, (event) => {
+      send({ type: "event", name, payload: event.payload });
+    });
+  }
+  connect();
+})();
+</script>
+</body>
+</html>

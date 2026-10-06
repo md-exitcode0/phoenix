@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Phoenix",
+  "version": "0.1.0",
+  "identifier": "dev.phoenix.app",
+  "build": {
+    "frontendDist": "ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Phoenix",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 680,
+        "minHeight": 480,
+        "center": true,
+        "visible": false,
+        "decorations": false,
+        "theme": "Light",
+        "backgroundColor": "#ffffff"
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$HOME/.phoenix/**"]
+      }
+    }
+  },
+  "bundle": {
+    "active": false
+  }
+}

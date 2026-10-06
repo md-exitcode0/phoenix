@@ -1,0 +1,54 @@
+{
+  "checks": {
+    "transparent_gutters": true,
+    "alpha_zero_rgb_zero": true,
+    "no_clipped_silhouette": true,
+    "loop_endpoints_match": true
+  },
+  "passed": true,
+  "stats": [
+    {
+      "file": "standard-idle.png",
+      "bytes": 392624,
+      "cells": 13,
+      "decoded_bytes": 2458624,
+      "sha256": "da76ded3422a5e31bc4ab1861d2402dd822f8a68898d0babca6dc7967eacb994"
+    },
+    {
+      "file": "standard-browsing.png",
+      "bytes": 985310,
+      "cells": 31,
+      "decoded_bytes": 4917248,
+      "sha256": "827a53a21b78d715dffd81441f264474ba8b8a00ab70eb55ff8be2585baadcd6"
+    },
+    {
+      "file": "standard-coding.png",
+      "bytes": 671406,
+      "cells": 22,
+      "decoded_bytes": 3687936,
+      "sha256": "aaeb3702dddc02d0ec3602c50ce8fcde512b371d3ec7acc590bee0bf580c60a8"
+    },
+    {
+      "file": "standard-waiting.png",
+      "bytes": 530397,
+      "cells": 17,
+      "decoded_bytes": 3687936,
+      "sha256": "71f2dd77c3cb04a5c82958a52d80fd2699c07ffe6e80186f9b62b05da4c07ada"
+    },
+    {
+      "file": "standard-success.png",
+      "bytes": 545632,
+      "cells": 17,
+      "decoded_bytes": 3687936,
+      "sha256": "44e6a9e4fb63c28357ec094ce6b90919f3f99a3f69a91b1b7998c50196bba893"
+    },
+    {
+      "file": "standard-error.png",
+      "bytes": 416889,
+      "cells": 13,
+      "decoded_bytes": 2458624,
+      "sha256": "98c67aca2785239a694f55bd87d59bdf29087615011f316165d2d25fcfaa2844"
+    }
+  ],
+  "bytes": 3542258
+}

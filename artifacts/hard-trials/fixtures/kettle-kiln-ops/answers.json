@@ -1,0 +1,20 @@
+{
+ "duplicate_order": [
+  "KK4158",
+  "KK4304"
+ ],
+ "returned_to_sender": "KK4240",
+ "payout_short_batch": "PB-0917",
+ "payout_missing_orders": [
+  "KK4195",
+  "KK4198",
+  "KK4196"
+ ],
+ "negative_margin_sku": "KK-GFT-SET",
+ "stockout_sku": "KK-VAS-BUD",
+ "duplicate_saas": [
+  "SHIPSTATION",
+  "SHIPPO"
+ ],
+ "chargeback_email": "m.harlow@example.com"
+}

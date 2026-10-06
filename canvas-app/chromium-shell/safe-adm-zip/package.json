@@ -1,0 +1,7 @@
+{
+  "name": "adm-zip",
+  "version": "0.5.99-phoenix-safe",
+  "description": "Safe drop-in for the adm-zip extraction electron-chrome-web-store uses",
+  "main": "index.js",
+  "private": true
+}

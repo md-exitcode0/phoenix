@@ -1,0 +1,28 @@
+{
+  "repository": "https://github.com/Leonxlnx/tastecode.git",
+  "revision": "d567c74c2eb0fa34569f00544878ff95a90ebd44",
+  "reviewedUtc": "2026-09-18T23:41:11.507855+00:00",
+  "license": "Apache-2.0",
+  "files": {
+    "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "NOTICE": "153a073cb41f4e72adee8612ae4cc9c25db5cdb7ea96c8fd8382644048945c7a",
+    "THIRD_PARTY_NOTICES.md": "8322c253c27541f39c788754631fc7bc3d3a5234bf8940d8476ade106af5f1f0",
+    "packages/design-agent/src/workflow.ts": "138469e0ae8a130d999dbc6d668a75283345da0d855f57684f7638b63cbd91f4",
+    "packages/design-agent/src/brand-phase.ts": "967bffb6e470d717e64e7eac0d3099150c2902bd74ede6833ee891ede05ce9b4",
+    "packages/design-agent/src/page-phase.ts": "34524bdd87b54647ea1e8921bc3d68f1247fca191842b77ab9a0c0c7976f27f5",
+    "packages/design-agent/src/asset-phase.ts": "daaf6b248de62b0ea1a6f04e31ad98b7ff3d26a19ce2b2cbf693a3a7986ee928",
+    "packages/design-agent/src/build-phase.ts": "bfd472d31211d9168caaee493cb13b5b39aa0749f7b70d763612639f883e5877",
+    "packages/design-agent/src/review-phase.ts": "e4c052aa9f114437da55b1c4f6c5189821384454f2d8e544b081148b6b54e259",
+    "packages/design-agent/src/content-guidance.ts": "29bdcdd8b451eb0a09f2fbfa9fde95765041ed588df01a2482691f8e5f5a29a8",
+    "packages/design-agent/src/motion-guidance.ts": "8ac19c1cc9ddaa1caa671a7799da187089dc74bcb2378e7f378a4d191ddec043",
+    "packages/design-agent/src/palette.ts": "2c9e1cb98489a6228fe7ec2238ac107dac4a38404a5c09c85cea6e0747159ccf",
+    "packages/design-agent/src/copywriting.ts": "e1e23287651018b423e83fa4cd5539ca83243317960fa0eb18bf1355b937c6ef",
+    "packages/design-agent/src/typography.ts": "a24395baf5030154947d1e0b72ff3c372b753745f323a0905006cdff656921ea",
+    "packages/design-agent/src/reference-library.ts": "f65cb5f748fbf8a939884c668e35dfb2c222116d79a82839f279f689018ae774",
+    "packages/design-agent/src/reference-directions.ts": "cc0dd85b89207d1f8655c124cf82636141873090b852b1dbba16dacf7289fec0",
+    "packages/design-agent/src/source-quality.ts": "697305b9c8f1817baf2516faf840e9eb521bff3ab2b7fb2a7a587f69f780c771",
+    "packages/design-agent/references/motion/reveal.js": "378beddcfdeb30a3bdb0030d3c22cb47db70b14fb7d8374029e4d23ed7f6c949",
+    "packages/design-agent/references/library/README.md": "a5c1734d7a3b535d9678fd99d8d481ce16e7bee2a4af2f62726e7a68d3135e48"
+  },
+  "policy": "Check and review upstream changes; never automatically overwrite Phoenix prompts or execute upstream code. Reference imagery is not redistributed."
+}

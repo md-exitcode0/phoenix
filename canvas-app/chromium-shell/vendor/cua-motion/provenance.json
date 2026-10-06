@@ -1,0 +1,16 @@
+{
+  "source": "https://github.com/trycua/cua",
+  "revision": "73387960d56a99dd2f607cef9b2bdae57e373217",
+  "directory": "libs/cua-driver/tools/cursor-gallery/motion-lab/motion",
+  "files": {
+    "generators.js": "3183eed11ec0ae4c6112c2415b4cbd5ef402d114adfd23326fa4ca37cf2bf1d3",
+    "scenes.js": "9a35d31241071a132dd235965a7af9f11c6006741ee0bcefbc394ca9b28cfd73",
+    "rng.js": "93148f5a4570d37638b6c8baef1b278183a22d3af789192fa633f48bc315afbd",
+    "THIRD_PARTY_NOTICES.md": "3268421fe758ec53bc11a2644aac1451a397027c508c199e86745636bb5499db",
+    "behaviors.js": "b6a788578aa1a3884c635fd36459591733a7aaf7227496ef850692f8bc7faf74",
+    "math.js": "37570056a7630bc21c2d696fd49f92e26a8ddf85370a18ac5c7f75fbf5111651",
+    "LICENSE": "c0779290c1d4783169aa3dbfb55feb505e563ef8a004bbf55298ceffcfbda8d9",
+    "plan.js": "1050b776c518a31ed79919ac779134d46cb22f5db3f8157f963cf9ca81e1ac19",
+    "candidates.js": "7231aa5769eb14c490f882cfabe2f571b406e1ffa28d2def8f86c7c5793c141e"
+  }
+}

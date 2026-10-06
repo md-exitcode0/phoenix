@@ -1,0 +1,16 @@
+#!/bin/bash
+set -euo pipefail
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ -x "$DIR/target/release/phoenix" ]]; then
+  exec "$DIR/target/release/phoenix" "$@"
+fi
+
+if [[ -x "$DIR/target/debug/phoenix" ]]; then
+  exec "$DIR/target/debug/phoenix" "$@"
+fi
+
+echo "Phoenix is not built yet."
+echo "Run ./install.sh once from phoenix_agent/ to build and install the CLI."
+exit 1

@@ -1,0 +1,8 @@
+/* The two-tone arrow is drawn by cursor-art.mjs. Only actual click feedback
+   gets a ripple; movement does not allocate decorative trail actors. */
+
+.phoenix-cursor-ripple {
+    background-color: rgba(255, 170, 80, 0.18);
+    border: 2px solid rgba(255, 190, 110, 0.85);
+    border-radius: 999px;
+}

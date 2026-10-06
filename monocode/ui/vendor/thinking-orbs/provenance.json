@@ -1,0 +1,11 @@
+{
+  "package": "thinking-orbs",
+  "version": "0.3.2",
+  "integrity": "sha512-QZFeBaPEzqhjiZoXy961EvDgaXk2WgXacF3Rbz+Sj5IfzDzBvTC86vdREUHniBffYibJFKSwbfllxLUdI/Xv6g==",
+  "source": "https://registry.npmjs.org/thinking-orbs/-/thinking-orbs-0.3.2.tgz",
+  "files": {
+    "engine.es.js": "e7dc939abf68eb2890f1a3ed49f129185e04ca690dee905b05820ed27adbf209",
+    "index-B8WsUNf5.js": "4b43963f6409d310b9d80e592d4fb0f1435884a59d0c252f6f1b75926c09b949",
+    "LICENSE": "915a283980628a0ca9e7b423ebafc6f3a0fa1e630ff17d34e59034808d92011c"
+  }
+}

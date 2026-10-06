@@ -1,0 +1,6 @@
+{
+  "sans": ["Bricolage Grotesque", "Syne", "Hanken Grotesk", "Schibsted Grotesk", "Space Grotesk", "Onest", "Instrument Sans", "Commissioner", "Spline Sans", "Figtree"],
+  "serif": ["Fraunces", "Newsreader", "Bodoni Moda", "Cormorant Garamond", "DM Serif Display", "Young Serif", "Instrument Serif", "Prata", "Gloock", "Lora"],
+  "display": ["Unbounded", "Dela Gothic One", "Archivo Black", "Big Shoulders", "Bebas Neue", "Changa One", "Righteous", "Bowlby One SC", "Paytone One", "Anybody"],
+  "mono": ["Martian Mono", "Azeret Mono", "Space Mono", "Fragment Mono", "Spline Sans Mono", "Roboto Mono", "Red Hat Mono", "PT Mono", "IBM Plex Mono", "JetBrains Mono"]
+}

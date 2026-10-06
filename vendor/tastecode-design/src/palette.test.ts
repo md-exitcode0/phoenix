@@ -1,0 +1,147 @@
+import { describe, expect, it } from 'vitest'
+import { auditPalette, generatePalette, paletteCssVariables } from './palette.js'
+
+const request = {
+  themes: {
+    light: {
+      accentSeed: '#C1492E',
+      neutralSeed: '#665A50',
+      surfaceContrast: 'quiet' as const,
+    },
+  },
+}
+
+describe('semantic palette generation', () => {
+  it('is deterministic and emits only passing semantic pairs', () => {
+    const first = generatePalette(request)
+    const second = generatePalette(request)
+    expect(first).toEqual(second)
+    expect(first.status).toBe('ready')
+    if (first.status !== 'ready') return
+    const light = first.value.themes.light!
+    expect(auditPalette(light.roles).pass).toBe(true)
+    expect(light.roles.accent).toBe('#C1492E')
+    expect(first.value.usageBalance.guidance).toContain('never a pixel quota')
+  })
+
+  it('preserves valid locked colors exactly', () => {
+    const result = generatePalette({
+      ...request,
+      locked: { light: { canvas: '#FFF8F0', accent: '#B92F2F' } },
+    })
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') return
+    expect(result.value.themes.light?.roles.canvas).toBe('#FFF8F0')
+    expect(result.value.themes.light?.roles.accent).toBe('#B92F2F')
+  })
+
+  it('never repairs the selected accent seed', () => {
+    const result = generatePalette({
+      themes: {
+        light: { accentSeed: '#5581D4', neutralSeed: '#666666', surfaceContrast: 'quiet' },
+      },
+    })
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') return
+    expect(result.value.themes.light?.roles.accent).toBe('#5581D4')
+  })
+
+  it.each(['light', 'dark'] as const)(
+    'repairs button text and hover together for a mid-tone accent in %s',
+    (theme) => {
+      const result = generatePalette({
+        themes: {
+          [theme]: { accentSeed: '#70805D', neutralSeed: '#635B52', surfaceContrast: 'quiet' },
+        },
+        locked: { [theme]: { accent: '#70805D' } },
+      })
+      expect(result.status).toBe('ready')
+      if (result.status !== 'ready') return
+      const palette = result.value.themes[theme]!
+      expect(palette.roles.accent).toBe('#70805D')
+      expect(auditPalette(palette.roles).pass).toBe(true)
+    },
+  )
+
+  it('derives accent-dependent roles from an explicit accent lock', () => {
+    const withLock = generatePalette({
+      themes: {
+        light: { accentSeed: '#C1492E', neutralSeed: '#666666', surfaceContrast: 'quiet' },
+      },
+      locked: { light: { accent: '#315EA8' } },
+    })
+    const fromLockedSeed = generatePalette({
+      themes: {
+        light: { accentSeed: '#315EA8', neutralSeed: '#666666', surfaceContrast: 'quiet' },
+      },
+      locked: { light: { accent: '#315EA8' } },
+    })
+    expect(withLock.status).toBe('ready')
+    expect(fromLockedSeed.status).toBe('ready')
+    if (withLock.status !== 'ready' || fromLockedSeed.status !== 'ready') return
+    for (const role of ['accent', 'accentHover', 'onAccent', 'accentText', 'focusRing'] as const) {
+      expect(withLock.value.themes.light?.roles[role]).toBe(
+        fromLockedSeed.value.themes.light?.roles[role],
+      )
+    }
+  })
+
+  it.each([
+    { canvas: '#777777', text: '#777777' },
+    { accent: '#70805D', onAccent: '#FFFFFF' },
+  ])('blocks an inaccessible locked pair instead of changing it: %o', (locked) => {
+    const result = generatePalette({
+      ...request,
+      locked: { light: locked },
+    })
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'blocked',
+        issues: expect.arrayContaining([
+          expect.objectContaining({ code: 'locked-contrast-conflict' }),
+        ]),
+      }),
+    )
+  })
+
+  it('keeps independent light and dark directions and stable CSS names', () => {
+    const result = generatePalette({
+      themes: {
+        light: request.themes.light,
+        dark: {
+          accentSeed: '#66D8C2',
+          neutralSeed: '#29343D',
+          surfaceContrast: 'defined',
+        },
+      },
+    })
+    expect(result.status).toBe('ready')
+    if (result.status !== 'ready') return
+    expect(result.value.themes.light?.roles.accent).toBe('#C1492E')
+    expect(result.value.themes.dark?.roles.accent).toBe('#66D8C2')
+    expect(paletteCssVariables(result.value.themes.dark!.roles)).toEqual(
+      expect.objectContaining({
+        '--color-surface-alt': expect.any(String),
+        '--color-on-accent': expect.any(String),
+      }),
+    )
+  })
+
+  it('rejects malformed colors and unknown locks at the boundary', () => {
+    expect(
+      generatePalette({ themes: { light: { ...request.themes.light, accentSeed: 'red' } } }),
+    ).toEqual(expect.objectContaining({ status: 'blocked' }))
+    expect(generatePalette({ ...request, locked: { light: { glow: '#FFFFFF' } } })).toEqual(
+      expect.objectContaining({
+        status: 'blocked',
+        issues: expect.arrayContaining([expect.objectContaining({ code: 'unknown-role' })]),
+      }),
+    )
+    expect(generatePalette({ ...request, locked: { ligth: { accent: '#FFFFFF' } } })).toEqual(
+      expect.objectContaining({
+        status: 'blocked',
+        issues: expect.arrayContaining([expect.objectContaining({ code: 'invalid-request' })]),
+      }),
+    )
+  })
+})

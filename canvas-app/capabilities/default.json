@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Phoenix desktop: core APIs and the native file-open dialog.",
+  "webviews": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-set-theme",
+    "core:window:allow-set-background-color",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-fullscreen",
+    "dialog:allow-open"
+  ]
+}

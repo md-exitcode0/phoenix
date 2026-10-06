@@ -1,0 +1,61 @@
+# Rust build artifacts (covers vendor/cognee-rs/target too)
+target/
+**/target/
+*.rs.bk
+*.pdb
+
+# Session/working notes — not product
+artifacts/**/durable-state/
+HANDOFF.md
+plans/
+reports/
+backups/
+_archive/
+memory/
+
+# Python leftovers
+__pycache__/
+*.pyc
+
+# JavaScript desktop/runtime dependencies
+node_modules/
+
+# Eval artifacts (HTML outputs from eval runs)
+evals/suite-e-head-to-head/**/*.html
+
+# Vendor metadata — don't track lockfiles, VCS info, or vendor gitignores
+vendor/cognee-rs/Cargo.lock
+vendor/headless_chrome/.cargo_vcs_info.json
+vendor/headless_chrome/.gitignore
+
+# Runtime state and secrets — never commit
+.phoenix/
+*.key
+*.pem
+.env
+.env.*
+auth-profiles.json
+secrets.*
+
+# Editor / tool local state
+.agents/
+.codex/
+.cursor/
+.claude/settings.local.json
+
+# OS noise
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Generated local outputs; retain only reusable test inputs
+/artifacts/*
+!/artifacts/banana-reference/
+!/artifacts/hard-trials/
+/artifacts/hard-trials/*
+!/artifacts/hard-trials/fixtures/
+!/artifacts/hard-trials/prompts/
+/canvas-app/artifacts/
+/canvas-app/sidekicks2d/evidence/
+/bench/

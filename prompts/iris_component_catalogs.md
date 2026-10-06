@@ -1,0 +1,10 @@
+Component catalogs (the user's picks; every item ships its full source code):
+
+- beUI — https://beui.dev/r/registry.json lists 124 animated components (buttons: button-magnetic, button-metallic, button-stateful, expanding-arrow-button, hold-action-button, slide-action-button; tilt-card, marquee, tabs, select, text-animation, ...). Item code: https://beui.dev/r/<name>.json. Docs per component: https://beui.dev/llms.txt. React + Tailwind + motion.
+- RareUI — https://www.rareui.com/r/registry.json (gooey-nav, scroll-progress, grid-reveal, animated-counter, gravity-letters, fluid-orb, folder-component, ...). Item code: https://www.rareui.com/r/<name>.json. Source: github.com/swamimalode07/rare-ui. React + Tailwind + motion.
+- Beautiful UI — https://www.beautifului.dev/r/registry.json (button, glide-menu, shimmer, stream-text, sidebar-nav, search, insight-cards, ...). Item code: https://www.beautifului.dev/r/<name>.json.
+- shadcn/ui — https://ui.shadcn.com/r/index.json. Item code: https://ui.shadcn.com/r/styles/new-york-v4/<name>.json; the newer set (bubble, ...) is https://ui.shadcn.com/r/styles/base-nova/<name>.json. Accessible primitives: accordion, dialog, tabs, navigation-menu, carousel, ... MIT.
+- Transitions.dev — https://transitions.dev/transitions/ lists ~40 motion patterns (tabs-sliding, accordion, modal-open-close, texts-reveal, 3d-tilt, card-stack-hover, learn-more-hover, number-pop-in, panel-reveal, shimmer-text, ...). Each page https://transitions.dev/transitions/<name>/ carries a plain CSS + HTML version and a self-contained React version with exact durations and easings.
+- Libraries.dev — MIT npm packages for React 18+: border-beam (glow riding a border), thinking-orbs, liquid-gooey, metal-fx (liquid-metal buttons), img-fx (image reveal loader; needs three). Docs: https://libraries.dev/beam.html, /orbs.html, /gooey.html, /metal.html, /image.html.
+
+Registry items are shadcn-format JSON: files[].content is the component source, dependencies are npm packages, registryDependencies are other items to fetch too.

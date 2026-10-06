@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f2ed">
+  <meta name="description" content="Phoenix is a desktop app with AI coworkers for research, websites, code and everyday computer work. See the product, explore the team, and learn how you stay in control.">
+  <title>Phoenix — AI coworkers for your computer</title>
+  <link rel="icon" href="assets/phoenix-logo.png" type="image/png">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="Phoenix home"><img src="assets/phoenix-logo.png" width="36" height="36" alt=""><span>Phoenix</span></a>
+    <button id="menu-toggle" class="mobile-menu" type="button" aria-controls="site-nav" aria-expanded="false">Menu <span aria-hidden="true">+</span></button>
+    <nav id="site-nav" aria-label="Main navigation">
+      <a href="#capabilities">What it does</a><a href="#team">Your coworkers</a><a href="#control">Your control</a>
+    </nav>
+    <div class="header-actions"><button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to dark theme" title="Switch color theme"><span aria-hidden="true">◐</span></button><button class="header-release" type="button" data-release>Release status <span aria-hidden="true">↗</span></button></div>
+  </header>
+  <main id="main">
+    <section id="top" class="hero" aria-labelledby="hero-title">
+      <div class="hero-heading">
+        <div><p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> Your work. A little more help.</p><h1 id="hero-title">AI coworkers.<br>On your <span class="last-word">computer<span class="period">.</span></span></h1></div>
+        <div class="hero-intro"><p>Phoenix is a desktop app that helps you research, build websites, write code, and work with files and apps.</p><p class="hero-follow">Give it a task. See the work. Decide what happens next.</p><a class="button primary" href="#tour">See how Phoenix works <span aria-hidden="true">↗</span></a><p class="availability">In development · Linux first</p></div>
+      </div>
+      <div class="product-stage" id="tour">
+        <div class="stage-topline"><span><i class="live-mark" aria-hidden="true"></i> ONE CONVERSATION. A WHOLE TEAM.</span><div class="preview-theme" role="group" aria-label="Product screenshot theme"><button type="button" data-preview-theme="light" aria-pressed="true">Light</button><button type="button" data-preview-theme="dark" aria-pressed="false">Dark</button></div></div>
+        <figure class="product-figure"><button class="screenshot-open" id="open-product-image" type="button" aria-label="Enlarge the Phoenix interface"><img id="product-image" src="assets/phoenix-team-light.png" width="1440" height="960" alt="Phoenix desktop interface showing a task and its named coworkers in one conversation." fetchpriority="high"><span class="image-zoom">View the interface <span aria-hidden="true">↗</span></span></button><figcaption>Actual Phoenix interface with example content. This preview does not run an AI task.</figcaption></figure>
+        <div class="product-notes"><p><span>01</span> Describe the outcome.</p><p><span>02</span> Follow the people and tools involved.</p><p><span>03</span> Review the result in the same place.</p></div>
+      </div>
+      <div class="hero-bottom"><span>Less copying between tools.<br>More time with the work itself.</span><a href="#capabilities">Start with something real <span aria-hidden="true">↓</span></a></div>
+    </section>
+
+    <section class="capabilities section" id="capabilities" aria-labelledby="capabilities-title">
+      <div class="section-heading"><p class="eyebrow">What would you like to get done?</p><h2 id="capabilities-title">Not just an answer.<br>A place to do the work.</h2><p>Start from a task, not a list of tools. Phoenix brings the conversation, files, browser and coworkers together.</p></div>
+      <div class="task-explorer">
+        <div class="task-tabs" role="tablist" aria-label="Explore an example task">
+          <button id="tab-build" type="button" role="tab" aria-selected="true" aria-controls="task-panel" data-task="build"><span class="task-number">01</span><span><strong>Build a website</strong><small>From a brief to a working page</small></span><span class="tab-arrow" aria-hidden="true">↗</span></button>
+          <button id="tab-research" type="button" role="tab" aria-selected="false" aria-controls="task-panel" tabindex="-1" data-task="research"><span class="task-number">02</span><span><strong>Research a decision</strong><small>Sources, comparisons, a clear answer</small></span><span class="tab-arrow" aria-hidden="true">↗</span></button>
+          <button id="tab-code" type="button" role="tab" aria-selected="false" aria-controls="task-panel" tabindex="-1" data-task="code"><span class="task-number">03</span><span><strong>Work on your code</strong><small>Read, change, test and review</small></span><span class="tab-arrow" aria-hidden="true">↗</span></button>
+          <button id="tab-files" type="button" role="tab" aria-selected="false" aria-controls="task-panel" tabindex="-1" data-task="files"><span class="task-number">04</span><span><strong>Make sense of files</strong><small>Turn source material into useful work</small></span><span class="tab-arrow" aria-hidden="true">↗</span></button>
+        </div>
+        <article class="task-panel" id="task-panel" role="tabpanel" aria-labelledby="tab-build" tabindex="0">
+          <div class="task-panel-head"><span class="eyebrow">Example brief</span><span class="example-label">Explore, not a live run</span></div>
+          <blockquote id="task-brief">Build a clear landing page for my product. Show what it does, make the mobile version work, and test the main actions.</blockquote>
+          <div class="task-team" id="task-team" aria-label="Coworkers for this example"></div>
+          <div class="task-detail"><h3 id="task-outcome">A website you can open and use.</h3><p id="task-explanation">Iris handles the interface. Theo can research assets and facts. Leo can check the code and interactions. You can inspect the files and the page as the work develops.</p></div>
+          <div class="task-footer"><button id="copy-brief" class="text-button" type="button">Copy this brief <span aria-hidden="true">↗</span></button><span id="copy-status" role="status" aria-live="polite"></span></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="team-section section" id="team" aria-labelledby="team-title">
+      <div class="team-intro"><p class="eyebrow">People-shaped roles. One workspace.</p><h2 id="team-title">Meet your<br>other coworkers.</h2><p>Talk to Phoenix to coordinate a task, or go straight to the coworker you need. Their roles make the work easier to follow.</p></div>
+      <div class="team-directory" aria-label="Phoenix coworkers">
+        <button type="button" class="person selected" data-person="phoenix" aria-pressed="true"><span class="person-mark phoenix-mark">P</span><span><strong>Phoenix</strong><small>Brings the work together</small></span><span aria-hidden="true">↗</span></button>
+        <button type="button" class="person" data-person="iris" aria-pressed="false"><span class="person-mark">I</span><span><strong>Iris</strong><small>Design & frontend</small></span><span aria-hidden="true">↗</span></button>
+        <button type="button" class="person" data-person="leo" aria-pressed="false"><span class="person-mark">L</span><span><strong>Leo</strong><small>Code & engineering</small></span><span aria-hidden="true">↗</span></button>
+        <button type="button" class="person" data-person="theo" aria-pressed="false"><span class="person-mark">T</span><span><strong>Theo</strong><small>Research & sources</small></span><span aria-hidden="true">↗</span></button>
+        <button type="button" class="person" data-person="elena" aria-pressed="false"><span class="person-mark">E</span><span><strong>Elena</strong><small>Documents & knowledge</small></span><span aria-hidden="true">↗</span></button>
+        <button type="button" class="person" data-person="remy" aria-pressed="false"><span class="person-mark">R</span><span><strong>Remy</strong><small>Reliability & review</small></span><span aria-hidden="true">↗</span></button>
+      </div>
+      <div class="coworker-note" aria-live="polite"><span class="eyebrow" id="person-role">Your point person</span><p id="person-description">Phoenix helps break down a task, bring in the right coworkers, and give you one clear response.</p></div>
+      <details class="more-team"><summary>The rest of the team <span aria-hidden="true">+</span></summary><div><p><strong>Nico</strong><span>Messages & correspondence</span></p><p><strong>Maya</strong><span>Calendars & coordination</span></p><p><strong>Vera</strong><span>Costs & purchasing</span></p><p><strong>Owen</strong><span>Relationships & follow-ups</span></p><p><strong>June</strong><span>Content & publishing</span></p><p><strong>Cleo</strong><span>Operations & routines</span></p></div></details>
+    </section>
+
+    <section class="control-section section" id="control" aria-labelledby="control-title">
+      <div class="control-copy"><p class="eyebrow">Help with the work. Not the last word.</p><h2 id="control-title">Your computer.<br>Your call.</h2><p>Phoenix gives AI tools access to real work. That makes clear boundaries just as important as capability.</p><dl><div><dt>Choose the workspace</dt><dd>Start inside a selected project. Broader access is a separate permission choice.</dd></div><div><dt>Choose the models</dt><dd>Connect the providers you use and assign models to different jobs.</dd></div><div><dt>Keep the work visible</dt><dd>Inspect files, tool activity and coworker contributions. Stop a task when you need to.</dd></div></dl></div>
+      <figure class="control-figure"><img src="assets/phoenix-settings-dark.png" width="1440" height="960" alt="Phoenix appearance settings showing the light and dark themes, text size and interface choices." loading="lazy"><figcaption>A workspace that feels like yours. Actual settings from the current app.</figcaption></figure>
+      <p class="privacy-note"><strong>Local-first does not mean offline AI.</strong> Phoenix keeps workspace and conversation state on your machine. Your chosen model providers and connected services receive the data needed for their requests.</p>
+    </section>
+
+    <section class="questions section" id="questions" aria-labelledby="questions-title">
+      <div><p class="eyebrow">Before you dive in</p><h2 id="questions-title">A few straight<br>answers.</h2></div>
+      <div class="faq-list">
+        <details><summary>Is Phoenix available to download?<span aria-hidden="true">+</span></summary><p>Phoenix is in development, with Linux as its current target. This page is a product preview. Public downloads, pricing and a release date have not been announced here.</p><button class="text-button" type="button" data-release>Read the release status <span aria-hidden="true">↗</span></button></details>
+        <details><summary>How is it different from a chatbot?<span aria-hidden="true">+</span></summary><p>The conversation sits beside tools for files, code, the browser and desktop apps. Coworkers can carry out steps and return their work in the same place, instead of only telling you what to do.</p></details>
+        <details><summary>Can it use my existing AI accounts?<span aria-hidden="true">+</span></summary><p>Phoenix supports multiple model providers and account-based routes. The providers and models available to you depend on your accounts and their supported connection methods. Provider usage limits still apply.</p></details>
+        <details><summary>Does it work completely on its own?<span aria-hidden="true">+</span></summary><p>You can give Phoenix a task that involves several steps and coworkers. Results still need review, and some actions need your input or permission. Reliability is being actively tested; this preview is not a promise of error-free autonomous work.</p></details>
+        <details><summary>What happens to my files?<span aria-hidden="true">+</span></summary><p>Phoenix works in the workspace you select. It can read or change files within the permissions you grant. Model and connected-service requests may include relevant task content, so choose providers and access settings appropriate for your work.</p></details>
+      </div>
+    </section>
+
+    <section class="closing section"><div><p class="eyebrow">A little team. Right where you work.</p><h2>Bring your next<br>idea to the desktop<span>.</span></h2></div><div><a class="button primary" href="#tour">Take another look <span aria-hidden="true">↗</span></a><button class="text-button" type="button" data-release>Check release status</button></div></section>
+  </main>
+  <footer class="site-footer"><a class="brand" href="#top"><img src="assets/phoenix-logo.png" width="30" height="30" alt=""><span>Phoenix</span></a><p>AI coworkers for your computer.</p><div><a href="#questions">Questions</a><a href="legal.html">Legal & licenses</a><span>© 2026 Phoenix</span></div></footer>
+
+  <dialog id="release-dialog" aria-labelledby="release-title"><button class="dialog-close" type="button" data-close aria-label="Close release status">×</button><p class="eyebrow">Release status</p><h2 id="release-title">Still in the workshop.</h2><p>Phoenix is being built and tested on Linux. There is no public installer, price, release date or waitlist connected to this page yet.</p><p>For now, explore the actual interface and sample tasks here. Nothing on this page starts a model request or collects your email.</p><a class="button primary" href="#tour" id="release-tour">See how Phoenix works <span aria-hidden="true">↗</span></a></dialog>
+  <dialog id="image-dialog" aria-label="Phoenix interface at full size"><button class="dialog-close" type="button" data-close aria-label="Close image">×</button><img id="enlarged-image" width="1440" height="960" alt="Enlarged Phoenix desktop interface with example content."><p>Actual interface · example content · not a live AI session</p></dialog>
+  <noscript><p class="noscript-note">All product information is available without JavaScript. Interactive previews and theme controls need JavaScript. Phoenix is in development; no public download or waitlist is connected to this page.</p></noscript>
+</body>
+</html>

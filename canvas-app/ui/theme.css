@@ -1,0 +1,266 @@
+/* Phoenix — porcelain / graphite.
+ * The application skin: semantic colors and shared control primitives.
+ * Layout and state machines remain in their owning component styles/scripts.
+ * Keep this after component styles so dialogs and portals use the same palette.
+ */
+:root {
+  color-scheme: light;
+  --bg: #f8f7f4;
+  --sidebar: #f0eeeb;
+  --sidebar-solid: #f0eeeb;
+  --surface: #fdfcf9;
+  --surface-raised: #fffefc;
+  --surface-muted: #f0eeea;
+  --hover: #eeebe6;
+  --selected: #eee4db;
+  --pressed: #e0dad2;
+  --line: #e2ded8;
+  --line-strong: #c9c2b9;
+  --ink: #292722;
+  --ink-soft: #625e58;
+  --ink-faint: #6b655e;
+  --muted: var(--ink-faint);
+  --ember: #aa513b;
+  --accent-ink: #93452f;
+  --accent-soft: #f3e5dc;
+  --accent-contrast: #fffaf5;
+  --control-bg: #fffefc;
+  --control-line: #d3ccc3;
+  --success: #387557;
+  --warning: #90601d;
+  --danger: #b64143;
+  --danger-contrast: #fff;
+  --overlay: rgb(36 31 26 / 27%);
+  --focus-ring: var(--ember);
+  --focus-halo: color-mix(in srgb, var(--ember) 25%, transparent);
+  --shadow-sm: 0 1px 2px rgb(41 31 22 / 5%), 0 1px 0 rgb(255 255 255 / 70%) inset;
+  --shadow: 0 8px 30px rgb(41 31 22 / 8%), 0 2px 5px rgb(41 31 22 / 4%);
+  --menu-shadow: 0 12px 38px rgb(35 29 23 / 13%), 0 3px 9px rgb(35 29 23 / 6%);
+  --terminal-bg: var(--surface);
+  --terminal-tab: var(--sidebar);
+  --terminal-hover: var(--hover);
+  --terminal-pressed: var(--pressed);
+  --terminal-line: var(--line);
+  --terminal-fg: var(--ink);
+  --terminal-muted: var(--ink-faint);
+  --terminal-scrollbar: var(--line-strong);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #18191d;
+  --sidebar: #1d1e23;
+  --sidebar-solid: #1d1e23;
+  --surface: #22242b;
+  --surface-raised: #292c33;
+  --surface-muted: #24262d;
+  --hover: #30323a;
+  --selected: #3b3332;
+  --pressed: #3c3e47;
+  --line: #353840;
+  --line-strong: #50545f;
+  --ink: #f2f0ed;
+  --ink-soft: #c4c1bd;
+  --ink-faint: #a6a3a0;
+  --ember: #e5a28b;
+  --accent-ink: #edb29e;
+  --accent-soft: #3c302e;
+  --accent-contrast: #302019;
+  --control-bg: #2d3038;
+  --control-line: #494d58;
+  --success: #88c8a4;
+  --warning: #e7bd7c;
+  --danger: #ef9293;
+  --danger-contrast: #32171a;
+  --overlay: rgb(7 8 12 / 62%);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 14%), 0 1px 0 rgb(255 255 255 / 3%) inset;
+  --shadow: 0 10px 34px rgb(0 0 0 / 20%), 0 2px 8px rgb(0 0 0 / 12%);
+  --menu-shadow: 0 16px 42px rgb(0 0 0 / 35%), 0 3px 10px rgb(0 0 0 / 20%);
+}
+
+/* Preserve the existing accent/contrast choices; no preference is rewritten. */
+:root[data-accent="gold"] { --ember: #866518; --accent-ink: #765713; --accent-soft: #f1ead5; }
+:root[data-accent="rose"] { --ember: #aa4262; --accent-ink: #93374f; --accent-soft: #f4e2e8; }
+:root[data-accent="copper"] { --ember: #a45930; --accent-ink: #864725; --accent-soft: #f2e5d9; }
+:root[data-theme="dark"][data-accent="gold"] { --ember: #d8ba77; --accent-ink: #e7cb8e; --accent-soft: #393425; }
+:root[data-theme="dark"][data-accent="rose"] { --ember: #df9bb3; --accent-ink: #ebb0c4; --accent-soft: #3d2d37; }
+:root[data-theme="dark"][data-accent="copper"] { --ember: #dea67d; --accent-ink: #edba97; --accent-soft: #3b3029; }
+:root[data-contrast="soft"] { --ink-soft: #716b63; }
+:root[data-theme="dark"][data-contrast="soft"] { --ink-soft: #b6b2ad; }
+:root[data-contrast="high"] { --ink: #181510; --ink-soft: #454038; --ink-faint: #5d574f; --control-line: #938a7e; }
+:root[data-theme="dark"][data-contrast="high"] { --ink: #fffdfa; --ink-soft: #e3dfd8; --ink-faint: #cbc5bc; --control-line: #797d88; }
+
+/* The persisted font setting names this bundled family. Do not advertise
+ * Apfel in Settings while silently overriding it with a different font. */
+:root[data-font="apfel"] { --ui-font: "Apfel Grotezk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+
+::selection { background: color-mix(in srgb, var(--ember) 55%, transparent); color: var(--ink); }
+:where(input, textarea)::placeholder { color: var(--ink-faint); opacity: 1; }
+:where(button, input, textarea, select, summary, a):focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 3px;
+}
+:where(button, input, textarea, select) { accent-color: var(--ember); }
+:where(button, summary) { -webkit-tap-highlight-color: transparent; }
+
+/* Chrome stays quiet; people and content retain the existing geometry. */
+.window-chrome { background: var(--sidebar); border-bottom-color: var(--line); }
+.company-sidebar { background: var(--sidebar); border-right-color: var(--line); }
+.sidebar-footer { background: var(--sidebar-solid); border-top-color: var(--line); }
+.fire-field { opacity: .36; }
+:root[data-fire="low"] .fire-field { opacity: .16; }
+:root[data-theme="dark"] .fire-field { opacity: .25; }
+:root[data-theme="dark"][data-fire="low"] .fire-field { opacity: .12; }
+.stage-fire { opacity: .14; }
+:root[data-stage-fire="low"] .stage-fire { opacity: .06; }
+.search-box, :root[data-theme="dark"] .search-box {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+}
+.search-box:focus-within { border-color: var(--ember); box-shadow: 0 0 0 3px var(--focus-halo); }
+.search-box input { color: var(--ink); }
+.company-row.selected { background: var(--accent-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ember) 12%, transparent); }
+.company-row.selected .row-title { color: var(--accent-ink); }
+.sidebar-actions button { color: var(--ink-soft); }
+.sidebar-actions button:hover, .sidebar-actions button:focus-visible { color: var(--ink); background: transparent; }
+.icon-button, .chrome-controls button, .settings-button { transition: background .14s ease, color .14s ease; }
+.profile-button { border: 1px solid var(--line-strong); box-shadow: var(--shadow-sm); }
+.conversation-header { border-bottom-color: var(--line); }
+#conversationFeed .user-bubble { background: var(--surface-muted); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent); }
+.composer, :root[data-theme="dark"] .composer {
+  background: var(--surface-raised);
+  border-color: var(--control-line);
+  border-radius: calc(var(--radius) + 4px);
+  box-shadow: var(--shadow);
+}
+.composer:focus-within, :root[data-theme="dark"] .composer:focus-within {
+  border-color: color-mix(in srgb, var(--ember) 65%, var(--control-line));
+  box-shadow: var(--shadow), 0 0 0 3px var(--focus-halo);
+}
+:root[data-glow="quiet"] .composer:focus-within { border-color: var(--line-strong); box-shadow: var(--shadow); }
+#composer .send-button { background: var(--ember); color: var(--accent-contrast); box-shadow: var(--shadow-sm); }
+#composer .send-button:hover:not(:disabled) { background: color-mix(in srgb, var(--ember) 86%, var(--ink)); }
+.composer-tool:hover { background: var(--hover); }
+.attachment-chip, .status-block, .approval-card { border-color: var(--line); background: var(--surface-raised); }
+.inspection-sidebar, .activity-summary, .workspace-rail { background: var(--surface); border-color: var(--line); }
+.code-block, .markdown pre, .tool-detail { background: var(--surface-muted); border-color: var(--line); }
+
+/* One control hierarchy across Settings, forms and all portal dialogs. */
+.button {
+  min-height: 36px;
+  height: auto;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  transition: background .14s ease, border-color .14s ease, box-shadow .14s ease;
+}
+.button.primary { background: var(--ember); color: var(--accent-contrast); border-color: color-mix(in srgb, var(--ember) 82%, var(--ink)); box-shadow: var(--shadow-sm); }
+.button.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--ember) 88%, var(--ink)); }
+.button.secondary { background: var(--control-bg); color: var(--ink-soft); border-color: var(--control-line); box-shadow: var(--shadow-sm); }
+.button.secondary:hover:not(:disabled) { background: var(--hover); border-color: var(--line-strong); color: var(--ink); }
+.button.danger { background: var(--danger); color: var(--danger-contrast); border-color: var(--danger); }
+.button:disabled { opacity: .46; cursor: not-allowed; box-shadow: none; }
+.menu-select { background: var(--control-bg); border: 1px solid var(--control-line); border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); color: var(--ink); }
+.menu-select:hover:not(:disabled) { background: var(--surface-raised); border-color: var(--line-strong); }
+.menu-select[aria-expanded="true"] { border-color: var(--ember); box-shadow: 0 0 0 3px var(--focus-halo); }
+.field { gap: 8px; }
+.field > span { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.field > span small, .field-hint { font-size: 11.5px; line-height: 1.5; color: var(--ink-faint); }
+.field input, .field textarea, .field select, .modal-body > input, .modal-body > textarea, .modal-body > select {
+  min-width: 0;
+  border: 1px solid var(--control-line);
+  border-radius: var(--radius-sm);
+  background: var(--control-bg);
+  color: var(--ink);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  box-shadow: var(--shadow-sm);
+}
+.field select, .modal-body > select { width: 100%; min-height: 40px; font-family: inherit; cursor: pointer; }
+.field select option, .modal-body > select option { background: var(--control-bg); color: var(--ink); }
+.field input:focus, .field textarea:focus, .field select:focus { border: 1px solid var(--ember); background: var(--control-bg); box-shadow: 0 0 0 3px var(--focus-halo); outline: 0; }
+.field input[aria-invalid="true"], .field textarea[aria-invalid="true"], .field select[aria-invalid="true"] { border-color: var(--danger); }
+.ember-check-box { background: var(--control-bg); border-color: var(--control-line); box-shadow: var(--shadow-sm); color: var(--accent-contrast); }
+.ember-check-input:checked + .ember-check-box { background: var(--ember); border-color: var(--ember); }
+.ember-check-input:focus-visible + .ember-check-box { outline: 2px solid var(--ember); outline-offset: 3px; box-shadow: none; }
+.color-swatch.selected { box-shadow: 0 0 0 2px var(--surface-raised), 0 0 0 4px var(--ember); }
+
+/* Menu separators are structural; selection has one restrained accent wash. */
+.popover, .view-menu, .menu-select-popover, #conversationPromptRail {
+  border: 1px solid var(--line-strong);
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--surface-raised);
+  box-shadow: var(--menu-shadow);
+  color: var(--ink);
+}
+.popover { padding: 6px; }
+.popover-label { padding: 9px 10px 6px; font-size: 10px; letter-spacing: .06em; color: var(--ink-faint); }
+.popover button, .popover label { min-height: 36px; padding: 7px 10px; border-radius: var(--radius-sm); color: var(--ink-soft); font-size: 13px; line-height: 1.45; }
+.popover button:hover, .popover label:hover { background: var(--hover); color: var(--ink); }
+.popover button.selected, .menu-select-popover .choice-row.selected, .popover button[aria-checked="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+.popover button small, .menu-select-popover .choice-row small { color: var(--ink-faint); font-size: 11.5px; line-height: 1.4; }
+.popover .choice-row strong { font-size: 13px; font-weight: 600; }
+.popover-separator { background: var(--line); margin: 6px 5px; }
+.popover .menu-select-search { min-height: 36px; height: 36px; margin: 3px 3px 6px; background: var(--surface-muted); border: 1px solid var(--line); }
+.popover .menu-select-search:focus-within { border-color: var(--ember); box-shadow: 0 0 0 2px var(--focus-halo); }
+.menu-select-options { padding: 2px 3px 3px; }
+.menu-select-popover .choice-row { min-height: 40px; }
+.popover button.danger, .danger-text { color: var(--danger); }
+.popover button.danger:hover, .danger-text:hover { background: color-mix(in srgb, var(--danger) 10%, var(--surface)); }
+.view-menu { background: var(--surface-raised) !important; }
+
+/* Modals are an elevated sheet, with a calm header and a real action footer. */
+.modal-layer, :root[data-theme="dark"] .modal-layer { background: var(--overlay); }
+.modal {
+  border: 1px solid var(--line-strong);
+  border-radius: calc(var(--radius) + 8px);
+  background: var(--surface-raised);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 22%), var(--shadow-sm);
+}
+.modal-header { gap: 16px; padding: 22px 24px 18px; }
+.modal-header > span { min-width: 0; }
+.modal-header strong { color: var(--ink); font-size: 20px; font-weight: 650; letter-spacing: -.03em; line-height: 1.25; }
+.modal-header small { margin-top: 6px; color: var(--ink-soft); font-size: 12px; line-height: 1.55; }
+.modal-close { width: 30px; height: 30px; flex: 0 0 30px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-faint); border-radius: var(--radius-sm); }
+.modal-close:hover { background: var(--hover); color: var(--ink); }
+.modal-body { padding: 0 24px 22px; gap: 16px; }
+.modal-footer { padding: 16px 24px; gap: 8px; border-top: 1px solid var(--line); background: var(--surface); box-shadow: none; }
+.modal-tabs { margin: 0 24px 18px; border: 1px solid var(--line); background: var(--surface-muted); padding: 3px; }
+.modal-tabs button { height: 32px; font-size: 12px; font-weight: 600; }
+.modal-tabs button.active { background: var(--surface-raised); color: var(--ink); box-shadow: var(--shadow-sm); }
+.confirm-copy { font-size: 13px; line-height: 1.6; }
+.avatar-studio { background: var(--surface); border: 1px solid var(--line); }
+.avatar-choice-row button { background: var(--control-bg); border: 1px solid var(--control-line); font-size: 12px; }
+.avatar-choice-row button.selected { background: var(--accent-soft); color: var(--accent-ink); border-color: color-mix(in srgb, var(--ember) 45%, var(--line)); }
+.avatar-drop { border: 1px dashed var(--line-strong); background: var(--surface); }
+.avatar-drop:hover { border: 1px dashed var(--ember); background: var(--accent-soft); }
+.member-picker { background: var(--surface); }
+.member-picker-copy strong { font-size: 13px; }
+.member-picker-copy small, .member-picker-copy p, .member-picker-status { font-size: 11.5px; line-height: 1.45; }
+.member-picker-status.valid { color: var(--success); }
+.toast { background: var(--surface-raised); color: var(--ink-soft); border-color: var(--line-strong); box-shadow: var(--menu-shadow); font-size: 12px; }
+.toast-copy strong { font-size: 12px; }
+.toast-copy small { font-size: 11px; }
+
+.command-palette, :root[data-theme="dark"] .command-palette { background: var(--overlay); }
+.command-palette-shell { background: var(--surface-raised); border-color: var(--line-strong); box-shadow: var(--menu-shadow); }
+.command-palette-item.active { background: var(--accent-soft); color: var(--accent-ink); }
+.command-palette-mark { border-color: var(--line); background: var(--surface); }
+.command-palette-footer { background: var(--surface); }
+
+@media (max-width: 600px) {
+  .modal-layer { padding: 12px; }
+  .modal { width: min(500px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); }
+  .modal-header { padding: 18px 18px 16px; }
+  .modal-body { padding: 0 18px 18px; }
+  .modal-footer { padding: 14px 18px; flex-wrap: wrap; }
+  .modal-tabs { margin-inline: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .button, .menu-select, .icon-button, .field input, .field textarea { transition: none; }
+}

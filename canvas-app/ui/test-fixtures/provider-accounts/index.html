@@ -1,0 +1,26 @@
+<!doctype html><html data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Provider account checks</title><link rel="stylesheet" href="../../sidebar.css"><link rel="stylesheet" href="../../settings.css?v=20260917-provider-recovery-2"><style>body{padding:32px;color:var(--ink);background:var(--surface)}nav{display:flex;gap:12px;flex-wrap:wrap}#notice{margin:20px 0}</style></head><body><h1>Provider account checks</h1><p>Local fixtures only. No real credentials or network sign-ins.</p><nav><button class="button primary" id="add">Add ChatGPT account</button><button class="button secondary" id="api">Add API account</button><button class="button secondary" id="manage">Manage Personal</button><button class="button secondary" id="theme">Switch theme</button><label><input id="fail" type="checkbox"> Simulate quota error</label></nav><p id="notice" role="status"></p><div id="modalLayer" class="modal-layer" hidden></div>
+<script>
+const catalog={providers:[{id:'openai-codex',name:'OpenAI Codex',auth_methods:[{type:'oauth',label:'Sign in with ChatGPT'}],profiles:[{id:'openai-codex:default',display:'Personal',method:'oauth'}],models:[]},{id:'openai',name:'OpenAI API',auth_methods:[{type:'api',label:'API key'}],profiles:[],models:[]}],oauth_login_providers:['openai-codex']};
+const byId=id=>document.getElementById(id);
+window.PhoenixUI={TAURI:true,escapeHtml:s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),toast:s=>byId('notice').textContent=s,showModal(html){byId('modalLayer').innerHTML=html;byId('modalLayer').hidden=false;byId('modalLayer').querySelector('.modal-close').onclick=this.closeModal;},closeModal(){byId('modalLayer').hidden=true;byId('modalLayer').innerHTML='';},openMenuSelect(){},async invoke(command,args){
+if(command==='providers_catalog')return structuredClone(catalog);
+if(command==='auth_probe'){
+const mode=byId('probeMode').value;
+if(mode==='throw')throw Error('503 provider unavailable');
+if(mode==='skipped')return {ok:true,skipped:true,message:'Not an LLM provider — nothing to probe'};
+if(mode==='invalid')return {};
+return byId('fail').checked?{ok:false,error:'429 usage_limit_reached\nLong diagnostic detail '.repeat(100)}:{ok:true};
+}
+if(command==='oauth_login'||command==='auth_set_key'){const p=catalog.providers.find(p=>p.id===args.provider);if(!p.profiles.find(a=>a.id===args.profileId))p.profiles.push({id:args.profileId,display:args.profileId,method:command==='oauth_login'?'oauth':'api'});}
+if(command==='auth_rename'){
+if(!args.label.trim()||[...args.label.trim()].length>80||/[\x00-\x1f\x7f-\x9f]/.test(args.label))throw Error('Account name must contain 1–80 characters without control characters.');
+catalog.providers.flatMap(p=>p.profiles).find(a=>a.id===args.profileId).display=args.label;
+}
+if(command==='auth_remove')catalog.providers.forEach(p=>p.profiles=p.profiles.filter(a=>a.id!==args.profileId));
+}};
+</script><script src="../../provider-setup.js?v=20260917-provider-recovery-2"></script><script>
+byId('add').onclick=()=>PhoenixProviderSetup.open({provider:'openai-codex'});byId('api').onclick=()=>PhoenixProviderSetup.open({provider:'openai'});byId('manage').onclick=()=>PhoenixProviderSetup.manage({provider:'openai-codex',profileId:'openai-codex:default'});byId('theme').onclick=()=>document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';
+const probeLabel=document.createElement('label');probeLabel.textContent='Probe response ';
+probeLabel.innerHTML+='<select id="probeMode" aria-label="Probe response"><option value="normal">Normal</option><option value="throw">Request fails</option><option value="skipped">Check skipped</option><option value="invalid">Invalid response</option></select>';
+document.querySelector('nav').append(probeLabel);
+</script></body></html>

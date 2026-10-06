@@ -1,0 +1,54 @@
+import assert from 'node:assert/strict';
+import {acceptanceAccount, acceptanceAccounts, codexLoginAccount, acceptanceAuthOptions, acceptanceAccountProvenance} from './lib/acceptance-account.mjs';
+const now=1000, credential=token=>({provider:'openai-codex',token,expires:now+3600000});
+const auth={profiles:{first:credential('synthetic-first'),configured:credential('synthetic-selected')}};
+assert.equal(acceptanceAccount(auth,'configured',now),auth.profiles.configured);
+assert.throws(()=>acceptanceAccount(auth,undefined,now),/no configured/);
+assert.throws(()=>acceptanceAccount(auth,'missing',now),/not a connected/);
+auth.profiles.configured.expires=now;
+assert.throws(()=>acceptanceAccount(auth,'configured',now),/needs refresh/,'must not fall back to the eligible first account');
+auth.profiles.configured={...credential('synthetic'),provider:'other'};
+assert.throws(()=>acceptanceAccount(auth,'configured',now),/not a connected/);
+console.log('PASS: configured identity, missing selection, expired selection and wrong-provider isolation');
+const pool={profiles:{a:credential('synthetic-a'),b:credential('synthetic-b'),foreign:{...credential('synthetic-other'),provider:'other'}},state:{order:{'provider:openai-codex':['foreign','removed','b','a']}}};
+assert.equal(acceptanceAccount(pool,null,now,'openai-codex'),pool.profiles.b);
+assert.deepEqual(acceptanceAccounts(pool,null,now,'openai-codex'),[pool.profiles.b,pool.profiles.a]);
+assert.deepEqual(acceptanceAccounts(pool,'a',now,'openai-codex'),[pool.profiles.a]);
+pool.profiles.b.expires=now;
+assert.deepEqual(acceptanceAccounts(pool,null,now,'openai-codex'),[pool.profiles.a]);
+assert.throws(()=>acceptanceAccounts(pool,'b',now,'openai-codex'),/needs refresh/);
+assert.equal(acceptanceAccount(pool,null,now,'openai-codex'),pool.profiles.a);
+assert.throws(()=>acceptanceAccount(pool,null,now,'other'),/no configured/);
+pool.profiles.a.expires=now;
+assert.throws(()=>acceptanceAccount(pool,null,now,'openai-codex'),/no fresh access/);
+assert.throws(()=>acceptanceAccounts(pool,null,now,'openai-codex'),/no fresh access/);
+console.log('PASS: explicit Codex pool selection follows priority, skips unavailable entries and never crosses provider');
+const jwt=claims=>'fixture.'+Buffer.from(JSON.stringify(claims)).toString('base64url')+'.fixture';
+const access=jwt({exp:7200,'https://api.openai.com/auth':{chatgpt_account_id:'fixture-account'}});
+const isolated=codexLoginAccount({tokens:{access_token:access,refresh_token:'never-copy',id_token:'never-copy'}},now);
+assert.deepEqual(isolated,{provider:'openai-codex',token:access,expires:7200000});
+assert.throws(()=>codexLoginAccount({tokens:{access_token:jwt({exp:0})}},now),/needs refresh/);
+assert.throws(()=>codexLoginAccount({tokens:{access_token:jwt({exp:7200})}},now),/account identity/);
+assert.throws(()=>codexLoginAccount({tokens:{access_token:'invalid'}},now),/metadata is invalid/);
+assert.throws(()=>codexLoginAccount({},now),/no saved/);
+console.log('PASS: explicit refreshed Codex login exports only unexpired access credentials');
+
+assert.deepEqual(acceptanceAuthOptions(),{authSource:'phoenix',accountPool:false,authProfile:null});
+assert.deepEqual(acceptanceAuthOptions(['--provider-pool']),{authSource:'phoenix',accountPool:true,authProfile:null});
+assert.deepEqual(acceptanceAuthOptions(['--profile=openai-codex:4']),{authSource:'phoenix',accountPool:false,authProfile:'openai-codex:4'});
+assert.deepEqual(acceptanceAuthOptions(['--codex-login']),{authSource:'codex',accountPool:false,authProfile:null});
+for(const flags of [['--provider-pool','--codex-login'],['--provider-pool','--profile=a'],['--profile=a','--codex-login'],
+  ['--profile=a','--profile=b'],['--provider-pool','--provider-pool'],['--profile='],['--profile=../private'],['--profil=a']])
+  assert.throws(()=>acceptanceAuthOptions(flags),/source|Duplicate|profile|options/);
+const named={profiles:{a:{...credential('PRIVATE-ACCESS'),refresh:'PRIVATE-REFRESH',metadata:'PRIVATE-EXTRA'},b:credential('OTHER-ACCESS')},
+  labels:{a:'Main\naccount',b:'Other account'},state:{order:{'provider:openai-codex':['b','a']}}};
+const selected=acceptanceAccounts(named,null,now,'openai-codex');
+const publicRows=acceptanceAccountProvenance(named,selected,'phoenix');
+assert.deepEqual(publicRows.map(row=>row.sourceProfileId),['b','a']);
+assert.deepEqual(publicRows.map(row=>row.testProfileId),['probe','probe-2']);
+assert.equal(publicRows[1].displayName,'Mainaccount');
+assert.ok(publicRows.every(row=>row.authenticated===false&&row.quotaChecked===false));
+assert.ok(!/PRIVATE|ACCESS|REFRESH|metadata/.test(JSON.stringify(publicRows)));
+assert.throws(()=>acceptanceAccountProvenance(named,[{...named.profiles.a}],'phoenix'),/exact source identity/);
+assert.equal(acceptanceAccountProvenance(null,[isolated],'codex')[0].sourceProfileId,null);
+console.log('PASS: explicit account sources, conflicting/unknown option rejection, ordered public profile provenance and no credential or quota claims.');

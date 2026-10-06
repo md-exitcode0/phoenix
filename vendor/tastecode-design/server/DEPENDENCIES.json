@@ -1,0 +1,23 @@
+[
+  {
+    "name": "zod",
+    "version": "4.4.3",
+    "integrity": "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/zod/-/zod-4.4.3.tgz"
+  },
+  {
+    "name": "parse5",
+    "version": "7.3.0",
+    "integrity": "sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw==",
+    "license": "MIT",
+    "source": "https://registry.npmjs.org/parse5/-/parse5-7.3.0.tgz"
+  },
+  {
+    "name": "entities",
+    "version": "6.0.1",
+    "integrity": "sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g==",
+    "license": "BSD-2-Clause",
+    "source": "https://registry.npmjs.org/entities/-/entities-6.0.1.tgz"
+  }
+]

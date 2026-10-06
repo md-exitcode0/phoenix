@@ -1,0 +1,35 @@
+{
+  "productCaptures": [
+    {
+      "name": "phoenix-team-light",
+      "path": "/home/mik-is-good/My_Stuff/dev-workspace/Project Phoenix/phoenix_agent/artifacts/iris-design-integration-2026-09-18/site-browser/shots/phoenix-team-light.png",
+      "sha256": "6e3ed07f6f85d46bb7048a40d058dba59cddce10ab03826fd19bbb5dd920e4e8",
+      "bytes": 181153
+    },
+    {
+      "name": "phoenix-team-dark",
+      "path": "/home/mik-is-good/My_Stuff/dev-workspace/Project Phoenix/phoenix_agent/artifacts/iris-design-integration-2026-09-18/site-browser/shots/phoenix-team-dark.png",
+      "sha256": "90138ad1e57c9e57457e7be9d1e4598def2fb66a1ec2e936c5c10012c03b0357",
+      "bytes": 187441
+    }
+  ],
+  "meaning": "Actual Phoenix renderer with the existing handoff-proof example fixture; not live provider activity.",
+  "fontSource": "canvas-app/ui/fonts",
+  "logoSource": "canvas-app/ui/assets/phoenix_logo.png",
+  "settingsSource": "artifacts/settings-redesign-2026-09-18/audit-worker/session-3/resumed-complete/059-dark-appearance-p01.png",
+  "settledProductCaptures": [
+    {
+      "theme": "light",
+      "path": "/home/mik-is-good/My_Stuff/dev-workspace/Project Phoenix/phoenix_agent/artifacts/iris-design-integration-2026-09-18/site-browser/shots/phoenix-team-light-settled.png",
+      "sha256": "0f0164059976d6947ef51ff3ee40bc6503c533c561ddff365af291ac9039026f",
+      "bytes": 270698
+    },
+    {
+      "theme": "dark",
+      "path": "/home/mik-is-good/My_Stuff/dev-workspace/Project Phoenix/phoenix_agent/artifacts/iris-design-integration-2026-09-18/site-browser/shots/phoenix-team-dark-settled.png",
+      "sha256": "e3e64257953fb2d787b3e0703c43956cf74d0e12cd76aa5bdc0656bdc43d621f",
+      "bytes": 269323
+    }
+  ],
+  "captureNote": "Earlier captures retained; current images were taken after the existing example answer finished revealing. Actual app renderer, no pixels retouched."
+}

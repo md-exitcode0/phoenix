@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Phoenix responsive acceptance</title>
+<style>body{margin:0;font:14px system-ui;background:#eee}header{padding:8px;display:flex;gap:12px;align-items:center}iframe{display:block;border:0;background:white}pre{white-space:pre-wrap;margin:12px}</style>
+<header><label>Viewport <select id="width"><option>820</option><option>1024</option><option>1440</option></select></label><button id="run">Check layout and content</button><output id="status">Loading preview</output></header>
+<iframe id="preview" title="Actual Phoenix conversation preview" width="820" height="920" src="../../index.html?shot=group&responsive-acceptance=worker-1"></iframe>
+<pre id="results"></pre>
+<script>
+const preview = document.getElementById('preview'), status = document.getElementById('status');
+preview.onload = async () => {
+  for (const file of ['checks.js', 'responsive.js']) await new Promise((resolve, reject) => {
+    const script = preview.contentDocument.createElement('script');
+    script.src = 'test-fixtures/sidebar-activity/' + file;
+    script.onload = resolve; script.onerror = reject; preview.contentDocument.head.append(script);
+  });
+  await preview.contentWindow.prepareResponsiveFixture(); status.textContent = 'Ready';
+};
+document.getElementById('width').onchange = event => { preview.width = event.target.value; status.textContent = 'Ready'; };
+document.getElementById('run').onclick = async () => {
+  status.textContent = 'Checking';
+  const report = await preview.contentWindow.checkResponsiveFixture(true);
+  window.responsiveReport = report;
+  document.getElementById('results').textContent = JSON.stringify(report, null, 2);
+  status.textContent = `${report.checks.filter(c => c.ok).length}/${report.checks.length} passed at ${report.width}px`;
+};
+</script>
+</html>
