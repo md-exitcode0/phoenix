@@ -779,8 +779,17 @@ html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-ex
    the members, and the transcript gets the whole column. */
 html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #conversationStage.has-thread:not(.mc-empty) :is(#fluffyHero,#groupPals){display:none!important}
 html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #conversationStage.has-thread:not(.mc-empty) #conversationBody{margin-top:0!important}
-/* Transcript edge: one short soft fade at the top only. */
+/* Keep a short edge in panes without a hero. The chat fade begins at
+   Fluffy's center and softens a full avatar-height of scrolling messages. */
 html:root[data-skin="monocode"] #conversationBody{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 18px)!important;mask-image:linear-gradient(to bottom,transparent 0,#000 18px)!important}
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage.has-fluffy:not(.mc-empty){--chat-hero-diameter:160px;--chat-hero-fade:160px}
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage.has-fluffy:not(.mc-empty) #fluffyHero{--mc-hero-diameter:var(--chat-hero-diameter);height:var(--chat-hero-diameter);flex-basis:var(--chat-hero-diameter)}
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage.has-fluffy:not(.mc-empty) #conversationBody{
+ margin-top:calc(var(--chat-hero-diameter) / -2 - 8px)!important;
+ -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 var(--chat-hero-fade))!important;
+ mask-image:linear-gradient(to bottom,transparent 0,#000 var(--chat-hero-fade))!important;
+}
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage.has-fluffy:not(.mc-empty) #conversationFeed{padding-top:calc(var(--chat-hero-fade) + 20px)!important}
 
 /* Window drag (frameless Electron window: Chromium reads -webkit-app-region).
    Drag: the 10px top edge above the floating panels, the empty part of the
