@@ -231,6 +231,29 @@ async function main() {
     })()`);
     console.log(JSON.stringify({sendFix},null,2));
     assert.ok(Object.values(sendFix).every(Boolean),'Sending, draft recovery and live-only browser cursors work: '+JSON.stringify(sendFix));
+    const previewErrors=await evaluate(`(async()=>{
+      const t=window.MonocodeRoomTest;document.body.classList.remove('sidebar-collapsed');t.setWorking(false);t.clearFeed();t.state.activeTurnId='preview-errors';
+      const file={name:'sha256-'+ 'a'.repeat(64)+'.png',path:'/tmp/history-image.png',type:'image/png',preview:t.ui.phoenixLogoSource()};
+      t.renderUser('Hey Tibo, check out the new UI.',[file]);t.renderAnswer('I like the glass UI.');t.renderPromptRail();
+      const rail=document.getElementById('conversationPromptRail'),first=rail.querySelector('button');t.syncRailProximity(null,first);
+      const authoredTitle=document.querySelector('.prompt-rail-card-title').textContent==='Hey Tibo, check out the new UI.';
+      const hashAbsent=!document.querySelector('.prompt-rail-card').textContent.includes('sha256-');
+      t.renderUser('',[file]);t.renderPromptRail();t.syncRailProximity(null,rail.querySelector('button:last-child'));
+      const imageOnlyFriendly=document.querySelector('.prompt-rail-card-title').textContent==='Attached image';
+      t.renderUser('https://example.com/'+ 'a'.repeat(160));t.renderPromptRail();t.syncRailProximity(null,rail.querySelector('button:last-child'));
+      const title=document.querySelector('.prompt-rail-card-title'),card=document.querySelector('.prompt-rail-card-body');
+      const longTitleContained=title.clientWidth>0&&title.scrollWidth<=title.clientWidth+1&&card.scrollWidth<=card.clientWidth+1;
+      const failure='The '+String.fromCharCode(96)+'orchestrator'+String.fromCharCode(96)+' agent could not complete its turn: None of the 5 loaded account(s) could serve the orchestrator request: openai-codex:2 — usage limit reached; openai-codex:4 — usage limit reached.';
+      t.state.activeTurnId='preview-errors';t.renderAgentUpdate('phoenix',failure,true);t.renderAnswer(failure.slice(0,-30)+'...');
+      const errors=[...document.querySelectorAll('#conversationFeed .runtime-error-details')];
+      const oneCompactError=errors.length===1&&!errors[0].open&&errors[0].querySelector('summary').textContent.includes('usage limit');
+      const noRawBubble=!document.querySelector('#conversationFeed').innerText.includes('None of the 5 loaded')&&!document.querySelector('#conversationFeed').innerText.includes('openai-codex:2');
+      const diagnosticsRetained=errors[0]?.querySelector('pre').textContent===failure;
+      t.syncRailProximity(null,rail.querySelector('button:last-child'));await new Promise(resolve=>setTimeout(resolve,220));
+      return{authoredTitle,hashAbsent,imageOnlyFriendly,longTitleContained,oneCompactError,noRawBubble,diagnosticsRetained};
+    })()`);
+    console.log(JSON.stringify({previewErrors},null,2));assert.ok(Object.values(previewErrors).every(Boolean),'Prompt previews and recovered failures remain readable: '+JSON.stringify(previewErrors));
+    if(process.env.PHOENIX_TEST_ERROR_PREVIEW_SCREENSHOT){const shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.PHOENIX_TEST_ERROR_PREVIEW_SCREENSHOT,Buffer.from(shot.data,'base64'));}
     const transcriptFix=await evaluate(`(async()=>{
       const t=window.MonocodeRoomTest,turn='poll-fixture';t.setWorking(false);t.clearFeed();t.state.activeTurnId=turn;
       const user={source:'history',turn_id:turn,value:{role:'user',text:'Current request',turn_id:turn}};

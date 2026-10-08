@@ -15,7 +15,7 @@ class Fixture(preview.Preview):
     def do_GET(self):
         if self.path.split("?")[0] == "/conversation.js":
             source = (ROOT / "ui/conversation.js").read_text()
-            hook = "window.MonocodeRoomTest={ui,state,clearFeed,ensureWorkCluster,renderGroupMessage,renderIncomingAgentTalk,renderAnswer,renderInspectionBrowserTabs,detectMention,renderComposerText,syncGroupPals,layoutGroupPals,palStageFor,palState,setWorking,syncSendMode,submitTurn,renderAttachments,draftSnapshot,activeSelectionToken,restoreUnackedDraft,acknowledgeSubmission,visibleNotice,renderTool,reconcileHistory,replaceDisplayRows,renderDisplayEntry,repaintConversation,humanFailureDetail};"
+            hook = "window.MonocodeRoomTest={ui,state,clearFeed,ensureWorkCluster,renderGroupMessage,renderIncomingAgentTalk,renderAnswer,renderInspectionBrowserTabs,detectMention,renderComposerText,syncGroupPals,layoutGroupPals,palStageFor,palState,setWorking,syncSendMode,submitTurn,renderAttachments,draftSnapshot,activeSelectionToken,restoreUnackedDraft,acknowledgeSubmission,visibleNotice,renderTool,reconcileHistory,replaceDisplayRows,renderDisplayEntry,repaintConversation,humanFailureDetail,renderUser,renderAgentUpdate,renderRuntimeFailure,renderPromptRail,syncRailProximity};"
             source = source.replace("  window.PhoenixConversation=", "  " + hook + "\n  window.PhoenixConversation=", 1)
             body = source.encode()
             self.send_preview_headers(200, "text/javascript", len(body))

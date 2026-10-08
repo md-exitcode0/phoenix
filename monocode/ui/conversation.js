@@ -753,7 +753,10 @@
     rail.hidden = !messages.length;
     if ($("historyButton")) $("historyButton").disabled = !messages.length;
     rail.innerHTML = messages.slice(first).map((message, offset) => {
-      const index=first+offset,prompt=message.innerText.trim().replace(/\s+/g," ")||"Your prompt";
+      const index=first+offset,files=message._messageAttachments||[],authored=String(message._messagePromptText||"").trim();
+      const attachmentName=files.length===1?String(files[0].name||""):"";
+      const attachmentTitle=!files.length?"":files.length>1?`${files.length} attachments`:attachmentName&&!/^sha256-[a-f0-9]{32,}/i.test(attachmentName)?attachmentName:files[0]&&isComposerImage(files[0])?"Attached image":"Attachment";
+      const prompt=(authored||(!files.length?message.querySelector('.user-bubble')?.innerText:"")||attachmentTitle||"Your prompt").trim().replace(/\s+/g," ");
       let reply="",cursor=message.nextElementSibling;
       while(cursor&&!cursor.classList.contains("user-message")){if(cursor.matches(".agent-message,.group-message")){reply=(cursor.querySelector(".markdown")||cursor).innerText.trim().replace(/\s+/g," ");break;}cursor=cursor.nextElementSibling;}
       const title=prompt.length>64?`${prompt.slice(0,61).trimEnd()}…`:prompt,description=reply.length>92?`${reply.slice(0,89).trimEnd()}…`:reply;
@@ -953,8 +956,8 @@
   }
   function renderRuntimeFailure(text,agent,meta=null){
     const summary=runtimeFailureSummary(text);if(!summary)return null;
-    const owner=agent||state.item?.id||"phoenix",key=answerKey(String(text)),turn=state.renderingTurnId||state.activeTurnId||"";
-    const existing=[...$("conversationFeed").querySelectorAll('.runtime-error')].find(n=>n.dataset.answerKey===key&&n.dataset.turnId===turn);if(existing)return existing;
+    const owner=canonicalAgentId(agent||state.item?.id||"phoenix"),key=answerKey(summary),turn=state.renderingTurnId||state.activeTurnId||"";
+    const existing=[...$("conversationFeed").querySelectorAll('.runtime-error')].find(n=>n.dataset.answerKey===key&&n.dataset.turnId===turn&&canonicalAgentId(n.dataset.agentId)===owner);if(existing){const details=existing.querySelector('pre');if(details&&String(text).length>details.textContent.length)details.textContent=String(text);return existing;}
     const cluster=precedingWorkCluster(owner);if(cluster)settleWorkCluster(cluster,true,meta);
     const node=feedNode("message-row agent-message runtime-error",`${avatar(agentProfile(owner))}<div class="message-content"><header><strong>${escape(agentLabel(owner))}</strong></header><details class="runtime-error-details"><summary><span>${escape(summary)}</span><span class="runtime-error-help" aria-hidden="true">?</span><span class="sr-only"> Error details</span></summary><pre></pre></details></div>`,{agentId:owner,from:"assistant",slot:"message"});
     node.dataset.answerKey=key;node.querySelector('pre').textContent=String(text);return node;
@@ -1145,7 +1148,7 @@
     const node = feedNode("message-row user-message", `<div class="message-content"><button type="button" class="turn-delete-button prompt-delete-button" data-delete-prompt aria-label="Permanently delete this prompt and its complete response" title="Delete prompt and response">${deleteIcon()}</button><div class="user-bubble" data-slot="message-bubble-content">${files}${markdown(visibleText)}</div>${via?`<span class="via-channel via-${via[1].toLowerCase()}">${via[1]==="Telegram"?'<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16.5 4 3.5 9.2l4.6 1.6L14 6.6l-4.6 5v3.9l2.3-2.6 3 2.2L16.5 4Z"/></svg>':'<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5.5c3-1.5 7-1.5 10 0l1.5 8c-1.5 1.2-3 1.8-4 2l-.8-1.4M8.3 14.1l-.8 1.4c-1-.2-2.5-.8-4-2L5 5.5"/><circle cx="7.8" cy="10.2" r="1"/><circle cx="12.2" cy="10.2" r="1"/></svg>'}via ${escape(via[1])} · ${escape(via[2])}</span>`:""}</div>`,{slot:"message",from:"user"});
     if(via)node.classList.add("from-channel");
     renderSentMentions(node.querySelector(".user-bubble"));
-    node._messageAttachments=attachments;
+    node._messageAttachments=attachments;node._messagePromptText=visibleText;
     hydrateUserMessageImages(node);
     if(queued?.id){node.dataset.queuedId=queued.id;node.dataset.queuedPending=String(!queued.canonical);}
     if(options?.steered)markSteeredNode(node,true);
@@ -2560,6 +2563,7 @@
   // or an early answer. It is a real transcript row, in order with the tools,
   // and the live cube stays below it.
   function renderAgentUpdate(agent,text,muted=false){
+    if(runtimeFailureSummary(text))return renderRuntimeFailure(text,agent);
     if(isCompactionText(text))return null;
     const cleaned=safeRuntimeCopy(String(text||"")).trim();
     if(!cleaned)return null;
