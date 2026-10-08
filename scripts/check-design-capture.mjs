@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { EventEmitter } from 'node:events';
 const require = createRequire(import.meta.url);
-const { captureScreenshot } = require('../canvas-app/chromium-shell/browser-capture.cjs');
+const { captureScreenshot, restoreViewport } = require('../canvas-app/chromium-shell/browser-capture.cjs');
 function fixture() {
   const calls = [], debuggerApi = new EventEmitter();
   let attached = false;
@@ -58,5 +58,32 @@ results.push('Malformed clips reject before debugger attachment');
   await assert.rejects(captureScreenshot(f.contents, { fullPage: true, clipOverride: {x:0,y:0,width:390,height:3000,scale:1} }), /injected/);
   assert.equal(f.attached(), false);
   results.push('Failure still retires the owned debugger');
+}
+{
+  const f = fixture();let released = false;
+  await captureScreenshot(f.contents, { viewport: {width:800,height:600}, lease: () => () => { released = true; } });
+  assert.ok(released);assert.ok(f.calls.some(c => c.method === 'Emulation.setDeviceMetricsOverride'));
+  assert.ok(f.calls.some(c => c.method === 'Emulation.clearDeviceMetricsOverride'));assert.equal(f.attached(), false);
+  results.push('Temporary capture viewport is cleared before the debugger detaches');
+}
+{
+  const f = fixture(), send = f.contents.debugger.sendCommand;
+  f.contents.debugger.sendCommand = async(method, params) => { if(method === 'Page.captureScreenshot')throw Error('capture failed');return send(method,params); };
+  await assert.rejects(captureScreenshot(f.contents, {viewport:{width:800,height:600}}), /capture failed/);
+  assert.ok(f.calls.some(c => c.method === 'Emulation.clearDeviceMetricsOverride'));assert.equal(f.attached(), false);
+  results.push('Failed captures also clear temporary viewport overrides');
+}
+{
+  const f = fixture();
+  await captureScreenshot(f.contents, {fullPage:true,clipOverride:{x:0,y:0,width:390,height:3000,scale:1},viewport:{width:800,height:600}});
+  assert.ok(!f.calls.some(c => c.method.startsWith('Emulation.')));
+  results.push('Exact design captures keep the caller-owned viewport');
+}
+{
+  const f = fixture();f.contents.debugger.attach();assert.equal(await restoreViewport(f.contents),false);
+  assert.equal(f.attached(),true);f.contents.debugger.detach();
+  assert.equal(await restoreViewport(f.contents),true);assert.equal(f.attached(),false);
+  assert.ok(f.calls.some(c=>c.method === 'Emulation.clearDeviceMetricsOverride'));
+  results.push('Mount/resize restores natural size without stealing an existing debugger');
 }
 console.log(JSON.stringify({passed:true, checks:results, actualBrowser:false}));

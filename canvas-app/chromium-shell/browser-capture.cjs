@@ -34,7 +34,7 @@ async function captureScreenshot(contents, { fullPage = false, timeoutMs = 8000,
   active.add(contents);
   const inspector = contents.debugger;
   const expires = Date.now() + timeoutMs;
-  let attached = false, pumping = false, primaryError, release = null;
+  let attached = false, pumping = false, primaryError, release = null, viewportOverridden = false;
   const send = (method, params = {}) => {
     const remaining = expires - Date.now();
     if (remaining <= 0) throw new Error("Browser screenshot timed out");
@@ -50,7 +50,9 @@ async function captureScreenshot(contents, { fullPage = false, timeoutMs = 8000,
     attached = true;
     inspector.on("message", acknowledge);
     await send("Page.enable");
-    if (viewport) {
+    // Exact design clips already have a caller-owned emulated viewport.
+    if (viewport && !clipOverride) {
+      viewportOverridden = true;
       await send("Emulation.setDeviceMetricsOverride", {
         width: viewport.width, height: viewport.height, deviceScaleFactor: 0, mobile: false,
       });
@@ -111,9 +113,14 @@ async function captureScreenshot(contents, { fullPage = false, timeoutMs = 8000,
         try {
           await deadline(inspector.sendCommand("Page.stopScreencast"), 750, "Browser capture cleanup timed out");
         } finally {
-          // Detaching also retires a late start/capture after a deadline. Never
-          // detach a pre-existing inspector: those requests were refused above.
-          if (!contents.isDestroyed() && inspector.isAttached()) inspector.detach();
+          try {
+            if (viewportOverridden && !contents.isDestroyed() && inspector.isAttached()) {
+              await deadline(inspector.sendCommand("Emulation.clearDeviceMetricsOverride"), 750, "Browser viewport cleanup timed out");
+            }
+          } finally {
+            // Detaching also retires a late start/capture after a deadline.
+            if (!contents.isDestroyed() && inspector.isAttached()) inspector.detach();
+          }
         }
       }
     } catch (error) { cleanupError = error; }
@@ -131,4 +138,20 @@ async function prepareInput(contents, lease = {}) {
   await captureScreenshot(contents, { inputReady: true, timeoutMs: 5000, ...lease });
 }
 
-module.exports = { captureScreenshot, prepareInput };
+// A page previously resized by a streamed/captured lane must follow the real
+// WebContentsView again when it is mounted or resized. Never steal a debugger.
+async function restoreViewport(contents) {
+  if (contents.isDestroyed() || active.has(contents) || contents.debugger.isAttached()) return false;
+  active.add(contents);
+  const inspector = contents.debugger;
+  let attached = false;
+  try {
+    inspector.attach("1.3");attached = true;
+    await deadline(inspector.sendCommand("Emulation.clearDeviceMetricsOverride"), 750, "Browser viewport reset timed out");
+    return true;
+  } finally {
+    if (attached && !contents.isDestroyed() && inspector.isAttached()) inspector.detach();
+    active.delete(contents);
+  }
+}
+module.exports = { captureScreenshot, prepareInput, restoreViewport };

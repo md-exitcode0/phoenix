@@ -36,6 +36,7 @@
 .fluffy-preview-grid button.playing{background:var(--surface-raised);border-color:var(--ink-faint)}
 .fluffy-preview-picture{position:relative;display:grid;place-items:center;min-width:0}
 .fluffy-preview-picture img,.fluffy-preview-picture canvas{grid-area:1/1;width:136px;height:136px;max-width:100%;object-fit:contain}
+.fluffy-preview-picture:has(.fluffy-live-preview)>img{visibility:hidden}
 .fluffy-live-preview{position:absolute;inset:0;margin:auto;z-index:1;background:var(--surface-raised)}
 .fluffy-preview-caption{display:flex;align-items:center;justify-content:space-between;gap:7px;font-size:12px}
 .fluffy-preview-caption svg{width:16px;height:16px;fill:currentColor;opacity:.65}

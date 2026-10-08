@@ -1188,11 +1188,6 @@ pub fn leader_convergence_turn_id(canonical_session_id: &str, turn_id: &str) -> 
 /// have settled and at least one reported. `None` means "do not converge".
 pub fn convergence_inputs(ledger: &super::group_conversation::GroupTurnLedgerRecord, leader: &str) -> Option<Vec<String>> {
     use super::group_conversation::GroupMemberActivationState as State;
-    let waits_on_leader = |agent_id: &str| {
-        ledger.activation.as_ref()
-            .and_then(|plan| plan.execution_dependencies.as_ref())
-            .is_some_and(|edges| edges.iter().any(|edge| edge.prerequisite == leader && edge.dependent == agent_id))
-    };
     let leader_receipt = ledger
         .members
         .iter()
@@ -1202,11 +1197,10 @@ pub fn convergence_inputs(ledger: &super::group_conversation::GroupTurnLedgerRec
     let dispatched = ledger
         .members
         .iter()
+        // Broadcast ordering alone is not a delegation. Only members woken
+        // by the leader's actual assignment owe a result back to the leader.
         .filter(|member| member.participant.agent_id != leader
-            && (member.source_receipt_id.as_deref() == Some(leader_receipt.as_str())
-                // `@everyone`: members start after the leader's plan in the
-                // same turn (a dependency on the leader, not a ping).
-                || waits_on_leader(&member.participant.agent_id)))
+            && member.source_receipt_id.as_deref() == Some(leader_receipt.as_str()))
         .collect::<Vec<_>>();
     if dispatched.is_empty()
         || dispatched.iter().any(|member| matches!(member.state, State::Queued | State::Working | State::WaitingUser))
@@ -1588,6 +1582,20 @@ mod tests {
         ledger.members[2].state = State::Done;
         ledger.members[2].receipt_id = Some("r-iris".into());
         assert_eq!(convergence_inputs(&ledger, "phoenix").unwrap(), vec!["r-leo", "r-iris"]);
+        for member in &mut ledger.members { member.source_receipt_id = None; }
+        ledger.activation = Some(super::super::group_conversation::GroupActivationIntent {
+            group_id: "build".into(), roster_fingerprint: "f".into(),
+            selection: GroupActivationSelection::Everyone,
+            active_agent_ids: vec!["phoenix".into(), "leo".into(), "iris".into()],
+            execution_dependencies: Some(vec![super::super::group_conversation::GroupDependency {
+                prerequisite: "phoenix".into(), dependent: "leo".into(),
+            }]),
+            inspection_participants: Default::default(),
+            tool_constraints: Default::default(),
+            execution_mode: super::super::group_conversation::GroupExecutionMode::Ordered,
+            execution_waves: vec![vec!["phoenix".into()], vec!["leo".into(), "iris".into()]],
+        });
+        assert!(convergence_inputs(&ledger, "phoenix").is_none(), "a user broadcast is not a leader assignment");
         ledger.members.truncate(1);
         assert!(convergence_inputs(&ledger, "phoenix").is_none(), "nothing dispatched, nothing to converge");
         assert!(leader_convergence_turn_id("group-build", "t1").starts_with(LEADER_CONVERGENCE_PREFIX));

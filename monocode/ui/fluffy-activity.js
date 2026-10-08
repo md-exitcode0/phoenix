@@ -124,6 +124,7 @@
     return toolEdge(a,kind,event,'native_');
    }
    if(['settled','execution_ended','turn_completed'].includes(kind)||kind==='group_member_status'&&event.state==='done')return terminal(a,event.ok===false?'error':'success','native_live_terminal',true);
+   if(!kind&&status==='idle'){resetTools(a);a.waiting=null;return emit(a,'idle','native_registry');}
    if(a.waiting)return holdWaiting(a);
    let mode=activeTool(a)||'idle';
    if(!a.tools.size&&runningStatus(status)){

@@ -925,7 +925,7 @@
   }
   function isInternalRuntimeText(text) {
     const value=String(text||"").trim().toLowerCase();
-    return value.startsWith("[late ask answer]") || value.startsWith("[queued wake]") || value.startsWith("queued prompt queued_") || /^initiating\s+[a-z0-9_-]+\s+call\.?$/i.test(value);
+    return value.startsWith("[late ask answer]") || value.startsWith("[queued wake]") || value.startsWith("queued prompt queued_") || /^leader convergence for turn (?:turn_|leader[-_])/.test(value) || /^initiating\s+[a-z0-9_-]+\s+call\.?$/i.test(value);
   }
   function askAnswerPrompt(value) {
     const row=value&&typeof value==="object"?value:{text:value},origin=row.origin||null;
@@ -976,7 +976,7 @@
     if(/(?:execution-economy|replay slice|RECOVERY ROUTE|\"node_id\"|\"attempt_id\"|failed work:|ok work:)/i.test(value))return"This coworker stopped before finishing. Its internal retries were kept out of the conversation.";
     return humanFailureDetail(value).slice(0,180)||"This coworker could not finish that part.";
   }
-  const INTERNAL_NOTICE=/^(?:memory lookup is taking longer|memory preload|librarian )/;
+  const INTERNAL_NOTICE=/^(?:memory lookup is taking longer|memory preload|librarian |members reported; the group leader will converge next$)/;
   function visibleNotice(value) {
     const text=String(value||"").trim(),lower=text.toLowerCase();if(!text)return null;
     if(lower.startsWith("queued prompt")||lower.startsWith("queued group turn"))return /failed|could not|stopped/.test(lower)?"A queued message needs review. Open the queue above the composer to inspect the saved reason before removing it or sending a new request.":null;
@@ -1476,6 +1476,7 @@
     // published delivery. Match original turn and route IDs before legacy text
     // keys; a reply's delivery ID can differ from the handoff it answers.
     const saved=left?.value||{},other=right?.value||{};
+    if(leftRole==="user"&&rightRole==="user"&&((saved.steer_id&&saved.steer_id===other.turn_id)||(other.steer_id&&other.steer_id===saved.turn_id)))return true;
     if(state.item?.kind==="group"&&(saved.historical===true||other.historical===true)){
       const turn=displayTurnId(left);
       if(!turn||turn!==displayTurnId(right)||(saved.group_id&&other.group_id&&saved.group_id!==other.group_id))return false;
@@ -1794,7 +1795,8 @@
       });
       if(restored.length!==rows.length)state.displayMigrationDirty=true;
       const withoutAskGhosts=pruneLateResolvedAskGhosts(restored);if(withoutAskGhosts.length!==restored.length)state.displayMigrationDirty=true;
-      const mirrored=repairLegacyGroupCatchUpTurns(withoutAskGhosts);if(mirrored.length!==withoutAskGhosts.length)state.displayMigrationDirty=true;
+      const steers=repairSteeredPromptMirrors(withoutAskGhosts);if(steers.length!==withoutAskGhosts.length)state.displayMigrationDirty=true;
+      const mirrored=repairLegacyGroupCatchUpTurns(steers);if(mirrored.length!==steers.length)state.displayMigrationDirty=true;
       const repairedReturns=repairHandoffReturnOrder(mirrored);
       if(repairedReturns.changed)state.displayMigrationDirty=true;
       return ensureDisplayTurnIds(trimDisplayRows(repairedReturns.rows));
@@ -1807,6 +1809,14 @@
       if(agent.display_name)text=text.replace(new RegExp(`(^|[^\\p{L}\\p{N}_])${escapeRegex(agent.display_name)}(?=$|[^\\p{L}\\p{N}_])`,`gu`),(_,prefix)=>`${prefix}@${agent.agent_id}`);
     });
     return text.toLowerCase();
+  }
+  function repairSteeredPromptMirrors(rows){
+    const steers=new Map(rows.filter(row=>displayRole(row)==="user"&&row.value?.steer_id).map(row=>[row.value.steer_id,row]));
+    return rows.filter(row=>{
+      if(displayRole(row)!=="user"||row.value?.steer_id)return true;
+      const original=steers.get(row.value?.turn_id||row.turn_id);
+      return !original||attachmentIdentity(original.value)!==attachmentIdentity(row.value);
+    });
   }
   function repairLegacyGroupCatchUpTurns(rows){
     if(state.item?.kind!=="group")return rows;
@@ -2306,6 +2316,13 @@
     const host=$("groupPals"),header=$("conversationHeader");if(!host||!header)return;
     const stage=palStageFor(palFreeWidth(header),palState.stage);
     if(stage!==palState.stage||host.dataset.stage!==String(stage)){palState.stage=stage;host.dataset.stage=String(stage);}
+    const leader=host.querySelector('[data-seat="leader"]'),body=$("conversationBody");
+    if(leader&&body&&leader.getBoundingClientRect().height){
+      const rect=leader.getBoundingClientRect(),margin=parseFloat(getComputedStyle(body).marginTop)||0;
+      const offset=Math.round(rect.top+rect.height/2-body.getBoundingClientRect().top+margin);
+      $("conversationStage").style.setProperty('--room-transcript-offset',`${offset}px`);
+      $("conversationStage").style.setProperty('--room-transcript-fade',`${Math.round(rect.height)}px`);
+    }
   }
   function syncGroupPals(activity=ui.activityFor?.(state.item)){
     const header=$("conversationHeader");if(!header)return;
@@ -6214,6 +6231,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
         if(!attached?.supported||attached?.embedded!==true||attached?.visible===false)throw new Error(attached?.reason||"Chromium did not embed inside Phoenix");
         clearTimeout(state.browserSurfaceRecoveryTimer);state.browserSurfaceRecoveryTimer=0;
         renderInspectionBrowserTabs(chromiumShell?attached:surface);
+        clearTimeout(state.browserResizeTimer);state.browserResizeKey="";
         state.browserSurfaceInfo={...surface,desktop:attached};state.browserNative=true;delete $("browserViewport").dataset.nativeError;$("browserViewport").classList.add("native-surface");$("browserCanvas").hidden=true;$("browserFrame").hidden=true;$("browserEmpty").hidden=true;startNativeBrowserStatus();scheduleNativeBrowserBounds();
         // Mutter/XWayland may accept the initial reparent and undo it a frame
         // later. Revalidate after the compositor has settled so a browser that
@@ -6554,10 +6572,10 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   function scheduleBrowserResize(){
     clearTimeout(state.browserResizeTimer);
     if($("browserOverlay").hidden||!state.browserOwnerId)return;
-    if(state.browserNative){scheduleNativeBrowserBounds();return;}
+    if(state.browserNative||window.__PHOENIX_CHROMIUM_SHELL__?.enabled===true){scheduleNativeBrowserBounds();return;}
     const instance=state.browserOwnerId,generation=state.browserSurfaceGeneration;
     state.browserResizeTimer=setTimeout(async()=>{
-      if(state.browserOwnerId!==instance||state.browserSurfaceGeneration!==generation)return;
+      if(state.browserOwnerId!==instance||state.browserSurfaceGeneration!==generation||state.browserNative||window.__PHOENIX_CHROMIUM_SHELL__?.enabled===true)return;
       const rect=$("browserViewport").getBoundingClientRect();
       const currentNative=window.PhoenixIsolatedBackend?.current;
       const width=Math.max(currentNative?320:640,Math.min(2560,Math.round(rect.width)));

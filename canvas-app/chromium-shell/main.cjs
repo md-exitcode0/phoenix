@@ -7,7 +7,7 @@ const { pathToFileURL } = require("node:url");
 const frontendRecovery = require("./frontend-recovery.cjs");
 const rendererResources = require("./renderer-resources.cjs");
 const { WebSocketServer, WebSocket } = require("ws");
-const { captureScreenshot, prepareInput } = require("./browser-capture.cjs");
+const { captureScreenshot, prepareInput, restoreViewport } = require("./browser-capture.cjs");
 const {
   app,
   BaseWindow,
@@ -479,8 +479,37 @@ function detachSurfaceTab(tab) {
   tab.host = null;
 }
 
+function syncSurfaceViewport(tab) {
+  if (tab.viewportSync) return;
+  tab.viewportSync = (async () => {
+    // Let the new host/view bounds reach Chromium before clearing emulation.
+    await new Promise(resolve => setTimeout(resolve, 50));
+    // A capture owns its debugger briefly. Wait for it to release without
+    // resetting the browser, navigating the page, or discarding any tabs.
+    const expires = Date.now() + 9000;
+    while (Date.now() < expires && !tab.view.webContents.isDestroyed()) {
+      try { if (await restoreViewport(tab.view.webContents)) {
+        // Clearing CDP metrics can restore Chromium's pre-capture size even
+        // though Electron already has the new bounds. Force a native resize
+        // notification, then restore the latest bounds without navigating.
+        const rect = tab.view.getBounds();
+        tab.view.setBounds({...rect,width:rect.width+1});
+        tab.view.setBounds(rect);
+        return;
+      } }
+      catch (error) { if (Date.now() + 100 >= expires) console.warn("[phoenix] viewport restore:", error.message); }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  })().finally(() => { tab.viewportSync = null; });
+}
+function setSurfaceBounds(tab, rect) {
+  const previous = tab.view.getBounds();
+  tab.view.setBounds(rect);
+  if (previous.width !== rect.width || previous.height !== rect.height) syncSurfaceViewport(tab);
+}
+
 function attachSurfaceTab(tab, host, rect, invalidateInput = true) {
-  const previous=tab.view.getBounds();
+  const previous=tab.view.getBounds(),changedHost=tab.host!==host;
   // Identical status-tick bounds do not change the input target. A capture
   // lease also restores its own temporary layout without invalidating input.
   if (invalidateInput && (tab.host !== host || tab.leased || ["x","y","width","height"].some(key=>previous[key]!==rect[key]))) tab.inputRevision++;
@@ -492,6 +521,7 @@ function attachSurfaceTab(tab, host, rect, invalidateInput = true) {
     tab.host = host;
   }
   tab.view.setBounds(rect);
+  if(host===mainWindow&&invalidateInput&&(changedHost||previous.width!==rect.width||previous.height!==rect.height))syncSurfaceViewport(tab);
 }
 
 function parkSurfaceTab(tab, rect, invalidateInput = true) {
@@ -627,7 +657,7 @@ function activateSurfaceTab(entry, targetId) {
   if (mounted && previous !== next && mainWindow && !mainWindow.isDestroyed()) {
     attachSurfaceTab(next, mainWindow, entry.rect);
   }
-  if (mounted) next.view.setBounds(entry.rect);
+  if (mounted) setSurfaceBounds(next, entry.rect);
   emit("browser-tab-activated", { instance: entry.instance, targetId, tabs: surfaceStatus(entry).tabs });
   browserState.scheduleSave(entry);
   return next;
@@ -685,7 +715,7 @@ function mountSurface(entry) {
     attachSurfaceTab(tab, mainWindow, entry.rect);
     entry.mounted = true;
   }
-  tab.view.setBounds(entry.rect);
+  setSurfaceBounds(tab, entry.rect);
 }
 
 function unmountSurface(entry) {
@@ -791,7 +821,7 @@ async function browserInvoke(command, args) {
     // view needs window pixels.
     entry.cssRect = normalizeRect(args.rect);
     entry.rect = zoomedRect(entry.cssRect);
-    if (entry.mounted) activeSurfaceTab(entry)?.view.setBounds(entry.rect);
+    if (entry.mounted && activeSurfaceTab(entry)) setSurfaceBounds(activeSurfaceTab(entry), entry.rect);
     else if (activeSurfaceTab(entry)) parkSurfaceTab(activeSurfaceTab(entry), entry.rect);
   } else if (command === "browser_surface_new_tab") {
     createSurfaceTab(entry, args.url || "about:blank", true);
@@ -875,6 +905,29 @@ async function runSelftest() {
     <main>Embedded Chromium · native pixels</main>`)}`;
   const tab = activeSurfaceTab(entry);
   await tab.view.webContents.loadURL(page);
+  // Reproduce a captured page retaining 800x600 inside a taller native view.
+  if(tab.viewportSync)await tab.viewportSync;
+  tab.view.webContents.debugger.attach("1.3");
+  await tab.view.webContents.debugger.sendCommand("Emulation.setDeviceMetricsOverride", {width:800,height:600,deviceScaleFactor:0,mobile:false});
+  tab.view.webContents.debugger.detach();
+  unmountSurface(entry);mountSurface(entry);if(tab.viewportSync)await tab.viewportSync;
+  // Native resize notifications reach the renderer after the CDP reply.
+  const pageSize = () => tab.view.webContents.executeJavaScript(`new Promise(resolve => {
+    const expires = Date.now() + 2000;
+    const check = () => {
+      const size = {width:innerWidth,height:innerHeight};
+      if ((size.width === ${entry.rect.width} && size.height === ${entry.rect.height}) || Date.now() >= expires) resolve(size);
+      else setTimeout(check, 20);
+    }; check();
+  })`);
+  const restoredSize = await pageSize();
+  const viewportRestoredOnMount = restoredSize.width === entry.rect.width && restoredSize.height === entry.rect.height;
+  entry.rect={...entry.rect,height:780};setSurfaceBounds(tab,entry.rect);if(tab.viewportSync)await tab.viewportSync;
+  const resizedSize = await pageSize();
+  const viewportFollowsResize = resizedSize.height === 780;
+  unmountSurface(entry);await captureSurfaceTab(entry,tab.targetId);mountSurface(entry);if(tab.viewportSync)await tab.viewportSync;
+  const afterCapture = await pageSize();
+  const viewportRestoredAfterCapture = afterCapture.height === 780;
   const firstTargetId = tab.targetId;
   const second = createSurfaceTab(entry, "about:blank", false);
   await second.view.webContents.loadURL("data:text/html,<title>Second embedded tab</title>");
@@ -965,7 +1018,7 @@ async function runSelftest() {
   mountSurface(entry);
   const gpu = await gpuProbe();
   const result = {
-    ok: gpu.hardwareAcceleration && gpu.renderer.webgpu && Boolean(gpu.renderer.adapter) && tabLifecycle && reloadPreservesTabs && selectedTabNavigation && capturedTabNavigation && closedTargetRejected && ipcRejectionRoundTrip && surfaceIsolation && tabStateIsolation && workerAuthInheritance && workerSurfaceCleanup
+    ok: gpu.hardwareAcceleration && gpu.renderer.webgpu && Boolean(gpu.renderer.adapter) && viewportRestoredOnMount && viewportFollowsResize && viewportRestoredAfterCapture && tabLifecycle && reloadPreservesTabs && selectedTabNavigation && capturedTabNavigation && closedTargetRejected && ipcRejectionRoundTrip && surfaceIsolation && tabStateIsolation && workerAuthInheritance && workerSurfaceCleanup
       && !(OZONE_PLATFORM === "wayland" && GPU_MODE === "vulkan"),
     engine: process.versions.chrome,
     electron: process.versions.electron,
@@ -976,6 +1029,9 @@ async function runSelftest() {
     },
     targetId: entry.activeTargetId,
     browserTitle: tab.view.webContents.getTitle(),
+    viewportRestoredOnMount,
+    viewportFollowsResize,
+    viewportRestoredAfterCapture,
     tabLifecycle,
     reloadPreservesTabs,
     selectedTabNavigation,
@@ -1048,7 +1104,7 @@ function createMainWindow() {
     // Native browser views are placed in window pixels; re-place them.
     for (const entry of surfaces.values()) if (entry.mounted && entry.cssRect) {
       entry.rect = zoomedRect(entry.cssRect);
-      activeSurfaceTab(entry)?.view.setBounds(entry.rect);
+      if (activeSurfaceTab(entry)) setSurfaceBounds(activeSurfaceTab(entry), entry.rect);
     }
   };
   mainWindow.webContents.on("did-finish-load", () => {

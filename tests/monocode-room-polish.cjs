@@ -303,12 +303,16 @@ async function main() {
     await sleep(200);
     assert.ok(await evaluate("!!document.getElementById('groupPals')&&!document.getElementById('fluffyHero')"),'A room uses its group avatar cluster without a second standalone chat hero');
     const uiFix=await evaluate(`(async()=>{
+      const t=window.MonocodeRoomTest;
       const css=node=>getComputedStyle(node),root=document.documentElement;
       const chrome=document.querySelector('.window-chrome'),header=document.getElementById('conversationHeader');
       const dragRegions=css(chrome).getPropertyValue('-webkit-app-region')==='drag'&&css(header).getPropertyValue('-webkit-app-region')==='drag';
       const controlsClickable=css(document.getElementById('stagePanelToggles')).getPropertyValue('-webkit-app-region')==='no-drag'&&css(document.getElementById('inspectionPanelControls')).getPropertyValue('-webkit-app-region')==='no-drag'&&css(document.getElementById('stageMore')).getPropertyValue('-webkit-app-region')==='no-drag'&&css(document.querySelector('.pal-seat')).getPropertyValue('-webkit-app-region')==='no-drag';
       const topStrip=css(chrome).display!=='none'&&chrome.getBoundingClientRect().height===10;
-      const onlyTopFade=css(document.getElementById('conversationBody')).maskImage.includes('18px')&&!css(document.getElementById('conversationBody')).maskImage.includes('100%');
+      t.layoutGroupPals();await new Promise(resolve=>setTimeout(resolve,50));
+      const body=document.getElementById('conversationBody'),leader=document.querySelector('.pal-seat[data-seat="leader"]').getBoundingClientRect();
+      const onlyTopFade=css(body).maskImage.includes(Math.round(leader.height)+'px')&&!css(body).maskImage.includes('100%');
+      const fadeStartsAtLeaderCenter=Math.abs(body.getBoundingClientRect().top-(leader.top+leader.height/2))<=1;
       const singleLeader=css(document.querySelector('.pal-seat[data-seat="leader"]>.pal-face')).visibility==='visible'&&!document.getElementById('fluffyHero');
       const select=document.createElement('select');select.dataset.placeholder='No test desktop';select.disabled=true;document.body.append(select);
       await new Promise(resolve=>setTimeout(resolve,50));
@@ -328,7 +332,7 @@ async function main() {
       PhoenixConversation.closeInspectionSidebar();
       document.body.classList.add('inspection-stacked');const stage=document.getElementById('conversationStage');stage.classList.add('has-thread');
       const stackedUsesTranscript=css(document.getElementById('groupPals')).display==='none'&&css(document.getElementById('conversationBody')).marginTop==='0px';document.body.classList.remove('inspection-stacked');
-      return {dragRegions,controlsClickable,topStrip,onlyTopFade,singleLeader,firstPlaceholder,livePlaceholder,selectedLabel,daylightInk,nightInk,desktopOnly,desktopHidden,stackedUsesTranscript};
+      return {dragRegions,controlsClickable,topStrip,onlyTopFade,fadeStartsAtLeaderCenter,singleLeader,firstPlaceholder,livePlaceholder,selectedLabel,daylightInk,nightInk,desktopOnly,desktopHidden,stackedUsesTranscript};
     })()`);
     console.log(JSON.stringify({uiFix},null,2));
     assert.ok(Object.values(uiFix).every(Boolean),'UI fixes keep drag controls clickable, dropdowns current, sky ink readable, and inspection tabs isolated: '+JSON.stringify(uiFix));
@@ -350,8 +354,8 @@ async function main() {
       const failedDraftRestored=input.value===text&&t.state.attachments.length===1;
       t.renderComposerText('Keep my newer draft');t.state.attachments=[];t.state.unackedSend={turnId:'test-newer',draft,item:t.state.item};t.restoreUnackedDraft({turnId:'test-newer'},token);
       const newerDraftSurvives=input.value==='Keep my newer draft';
-      const internalNoticeHidden=t.visibleNotice('Memory lookup is taking longer than expected.')===null&&t.visibleNotice('Librarian preloading memories')===null;
-      const usefulNoticeVisible=t.visibleNotice('Please reconnect your account.')==='Please reconnect your account.';
+      const internalNoticeHidden=t.visibleNotice('Memory lookup is taking longer than expected.')===null&&t.visibleNotice('Librarian preloading memories')===null&&t.visibleNotice('Members reported; the group leader will converge next')===null;
+      const usefulNoticeVisible=t.visibleNotice('Please reconnect your account.')==='Please reconnect your account.'&&!!t.visibleNotice("The group leader's convergence turn could not be queued: service unavailable");
       const cursor=document.getElementById('browserGhostCursor');cursor.style.setProperty('--cursor-x','1%');
       const event={kind:'tool',agent:agent.agent_id,tool:'browser_click',target:'{"x":20,"y":30}',ok:true};
       t.renderTool(event,true);const replayCursorStill=cursor.style.getPropertyValue('--cursor-x')==='1%';
@@ -400,7 +404,15 @@ async function main() {
       t.replaceDisplayRows([...t.state.displayRows,{source:'history',turn_id:'later-turn',value:{role:'user',text:'Another request'}},{...recovered,turn_id:'later-turn'}]);
       const laterRepeatPreserved=t.state.displayRows.filter(row=>row.value.text==='I will check the page.').length===2;
       const truthfulBrowserFailure=t.humanFailureDetail('Phoenix browser input preparation rejected (HTTP 400: Browser input target changed during preparation; observe it again); no input sent','browser_click').includes('page changed');
-      return{repairedDuplicate,oneRealAddition,stable,noArchiveLeak,noBoundaryNoImport,laterRepeatPreserved,truthfulBrowserFailure};
+      const steer={source:'history',turn_id:'old-task',value:{role:'user',text:'One mid-task message',steered:true,steer_id:'steer-test',turn_id:'old-task'}};
+      const canonical={source:'history',turn_id:'steer-test',value:{role:'user',text:'One mid-task message',turn_id:'steer-test'}};
+      const repaired=t.parseDisplayRows({'conversation:display:v2':JSON.stringify({version:2,rows:[steer,canonical,{...canonical,turn_id:'intentional-repeat',value:{...canonical.value,turn_id:'intentional-repeat'}}]})});
+      const steerMirrorRepaired=repaired.length===2;
+      t.replaceDisplayRows([steer]);const steerEchoMatched=t.reconcileHistory([canonical.value],{appendOnly:true}).added.length===0;
+      const internalPromptHidden=t.isInternalRuntimeText('Leader convergence for turn turn_test. @phoenix — internal task context');
+      const store=PhoenixFluffyActivity.createStore();store.registry({agentId:'fixture',sessionId:'group-fixture',status:'working'});store.registry({agentId:'fixture',sessionId:'group-fixture',status:'queued'});store.registry({agentId:'fixture',sessionId:'group-fixture',status:'idle'});
+      const roomIdleClearsWaiting=store.snapshot('fixture').mode==='idle'&&store.snapshot('fixture').waitingReason===null;store.destroy();
+      return{repairedDuplicate,oneRealAddition,stable,noArchiveLeak,noBoundaryNoImport,laterRepeatPreserved,truthfulBrowserFailure,steerMirrorRepaired,steerEchoMatched,internalPromptHidden,roomIdleClearsWaiting};
     })()`);
     console.log(JSON.stringify({transcriptFix},null,2));
     assert.ok(Object.values(transcriptFix).every(Boolean),'Quiet polling preserves the live transcript and updates are not duplicated: '+JSON.stringify(transcriptFix));
