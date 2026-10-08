@@ -169,7 +169,7 @@ export function installConversationPreviews({
       state.sendOrbHovered=true;syncSendOrb();
       const workingHoverKeepsStop = $("sendLabel").textContent === "Stop";
       state.sendOrbHovered=false;$("composerInput").value="Queue this while Phoenix works";syncSendMode();
-      const workingDraftShowsQueue = $("sendLabel").textContent === "Queue" && $("sendButton").getAttribute("aria-label") === "Queue message";
+      const workingDraftShowsSendNow = $("sendLabel").textContent === "Send" && String($("sendButton").getAttribute("aria-label")||"").startsWith("Send now");
       $("composerInput").value="";syncSendMode();
       // Thinking is live status: it relabels the one working cube and never
       // becomes a transcript row. Messages the agent writes between tool
@@ -467,7 +467,14 @@ export function installConversationPreviews({
       let imageDropPrevented=false,imageDropStopped=false;const droppedFiles=[new File([new Uint8Array([137,80,78,71])],"first.png",{type:"image/png"}),new File([new Uint8Array([255,216,255])],"second.jpg",{type:"image/jpeg"})];
       mark("drop-images");await dropComposerImages({dataTransfer:{files:droppedFiles},preventDefault:()=>{imageDropPrevented=true;},stopPropagation:()=>{imageDropStopped=true;}});const multipleExplorerImageDrop=Boolean(imageDropPrevented&&imageDropStopped&&state.attachments.length===3&&state.attachments.slice(-2).map((file)=>file.name).join(",")==="first.png,second.jpg");
       state.attachments=[];renderAttachments();
-      mark("queue-submit");state.mentions=[];state.attachments=[];$("composerInput").value="This follow-up should look like a regular message";setWorking(true);syncSendMode();await submitTurn();mark("queue-submitted");
+      mark("steer-submit");state.mentions=[];state.attachments=[];$("composerInput").value="This follow-up should reach the running turn";setWorking(true);syncSendMode();const draftsBeforeSteer=state.queuedDrafts.size;await submitTurn();mark("steer-submitted");
+      // A one-to-one send while working is delivered into the running turn:
+      // shown at once as sent (labelled), never a queue row or queued draft.
+      const steeredBubble=[...$("conversationFeed").querySelectorAll(".user-message.steered-message")].at(-1);
+      const steerDeliveredImmediately=Boolean(steeredBubble&&steeredBubble.textContent.includes("This follow-up should reach the running turn")&&steeredBubble.querySelector(".steered-label")&&$("queueBlock").hidden&&state.working&&state.queuedDrafts.size===draftsBeforeSteer&&state.displayRows.some((entry)=>entry.value?.steered&&entry.value?.text==="This follow-up should reach the running turn")&&!$("composerInput").value);
+      // The durable queue drawer remains for recovered/internal queued work
+      // (group rooms never queue a user message); exercise that retained path.
+      mark("queue-submit");{const text="This follow-up should look like a regular message",turnId="turn_preview_group_followup",queueId="q-preview-group-followup";state.queue.push({queue_id:queueId,preview:text,turn_id:turnId,state:"waiting"});state.queuedDrafts.set(turnId,{queueId,turnId,requestText:text,displayText:text,initiatingAgentId:null,files:[]});renderQueue();}mark("queue-submitted");
       const queuedDraft=[...state.queuedDrafts.values()].at(-1),queuedBeforeCanonical=$("conversationFeed").querySelector(`.user-message[data-queued-id="${CSS.escape(String(queuedDraft?.queueId||""))}"]`),queueAboveTodo=$("queueBlock").compareDocumentPosition($("taskBlock"))&Node.DOCUMENT_POSITION_FOLLOWING;
       const queuedPromptLooksRegular=Boolean(queuedDraft&&!queuedBeforeCanonical&&!$("queueBlock").hidden&&$("queueList").textContent.includes("This follow-up should look like a regular message")&&queueAboveTodo);
       const queuedDrawerDoesNotDuplicate=Boolean(!queuedBeforeCanonical&&$("queueList").querySelectorAll(".queue-row").length===1);
@@ -507,7 +514,7 @@ export function installConversationPreviews({
         squareBesideLatestCall,
         foldedToolGroupKeepsSquare,
         workingHoverKeepsStop,
-        workingDraftShowsQueue,
+        workingDraftShowsSendNow,
         slashPickerDiscoversCompact,
         slashCommandStayedLocal,
         immediateThinkingCursor,
@@ -564,6 +571,7 @@ export function installConversationPreviews({
         recoveredWorkPrecedesAnswer,
         catchUpUserIdentityStable,
         legacyCatchUpStormRepaired,
+        steerDeliveredImmediately,
         queuedPromptLooksRegular,
         queuedDrawerDoesNotDuplicate,
         queuedWakeShowsCube,

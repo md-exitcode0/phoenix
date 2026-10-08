@@ -1714,3 +1714,47 @@ body.sidebar-collapsed .sidebar-wake .phoenix-raster-logo{width:18px!important;h
 .inspection-browser-tabs .browser-owner-chip svg{width:18px;height:18px;flex:0 0 18px;stroke:none}
 /* The DOM browser host must also yield to menus while its native page is parked. */
 body:has(#browserExtensionsMenu:not([hidden]),#browserSettingsMenu:not([hidden])) .browser-overlay {visibility:hidden;pointer-events:none}
+
+/* Back to latest rides on top of the composer block: approval cards and the
+   "N more requests waiting" pill are inside that block, so anchoring to its
+   top edge keeps the control above them at every height. The block is
+   isolated and transformed, so it is the containing block here. */
+#composerZone>.jump-latest{position:absolute;z-index:40;left:50%;right:auto;top:auto;bottom:calc(100% + 10px);margin:0;transform:translateX(-50%);pointer-events:auto;white-space:nowrap}
+
+/* Group live pals. The leader is a large animated circle (56px floor) centred
+   in the header; pals are 22px seats positioned around it per stage. The
+   cluster may hang a few pixels below the header, so the header is lifted
+   over the feed while it shows. Glow uses box-shadow, which no stage clips. */
+.conversation-header.has-group-pals{z-index:3;overflow:visible}
+.group-pals{--leader:56px;--pal:22px;position:absolute;z-index:4;left:50%;top:2px;width:var(--leader);height:var(--leader);transform:translateX(-50%);pointer-events:none}
+.group-pals .pal-seat{position:absolute;display:grid;place-items:center;border-radius:50%;background:var(--surface-raised,var(--bg));pointer-events:auto;transition:transform .32s cubic-bezier(.3,.7,.2,1),box-shadow .25s ease}
+.group-pals .pal-face{width:100%;height:100%;display:grid;place-items:center;overflow:hidden;border-radius:50%;line-height:0}
+.group-pals .pal-face>svg,.group-pals .pal-face>.custom-avatar-shell,.group-pals .pal-face img,.group-pals .pal-face>.phoenix-raster-avatar{width:100%!important;height:100%!important}
+.group-pals .pal-seat[data-seat="leader"]{inset:0;z-index:1;width:var(--leader);height:var(--leader);min-width:56px;min-height:56px;box-shadow:0 0 0 2px color-mix(in srgb,var(--agent,#77736d) 45%,var(--bg)),0 6px 18px rgba(0,0,0,.14);animation:pal-breathe 4.8s ease-in-out infinite}
+.group-pals .pal-seat:not([data-seat="leader"]){left:50%;top:50%;z-index:2;width:var(--pal);height:var(--pal);margin:calc(var(--pal) / -2);border:2px solid var(--bg);transform:translate(var(--x,0),var(--y,0))}
+.group-pals .pal-more{position:absolute;left:50%;top:50%;z-index:3;min-width:22px;height:18px;margin:-9px 0 0 -11px;padding:0 5px;display:grid;place-items:center;border:1.5px solid var(--bg);border-radius:9px;background:var(--surface-raised,var(--hover));color:var(--ink-soft);font-size:10px;font-weight:700;line-height:1;pointer-events:auto;transform:translate(var(--x,0),var(--y,0));transition:transform .32s cubic-bezier(.3,.7,.2,1)}
+/* Stage 1: spacious row, two pals each side. */
+.group-pals[data-stage="1"] [data-seat="inner-left"]{--x:-47px;--y:0px}
+.group-pals[data-stage="1"] [data-seat="inner-right"]{--x:47px;--y:0px}
+.group-pals[data-stage="1"] [data-seat="outer-left"]{--x:-75px;--y:0px}
+.group-pals[data-stage="1"] [data-seat="outer-right"]{--x:75px;--y:0px}
+.group-pals[data-stage="1"] .pal-more{--x:100px;--y:0px}
+/* Stage 2: inner pair docks at SW/SE rim, outer pair moves inward. */
+.group-pals[data-stage="2"] [data-seat="inner-left"]{--x:-22px;--y:22px}
+.group-pals[data-stage="2"] [data-seat="inner-right"]{--x:22px;--y:22px}
+.group-pals[data-stage="2"] [data-seat="outer-left"]{--x:-45px;--y:0px}
+.group-pals[data-stage="2"] [data-seat="outer-right"]{--x:45px;--y:0px}
+.group-pals[data-stage="2"] .pal-more{--x:24px;--y:-22px}
+/* Stage 3: badge cluster on the lower arc; inner pair sits lowest. */
+.group-pals[data-stage="3"] [data-seat="inner-left"]{--x:-13px;--y:28px}
+.group-pals[data-stage="3"] [data-seat="inner-right"]{--x:13px;--y:28px}
+.group-pals[data-stage="3"] [data-seat="outer-left"]{--x:-29px;--y:12px}
+.group-pals[data-stage="3"] [data-seat="outer-right"]{--x:29px;--y:12px}
+.group-pals[data-stage="3"] .pal-more{--x:24px;--y:-22px}
+.group-pals .pal-seat.speaking{box-shadow:0 0 0 2px var(--ember,#ff6e14),0 0 12px 2px color-mix(in srgb,var(--ember,#ff6e14) 55%,transparent);animation:pal-speak 1.4s ease-in-out infinite}
+.group-pals .pal-seat[data-seat="leader"].speaking{box-shadow:0 0 0 2.5px var(--ember,#ff6e14),0 0 20px 4px color-mix(in srgb,var(--ember,#ff6e14) 50%,transparent);animation:pal-breathe 4.8s ease-in-out infinite,pal-speak 1.4s ease-in-out infinite}
+@keyframes pal-breathe{50%{scale:1.035}}
+@keyframes pal-speak{50%{filter:brightness(1.12) saturate(1.1)}}
+/* A message sent while the agent was working, delivered into that turn. */
+#conversationFeed .user-message.steered-message .message-content{flex-direction:column;align-items:flex-end;gap:4px}
+.user-message .steered-label{font-size:10.5px;line-height:1.2;color:var(--ink-faint);letter-spacing:.01em;user-select:none}

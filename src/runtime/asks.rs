@@ -280,6 +280,21 @@ pub fn archive_late_answer(id: &str, answer: &str) {
     }
 }
 
+/// Close a duplicate approval card after the same decision was made on a
+/// sibling card (same group, same coworker, same permission). A still-parked
+/// turn receives the decision like any answer; a card whose turn already ended
+/// is archived silently. It never queues a wake, so a stale duplicate can not
+/// fail later with an unroutable continuation.
+pub fn settle_superseded_approval(id: &str, decision: &str) -> anyhow::Result<bool> {
+    if answer(id, decision.to_string()) {
+        return Ok(true);
+    }
+    prepare_typed_decision(id, decision, None)?;
+    block_unresumable_protected_action(id)?;
+    archive_resolution(id, decision, "answered")?;
+    Ok(false)
+}
+
 fn block_unresumable_protected_action(id: &str) -> anyhow::Result<()> {
     let path = breadcrumb_path(id)?;
     crate::config::private_io::with_private_lock(&path, || {

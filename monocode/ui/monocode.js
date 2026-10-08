@@ -23,8 +23,7 @@
   ui.applyVisualPrefs(ui.visualPrefs());
   // Window controls belong to the full window, never the resizable main pane.
   const controls=document.querySelector('.chrome-controls');controls.classList.add('mc-window-controls');document.body.append(controls);
-  // Back to latest uses the same mounted control/listener, but belongs to
-  // composer flow here. The copied body overlay assumed an overlaid composer.
+  // Keep the original mounted control/listener anchored above the composer.
   const jump=$('jumpLatest');if(jump)zone.insertBefore(jump,$('taskBlock'));
   // No extra Write next message plus. Attachment and browser plus stay mounted.
   const label=document.createElement('h1');label.className='mc-empty-heading';label.textContent='What should we work on?';zone.prepend(label);

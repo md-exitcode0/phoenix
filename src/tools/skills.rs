@@ -110,7 +110,7 @@ fn ensure_safe_relative_file(root: &Path, path: &Path) -> Result<bool> {
     Ok(false)
 }
 
-fn read_skill_file(root: &Path, path: &Path) -> Result<String> {
+pub(crate) fn read_skill_file(root: &Path, path: &Path) -> Result<String> {
     if !ensure_safe_relative_file(root, path)? {
         bail!("skill file does not exist: {}", path.display());
     }
@@ -330,6 +330,16 @@ fn discover_in(roots: &[PathBuf]) -> Vec<SkillMeta> {
     }
     skills.sort_by(|a, b| a.name.cmp(&b.name));
     skills
+}
+
+/// Test seam for other tool modules: (name, description) of every skill
+/// discovered under explicit roots, hermetic from the live skills root.
+#[cfg(test)]
+pub(crate) fn discover_in_roots_for_tests(roots: &[PathBuf]) -> Vec<(String, String)> {
+    discover_in(roots)
+        .into_iter()
+        .map(|skill| (skill.name, skill.description))
+        .collect()
 }
 
 /// Above this many installed skills, the context block drops per-skill
@@ -651,6 +661,18 @@ format — portable Agent Skills packages) placed under {} or <workspace>/.phoen
             return Err(anyhow!(miss_message(skill, rel)));
         }
         Err(error) => return Err(error),
+    };
+    // Phoenix's bundled motionmaxxing runs through its workflow tool, which
+    // carries the adapter (script paths, gates, isolation) the raw skill lacks.
+    let content = if rel == "SKILL.md"
+        && skill.name == super::motion_graphics::SKILL_NAME
+        && skill.dir.join(".phoenix-bundle").is_file()
+    {
+        format!(
+            "Phoenix: run this skill through the `motion_graphics` tool (`guide` prints the Phoenix adapter; `start`, `still`, `review`, `render`, `look`, `script` run its scripts).\n\n{content}"
+        )
+    } else {
+        content
     };
     Ok(ToolOutput {
         summary: format!("skill {} / {}", skill.name, rel),
@@ -2002,7 +2024,7 @@ fn copy_dir(from: &Path, to: &Path) -> Result<()> {
 
 /// Confine `rel` to the skill directory (skills are third-party content —
 /// a malicious `file` must not escape into the filesystem).
-fn resolve_in_skill(skill_dir: &Path, rel: &str) -> Result<PathBuf> {
+pub(crate) fn resolve_in_skill(skill_dir: &Path, rel: &str) -> Result<PathBuf> {
     let rel = rel.strip_prefix("./").unwrap_or(rel);
     let relative = Path::new(rel);
     if relative.as_os_str().is_empty()

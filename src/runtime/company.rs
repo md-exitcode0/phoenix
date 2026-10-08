@@ -822,6 +822,7 @@ impl CompanyStore {
         connection.busy_timeout(std::time::Duration::from_secs(5))?;
         migrate(&connection)?;
         super::company_directory::migrate(&connection)?;
+        super::group_coordination::migrate(&connection)?;
         validate_company_text_bounds(&connection)?;
         let runtime_epoch = format!("epoch_{}", uuid::Uuid::new_v4().simple());
         let runtime_claim = crate::config::private_io::try_execution_claim(
@@ -2222,6 +2223,60 @@ impl CompanyStore {
             .with_context(|| format!("updated group `{group_id}` disappeared"))
     }
 
+    /// Change a group's leader. The leader must be an active member.
+    pub fn set_group_leader(
+        &self,
+        actor_agent_id: &str,
+        group_id: &str,
+        leader_agent_id: &str,
+    ) -> Result<super::company_directory::GroupRecord> {
+        let snapshot = self.directory_snapshot()?;
+        let mut profile = snapshot
+            .groups
+            .iter()
+            .find(|group| group.profile.group_id == group_id)
+            .with_context(|| format!("unknown group `{group_id}`"))?
+            .profile
+            .clone();
+        anyhow::ensure!(
+            profile.lifecycle != super::company_directory::LifecycleState::PendingDeletion,
+            "restore `{group_id}` before changing its leader"
+        );
+        anyhow::ensure!(
+            snapshot
+                .members
+                .iter()
+                .any(|member| member.group_id == group_id && member.agent_id == leader_agent_id),
+            "group leader `{leader_agent_id}` must be a member of `{group_id}`"
+        );
+        anyhow::ensure!(
+            snapshot.agents.iter().any(|agent| agent.profile.agent_id == leader_agent_id
+                && agent.profile.lifecycle == super::company_directory::LifecycleState::Active),
+            "group leader `{leader_agent_id}` is not an active coworker"
+        );
+        profile.leader_agent_id = Some(leader_agent_id.to_string());
+        self.apply_directory_change(
+            actor_agent_id,
+            format!("group-leader:{group_id}:{}", uuid::Uuid::new_v4()),
+            super::company_directory::DirectoryChange::GroupUpserted { profile },
+        )?;
+        self.directory_snapshot()?
+            .groups
+            .into_iter()
+            .find(|group| group.profile.group_id == group_id)
+            .with_context(|| format!("updated group `{group_id}` disappeared"))
+    }
+
+    /// Group coordination (mission board, claims, rounds) lives in this same
+    /// company database. See `group_coordination`.
+    pub(crate) fn with_coordination<T>(
+        &self,
+        f: impl FnOnce(&mut Connection) -> Result<T>,
+    ) -> Result<T> {
+        let mut connection = self.connection.lock().unwrap_or_else(|p| p.into_inner());
+        f(&mut *connection)
+    }
+
     pub fn set_sidebar_item_pinned(
         &self,
         actor_agent_id: &str,
@@ -2777,6 +2832,15 @@ impl CompanyStore {
             .unwrap_or_else(|| format!("group-{}", profile.group_id));
         crate::session::SessionStore::validate_session_id(&session_id)?;
         profile.canonical_session_id = None;
+        // Group leader architecture: the leader must be a member; default is
+        // the chief of staff (`phoenix`) when present, else the first member.
+        match profile.leader_agent_id.as_deref() {
+            Some(leader) => anyhow::ensure!(
+                members.iter().any(|member| member == leader),
+                "group leader `{leader}` must be one of the group's members"
+            ),
+            None => profile.leader_agent_id = super::company_directory::default_leader_for(&members),
+        }
         let group_id = profile.group_id.clone();
         let mut inputs = vec![NewCompanyEvent {
             run_id: "company-directory".to_string(),
@@ -8346,6 +8410,7 @@ mod tests {
                         sort_order: 0,
                         canonical_session_id: None,
                         metadata_json: "{}".into(),
+                        leader_agent_id: None,
                     },
                 },
             )
@@ -8762,6 +8827,7 @@ mod tests {
                     sort_order: 50,
                     canonical_session_id: None,
                     metadata_json: "{}".into(),
+                    leader_agent_id: None,
                 },
                 vec!["planner".into(), "coder".into()],
             )
@@ -8939,6 +9005,7 @@ mod tests {
                     sort_order: 1,
                     canonical_session_id: None,
                     metadata_json: "{}".into(),
+                    leader_agent_id: None,
                 },
                 vec!["planner".into(), "researcher".into()],
             )
@@ -9197,6 +9264,7 @@ mod tests {
                     sort_order: 0,
                     canonical_session_id: None,
                     metadata_json: "{}".into(),
+                    leader_agent_id: None,
                 },
                 vec!["finance".into(), "planner".into()],
             )
@@ -9397,6 +9465,7 @@ mod tests {
             sort_order: 0,
             canonical_session_id: None,
             metadata_json: "{}".into(),
+            leader_agent_id: None,
         };
 
         assert!(store
@@ -9508,6 +9577,7 @@ mod tests {
                     sort_order: 0,
                     canonical_session_id: None,
                     metadata_json: "{}".into(),
+                    leader_agent_id: None,
                 },
                 vec!["critic".into(), "coder".into(), "frontend".into()],
             )
@@ -9615,6 +9685,7 @@ mod tests {
             color: "#334455".into(), icon_seed: "history".into(),
             lifecycle: super::super::company_directory::LifecycleState::Active,
             pinned: false, sort_order: 0, canonical_session_id: Some("room-history".into()), metadata_json: "{}".into(),
+            leader_agent_id: None,
         }, vec!["phoenix".into(), "coder".into()]).unwrap();
         for id in ["room-history", "room-history__phoenix", "room-history__coder--assignment"] {
             sessions.upsert(crate::session::Session::new_main_with_id(id, "model", "room-private"));
@@ -10027,6 +10098,7 @@ mod tests {
             group_id:"ping-room".into(),name:"Ping room".into(),description:"test".into(),
             color:"#123456".into(),icon_seed:"test".into(),lifecycle:LifecycleState::Active,
             pinned:false,sort_order:1,canonical_session_id:Some("group-ping-room".into()),metadata_json:"{}".into(),
+            leader_agent_id: None,
         },vec!["phoenix".into(),"researcher".into()]).unwrap();
         let snapshot=store.directory_snapshot().unwrap();
         let plan=preview_group_activation(&snapshot,"ping-room","@phoenix ping Theo").unwrap().intent();

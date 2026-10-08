@@ -351,6 +351,7 @@ mod tests {
                     sort_order: 0,
                     canonical_session_id: Some("group-launch".into()),
                     metadata_json: "{}".into(),
+                    leader_agent_id: None,
                 },
                 archived_at: None,
                 delete_after: None,

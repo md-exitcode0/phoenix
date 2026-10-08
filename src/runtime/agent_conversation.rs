@@ -369,6 +369,7 @@ mod tests {
                 sort_order: 0,
                 canonical_session_id: Some("group-launch-room".into()),
                 metadata_json: "{}".into(),
+                leader_agent_id: None,
             },
             archived_at: Some("now".into()),
             delete_after: None,

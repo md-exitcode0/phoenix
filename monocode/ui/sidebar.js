@@ -167,7 +167,11 @@ function mockDirectoryCommand(command) {
       metadata.avatar = command.avatar; row.metadata_json = JSON.stringify(metadata);
     }
   }
-  if (command.action === "update_group") Object.assign(groups.find((row) => row.group_id === command.group_id), { name: command.name, description: command.description, color: command.color, icon_seed: command.icon_seed });
+  if (command.action === "update_group") Object.assign(groups.find((row) => row.group_id === command.group_id), { name: command.name, description: command.description, color: command.color, icon_seed: command.icon_seed }, command.leader_agent_id ? { leader_agent_id: command.leader_agent_id } : {});
+  if (command.action === "set_group_leader") {
+    if (!view.directory.members.some((row) => row.group_id === command.group_id && row.agent_id === command.leader_agent_id)) throw new Error("The leader must be a member of the group.");
+    groups.find((row) => row.group_id === command.group_id).leader_agent_id = command.leader_agent_id;
+  }
   if (command.action === "set_group_members") {
     view.directory.members = view.directory.members.filter((row) => row.group_id !== command.group_id);
     command.members.forEach((member, sort_order) => view.directory.members.push({
@@ -178,6 +182,8 @@ function mockDirectoryCommand(command) {
       history_start_message_index: 0,
       sort_order,
     }));
+    const group = groups.find((row) => row.group_id === command.group_id);
+    if (group && !command.members.some((member) => member.agent_id === group.leader_agent_id)) group.leader_agent_id = defaultGroupLeader(command.members.map((member) => member.agent_id));
   }
   if (command.action === "update_relationship") {
     const relationships=view.directory.relationships||(view.directory.relationships=[]);
@@ -199,7 +205,7 @@ function mockDirectoryCommand(command) {
   }
   if (command.action === "create_group") {
     const name = String(command.name || "New group").trim() || "New group", id = slugId(name, `group-${groups.length + 1}`);
-    groups.push({ group_id: id, name, description: command.description, color: command.color, icon_seed: slugId(command.icon_seed, id), lifecycle: "active", pinned: false, sort_order: agents.length + groups.length, canonical_session_id: `group-${id}`, metadata_json: JSON.stringify(command.settings), archived_at: null, delete_after: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), as_of_seq: 100 });
+    groups.push({ group_id: id, name, description: command.description, color: command.color, icon_seed: slugId(command.icon_seed, id), lifecycle: "active", pinned: false, sort_order: agents.length + groups.length, canonical_session_id: `group-${id}`, metadata_json: JSON.stringify(command.settings), leader_agent_id: command.members.includes(command.leader_agent_id) ? command.leader_agent_id : defaultGroupLeader(command.members), archived_at: null, delete_after: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), as_of_seq: 100 });
     command.members.forEach((agent_id, sort_order) => view.directory.members.push({ group_id: id, agent_id, member_role: "member", history_access: "full", history_start_message_index: 0, sort_order }));
     view.activities.push({ item: wireItem("group", id), canonical_session_id: `group-${id}`, title: command.description, status: "idle", activity_label: null, active_agent_ids: [], provider_id: null, model: null, transcript_revision: 0, last_read_revision: 0, unread: false, modified_at: new Date().toISOString(), recent_prompts: [] });
   }
@@ -995,6 +1001,19 @@ function updateStage() {
   rosterButton.onclick = () => openGroupRoster(rosterButton);
 }
 
+// Group leader: the chief of staff (agent_id "phoenix") leads by default
+// when a member, else the first member. Snapshots carry the effective
+// `leader_agent_id` on every group row.
+const CHIEF_OF_STAFF_ID = "phoenix";
+function defaultGroupLeader(memberIds) {
+  return memberIds.includes(CHIEF_OF_STAFF_ID) ? CHIEF_OF_STAFF_ID : (memberIds[0] || null);
+}
+function groupLeaderId(groupId) {
+  const group = state.view?.directory.groups.find((row) => row.group_id === groupId);
+  const memberIds = (state.view?.directory.members || []).filter((member) => member.group_id === groupId).sort((a,b) => a.sort_order - b.sort_order).map((member) => member.agent_id);
+  return group?.leader_agent_id && memberIds.includes(group.leader_agent_id) ? group.leader_agent_id : defaultGroupLeader(memberIds);
+}
+
 function groupMembers(groupId) {
   const agents = state.view?.directory.agents || [];
   return (state.view?.directory.members || [])
@@ -1008,10 +1027,10 @@ function groupMembers(groupId) {
 
 function openGroupRoster(anchor) {
   if (state.selected.kind !== "group") return;
-  const group = profileFor(state.selected), members = groupMembers(state.selected.id);
-  const rows = members.map((member) => `<article class="group-roster-row" role="listitem">
+  const group = profileFor(state.selected), members = groupMembers(state.selected.id), leaderId = groupLeaderId(state.selected.id);
+  const rows = members.map((member) => `<article class="group-roster-row${member.agent_id === leaderId ? " is-leader" : ""}" role="listitem">
     <i class="group-roster-avatar" style="--agent:${escapeHtml(profileColor(member))}">${avatarSvg(member)}</i>
-    <span class="group-roster-copy"><strong>${escapeHtml(member.display_name)}</strong><small>${escapeHtml(member.role_title || "Coworker")}</small><p>${escapeHtml(member.description || "No responsibility description yet.")}</p></span>
+    <span class="group-roster-copy"><strong>${escapeHtml(member.display_name)}${member.agent_id === leaderId ? ' <em class="group-leader-badge" title="Group leader: unaddressed messages go here">Leader</em>' : ""}</strong><small>${escapeHtml(member.role_title || "Coworker")}</small><p>${escapeHtml(member.description || "No responsibility description yet.")}</p></span>
   </article>`).join("");
   const pop = openPopover(anchor, `<div class="group-roster-head"><span><strong>${escapeHtml(group?.name || "Group")}</strong><small>${members.length} ${members.length === 1 ? "coworker" : "coworkers"}</small></span><button type="button" data-configure-roster aria-label="Configure group">${ICONS.edit}</button></div><div class="group-roster-list" role="list" aria-label="Group coworkers">${rows || '<p class="group-roster-empty">No coworkers in this group.</p>'}</div>`, "group-roster-popover", { align:"start" });
   pop.setAttribute("role", "dialog");
@@ -1241,7 +1260,7 @@ function suggestedGroupName(memberIds, description = "") {
   return "New group";
 }
 
-function groupMemberPicker(agents, selectedIds = []) {
+function groupMemberPicker(agents, selectedIds = [], leaderId = null) {
   const selected = new Set(selectedIds);
   const rows = agents.map((agent) => `<label class="member-picker-row">
     <input class="ember-check-input" type="checkbox" name="members" value="${escapeHtml(agent.agent_id)}" ${selected.has(agent.agent_id) ? "checked" : ""}>
@@ -1249,7 +1268,8 @@ function groupMemberPicker(agents, selectedIds = []) {
     <i class="mini-avatar" style="--agent:${escapeHtml(profileColor(agent))}">${avatarSvg(agent)}</i>
     <span class="member-picker-copy"><strong>${escapeHtml(agent.display_name)}</strong><small>${escapeHtml(agent.role_title || "Coworker")}</small><p>${escapeHtml(agent.description || "No responsibility description yet.")}</p></span>
   </label>`).join("");
-  return `<fieldset class="member-field"><legend>Coworkers</legend><div class="member-picker" aria-describedby="memberPickerStatus">${rows || '<p class="member-picker-empty">Create or activate at least two coworkers before making a group.</p>'}</div><span id="memberPickerStatus" class="member-picker-status" data-member-count aria-live="polite">Choose 2–6 active coworkers.</span></fieldset>`;
+  return `<fieldset class="member-field"><legend>Coworkers</legend><div class="member-picker" aria-describedby="memberPickerStatus">${rows || '<p class="member-picker-empty">Create or activate at least two coworkers before making a group.</p>'}</div><span id="memberPickerStatus" class="member-picker-status" data-member-count aria-live="polite">Choose 2–6 active coworkers.</span></fieldset>
+  <label class="field group-leader-field"><span>Leader <small>gets every message without an @mention and coordinates the room</small></span><select name="leader" data-group-leader data-initial-leader="${escapeHtml(leaderId || "")}"></select></label>`;
 }
 
 function bindGroupMemberPicker(form, { autoName = false, unchangedMemberIds = null } = {}) {
@@ -1272,6 +1292,17 @@ function bindGroupMemberPicker(form, { autoName = false, unchangedMemberIds = nu
     const hint = form.querySelector("[data-group-name-hint]");
     if (hint) hint.textContent = `Suggested from this roster: ${suggestion}`;
     if (autoName && nameInput?.dataset.autoGroupName === "true") nameInput.value = suggestion;
+    const leaderSelect = form.querySelector("[data-group-leader]");
+    if (leaderSelect) {
+      const wanted = leaderSelect.value || leaderSelect.dataset.initialLeader || "";
+      const chosen = selectedIds.includes(wanted) ? wanted : defaultGroupLeader(selectedIds);
+      leaderSelect.innerHTML = selectedIds.map((id) => {
+        const agent = activeCoworkers().find((row) => row.agent_id === id);
+        const label = `${agent?.display_name || id}${id === CHIEF_OF_STAFF_ID ? " · chief of staff" : ""}`;
+        return `<option value="${escapeHtml(id)}" ${id === chosen ? "selected" : ""}>${escapeHtml(label)}</option>`;
+      }).join("");
+      leaderSelect.disabled = !selectedIds.length;
+    }
   };
   inputs.forEach((input) => input.addEventListener("change", update));
   description?.addEventListener("input", update);
@@ -1309,7 +1340,7 @@ function openCreateModal(tab = "agent") {
       const members = selectedGroupMembers?.() || [];
       if (tab === "group" && (members.length < 2 || members.length > 6)) throw new Error("Choose between 2 and 6 active coworkers.");
       const groupName = String(data.get("name") || "").trim() || event.currentTarget.dataset.groupSuggestion || suggestedGroupName(members,data.get("description"));
-      const command = tab === "agent" ? { action:"create_agent", description:data.get("description"), preferred_name:data.get("name") || null, color:data.get("color") || avatarAccentColor(event.currentTarget) || "#e55732", avatar:await avatarConfigFromForm(event.currentTarget) } : { action:"create_group", name:groupName, description:data.get("description"), color:data.get("color"), icon_seed:slugId(groupName), members, settings:{ discussion_rounds:1, read_full_transcript:true } };
+      const command = tab === "agent" ? { action:"create_agent", description:data.get("description"), preferred_name:data.get("name") || null, color:data.get("color") || avatarAccentColor(event.currentTarget) || "#e55732", avatar:await avatarConfigFromForm(event.currentTarget) } : { action:"create_group", name:groupName, description:data.get("description"), color:data.get("color"), icon_seed:slugId(groupName), members, settings:{ discussion_rounds:1, read_full_transcript:true }, leader_agent_id:(members.includes(data.get("leader")) ? data.get("leader") : defaultGroupLeader(members)) };
       const oldIds=new Set(state.view.directory.agents.map(a=>a.agent_id)),avatarDraft=tab==='agent'?avatarFormValues(form):null;
       if (await mutate(command,{quiet:true})) {
         if(tab==='agent'){
@@ -1327,8 +1358,9 @@ function openEditModal(item) {
   const currentMemberIds = agent ? [] : groupMembers(item.id).map((member) => member.agent_id);
   const activeAgentIds = new Set(agents.map((coworker) => coworker.agent_id));
   const currentActiveMemberIds = currentMemberIds.filter((agentId) => activeAgentIds.has(agentId));
+  const currentLeaderId = agent ? null : groupLeaderId(item.id);
   showModal(`<section class="modal" role="dialog" aria-modal="true"><header class="modal-header"><span><strong>Configure ${escapeHtml(displayName(item,p))}</strong><small>The canonical thread, memory, browser profile, and shared company knowledge stay intact.</small></span><button class="modal-close" aria-label="Close"><svg viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></button></header>
-    <form id="editForm" class="modal-body"><label class="field"><span>Name</span><input name="name" required maxlength="72" value="${escapeHtml(displayName(item,p))}"></label>${agent ? avatarEditor(p) : `<label class="field"><span>Color</span>${colorField("color",profileColor(p))}</label>`}${agent ? `<label class="field"><span>Responsibility</span><input name="role" required value="${escapeHtml(p.role_title)}"></label>` : ""}<label class="field"><span>Description</span><textarea name="description" rows="4">${escapeHtml(p.description)}</textarea></label>${agent ? "" : groupMemberPicker(agents,currentMemberIds)}</form>
+    <form id="editForm" class="modal-body"><label class="field"><span>Name</span><input name="name" required maxlength="72" value="${escapeHtml(displayName(item,p))}"></label>${agent ? avatarEditor(p) : `<label class="field"><span>Color</span>${colorField("color",profileColor(p))}</label>`}${agent ? `<label class="field"><span>Responsibility</span><input name="role" required value="${escapeHtml(p.role_title)}"></label>` : ""}<label class="field"><span>Description</span><textarea name="description" rows="4">${escapeHtml(p.description)}</textarea></label>${agent ? "" : groupMemberPicker(agents,currentMemberIds,currentLeaderId)}</form>
     <footer class="modal-footer"><button class="button secondary" data-cancel>Cancel</button><button class="button primary" form="editForm" type="submit">Save changes</button></footer></section>`);
   $('editForm').dataset.configureKind=item.kind;$('editForm').dataset.configureId=item.id;
   bindColorField($("modalLayer"));
@@ -1358,6 +1390,8 @@ function openEditModal(item) {
       if (!await mutate(command,{quiet:true})) { submit.disabled = false; return; }
       if (agent) { window.PhoenixAvatarPreferences.commit(item.id,form); render();window.dispatchEvent(new CustomEvent("phoenix:directory-updated",{detail:{view:state.view}})); }
       if (rosterChanged && !await mutate({ action:"set_group_members", group_id:item.id, members:groupMemberPayload(members) }, { quiet:true })) { submit.disabled = false; return; }
+      const chosenLeader = agent ? null : d.get("leader");
+      if (chosenLeader && members.includes(chosenLeader) && chosenLeader !== groupLeaderId(item.id) && !await mutate({ action:"set_group_leader", group_id:item.id, leader_agent_id:chosenLeader }, { quiet:true })) { submit.disabled = false; return; }
       closeModal(); toast("Configuration saved.");
     } catch (error) { toast(error.message || String(error),true); submit.disabled = false; }
   };

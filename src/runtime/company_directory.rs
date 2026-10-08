@@ -130,7 +130,17 @@ pub struct GroupProfile {
     pub canonical_session_id: Option<String>,
     #[serde(default)]
     pub metadata_json: String,
+    /// Group leader (coordinates the room). `None` on input means "use the
+    /// default rule"; snapshots always carry the effective leader: the stored
+    /// leader while it is an active member, else the chief of staff
+    /// (`phoenix`) when it is an active member, else the first active member
+    /// by group sort order.
+    #[serde(default)]
+    pub leader_agent_id: Option<String>,
 }
+
+/// Chief-of-staff agent id. It leads a group by default when it is a member.
+pub const DEFAULT_GROUP_LEADER: &str = "phoenix";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GroupRecord {
@@ -512,7 +522,93 @@ pub(crate) fn migrate(connection: &Connection) -> Result<()> {
         "history_start_message_index",
         "INTEGER NOT NULL DEFAULT 0",
     )?;
+    // Group leader architecture: existing rooms (for example exported
+    // "Build Group" / "Marketing Team") have no leader. Backfill with the
+    // default rule; NULL keeps meaning "default rule" for later rows.
+    ensure_column(connection, "company_groups", "leader_agent_id", "TEXT")?;
+    connection.execute(
+        &format!(
+            "UPDATE company_groups SET leader_agent_id=({DEFAULT_LEADER_SQL})
+             WHERE leader_agent_id IS NULL"
+        ),
+        [],
+    )?;
     Ok(())
+}
+
+/// Default-rule leader for the `company_groups` row in scope: chief of staff
+/// if an active member, else the first active member by sort order, else the
+/// first member at all. NULL when the group has no members yet.
+const DEFAULT_LEADER_SQL: &str = "SELECT m.agent_id FROM company_group_members m
+    LEFT JOIN company_agents a ON a.agent_id=m.agent_id
+    WHERE m.group_id=company_groups.group_id
+    ORDER BY (a.lifecycle='active') DESC, (m.agent_id='phoenix') DESC,
+             m.sort_order, m.joined_at, m.agent_id
+    LIMIT 1";
+
+/// Apply the default rule wherever the stored leader is no longer an active
+/// member (removed, archived, purged). Called after roster/lifecycle changes.
+fn reassign_orphaned_group_leaders(tx: &Transaction<'_>) -> Result<()> {
+    tx.execute(
+        &format!(
+            "UPDATE company_groups SET leader_agent_id=({DEFAULT_LEADER_SQL})
+             WHERE EXISTS (SELECT 1 FROM company_group_members m0 WHERE m0.group_id=company_groups.group_id)
+               AND (leader_agent_id IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM company_group_members m1
+                    JOIN company_agents a1 ON a1.agent_id=m1.agent_id
+                    WHERE m1.group_id=company_groups.group_id
+                      AND m1.agent_id=company_groups.leader_agent_id
+                      AND a1.lifecycle='active'))"
+        ),
+        [],
+    )?;
+    Ok(())
+}
+
+/// Effective leader for one group in a snapshot (see [`GroupProfile::leader_agent_id`]).
+pub fn effective_group_leader(snapshot: &DirectorySnapshot, group_id: &str) -> Option<String> {
+    let stored = snapshot
+        .groups
+        .iter()
+        .find(|group| group.profile.group_id == group_id)?
+        .profile
+        .leader_agent_id
+        .clone();
+    let mut members = snapshot
+        .members
+        .iter()
+        .filter(|member| member.group_id == group_id)
+        .collect::<Vec<_>>();
+    members.sort_by(|a, b| {
+        (a.sort_order, a.joined_at.as_str(), a.agent_id.as_str())
+            .cmp(&(b.sort_order, b.joined_at.as_str(), b.agent_id.as_str()))
+    });
+    let active = |agent_id: &str| {
+        snapshot.agents.iter().any(|agent| {
+            agent.profile.agent_id == agent_id && agent.profile.lifecycle == LifecycleState::Active
+        })
+    };
+    if let Some(stored) = stored {
+        if members.iter().any(|member| member.agent_id == stored) && active(&stored) {
+            return Some(stored);
+        }
+    }
+    if members.iter().any(|member| member.agent_id == DEFAULT_GROUP_LEADER) && active(DEFAULT_GROUP_LEADER) {
+        return Some(DEFAULT_GROUP_LEADER.to_string());
+    }
+    members
+        .iter()
+        .find(|member| active(&member.agent_id))
+        .or_else(|| members.first())
+        .map(|member| member.agent_id.clone())
+}
+
+/// Default-rule leader for a prospective member list (group creation).
+pub fn default_leader_for(members: &[String]) -> Option<String> {
+    if members.iter().any(|member| member == DEFAULT_GROUP_LEADER) {
+        return Some(DEFAULT_GROUP_LEADER.to_string());
+    }
+    members.first().cloned()
 }
 
 fn ensure_column(
@@ -618,6 +714,9 @@ pub(crate) fn project(
                 ],
             )?;
             anyhow::ensure!(changed == 1, "agent `{agent_id}` does not exist");
+            if *lifecycle != LifecycleState::Active {
+                reassign_orphaned_group_leaders(tx)?;
+            }
         }
         DirectoryChange::AgentDeletionScheduled {
             agent_id,
@@ -689,6 +788,7 @@ pub(crate) fn project(
             )?;
             let changed = tx.execute("DELETE FROM company_agents WHERE agent_id=?1", [agent_id])?;
             anyhow::ensure!(changed == 1, "agent `{agent_id}` does not exist");
+            reassign_orphaned_group_leaders(tx)?;
         }
         DirectoryChange::GroupUpserted { profile } => {
             if let Some(session_id) = profile.canonical_session_id.as_deref() {
@@ -697,15 +797,16 @@ pub(crate) fn project(
             tx.execute(
                 "INSERT INTO company_groups(
                     group_id,name,description,color,icon_seed,lifecycle,pinned,sort_order,
-                    canonical_session_id,metadata_json,created_at,updated_at,as_of_seq)
-                 VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?11,?12)
+                    canonical_session_id,metadata_json,created_at,updated_at,as_of_seq,leader_agent_id)
+                 VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?11,?12,?13)
                  ON CONFLICT(group_id) DO UPDATE SET
                     name=excluded.name,description=excluded.description,color=excluded.color,
                     icon_seed=excluded.icon_seed,lifecycle=excluded.lifecycle,pinned=excluded.pinned,
                     sort_order=excluded.sort_order,
                     canonical_session_id=COALESCE(excluded.canonical_session_id,company_groups.canonical_session_id),
                     metadata_json=excluded.metadata_json,updated_at=excluded.updated_at,
-                    as_of_seq=excluded.as_of_seq",
+                    as_of_seq=excluded.as_of_seq,
+                    leader_agent_id=COALESCE(excluded.leader_agent_id,company_groups.leader_agent_id)",
                 params![
                     profile.group_id,
                     profile.name,
@@ -719,6 +820,7 @@ pub(crate) fn project(
                     normalized_json(&profile.metadata_json),
                     timestamp,
                     seq,
+                    profile.leader_agent_id,
                 ],
             )?;
         }
@@ -831,6 +933,8 @@ pub(crate) fn project(
                     "DELETE FROM company_group_members WHERE group_id=?1 AND agent_id=?2",
                     params![group_id, agent_id],
                 )?;
+                // Removing the leader hands the room to the default rule.
+                reassign_orphaned_group_leaders(tx)?;
             }
         }
         DirectoryChange::ResponsibilityUpserted {
@@ -1027,7 +1131,8 @@ pub(crate) fn snapshot(connection: &Connection) -> Result<DirectorySnapshot> {
     let groups = collect_rows(
         connection,
         "SELECT group_id,name,description,color,icon_seed,lifecycle,pinned,sort_order,
-                canonical_session_id,metadata_json,archived_at,delete_after,created_at,updated_at,as_of_seq
+                canonical_session_id,metadata_json,archived_at,delete_after,created_at,updated_at,as_of_seq,
+                leader_agent_id
          FROM company_groups ORDER BY pinned DESC,sort_order,name",
         row_to_group,
     )?;
@@ -1063,7 +1168,7 @@ pub(crate) fn snapshot(connection: &Connection) -> Result<DirectorySnapshot> {
          FROM company_conversation_sources ORDER BY owner_kind,owner_id,canonical DESC,linked_at DESC",
         row_to_conversation_source,
     )?;
-    Ok(DirectorySnapshot {
+    let mut snapshot = DirectorySnapshot {
         as_of_seq,
         agents,
         groups,
@@ -1072,7 +1177,17 @@ pub(crate) fn snapshot(connection: &Connection) -> Result<DirectorySnapshot> {
         relationships,
         outside_call_grants,
         conversation_sources,
-    })
+    };
+    // Every reader (UI payload, routing, prompts) sees the effective leader.
+    let leaders = snapshot
+        .groups
+        .iter()
+        .map(|group| effective_group_leader(&snapshot, &group.profile.group_id))
+        .collect::<Vec<_>>();
+    for (group, leader) in snapshot.groups.iter_mut().zip(leaders) {
+        group.profile.leader_agent_id = leader;
+    }
+    Ok(snapshot)
 }
 
 /// The team a new company starts with. Every other role in
@@ -1542,6 +1657,9 @@ fn validate_group(profile: &GroupProfile) -> Result<()> {
     )?;
     validate_color(&profile.color)?;
     validate_id(&profile.icon_seed, "group icon seed")?;
+    if let Some(leader) = profile.leader_agent_id.as_deref() {
+        validate_id(leader, "group leader agent id")?;
+    }
     if let Some(session_id) = profile.canonical_session_id.as_deref() {
         crate::session::SessionStore::validate_session_id(session_id)?;
     }
@@ -1675,6 +1793,7 @@ fn row_to_group(row: &rusqlite::Row<'_>) -> rusqlite::Result<GroupRecord> {
             sort_order: row.get(7)?,
             canonical_session_id: row.get(8)?,
             metadata_json: row.get(9)?,
+            leader_agent_id: row.get(15)?,
         },
         archived_at: row.get(10)?,
         delete_after: row.get(11)?,
@@ -1792,6 +1911,91 @@ pub(crate) fn outside_call_granted(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn legacy_directory_with_rooms() -> Connection {
+        let connection = Connection::open_in_memory().unwrap();
+        // Pre-leader schema: the old company_groups table has no leader column.
+        connection.execute_batch(
+            "CREATE TABLE company_groups(
+                group_id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL,
+                color TEXT NOT NULL, icon_seed TEXT NOT NULL, lifecycle TEXT NOT NULL,
+                pinned INTEGER NOT NULL DEFAULT 0, sort_order INTEGER NOT NULL DEFAULT 0,
+                canonical_session_id TEXT, metadata_json TEXT NOT NULL DEFAULT '{}',
+                archived_at TEXT, delete_after TEXT, created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL, as_of_seq INTEGER NOT NULL);",
+        ).unwrap();
+        migrate(&connection).unwrap_or_else(|error| panic!("first migrate: {error:#}"));
+        connection.execute("UPDATE company_groups SET leader_agent_id=NULL", []).unwrap();
+        for (id, lifecycle) in [("phoenix", "active"), ("coder", "active"), ("marketing", "active"), ("sales", "archived")] {
+            connection.execute(
+                "INSERT INTO company_agents(agent_id,internal_role,display_name,role_title,description,color,
+                    icon_seed,agent_kind,lifecycle,browser_profile_id,created_at,updated_at,as_of_seq)
+                 VALUES(?1,?1,?1,'r','d','#112233',?1,'responsibility_owner',?2,?1,'t','t',1)",
+                params![id, lifecycle],
+            ).unwrap();
+        }
+        for group in ["build-group", "marketing-team"] {
+            connection.execute(
+                "INSERT INTO company_groups(group_id,name,description,color,icon_seed,lifecycle,created_at,updated_at,as_of_seq)
+                 VALUES(?1,?1,'d','#112233',?1,'active','t','t',1)",
+                [group],
+            ).unwrap();
+        }
+        for (group, agent, order) in [("build-group", "coder", 0), ("build-group", "phoenix", 1),
+            ("marketing-team", "sales", 0), ("marketing-team", "marketing", 1)] {
+            connection.execute(
+                "INSERT INTO company_group_members(group_id,agent_id,member_role,history_access,sort_order,joined_at,as_of_seq)
+                 VALUES(?1,?2,'member','full',?3,'t',1)",
+                params![group, agent, order],
+            ).unwrap();
+        }
+        connection
+    }
+
+    fn stored_leader(connection: &Connection, group: &str) -> Option<String> {
+        connection
+            .query_row("SELECT leader_agent_id FROM company_groups WHERE group_id=?1", [group], |row| row.get(0))
+            .unwrap()
+    }
+
+    #[test]
+    fn leader_migration_defaults_to_chief_of_staff_else_first_active_member() {
+        let connection = legacy_directory_with_rooms();
+        migrate(&connection).unwrap();
+        assert_eq!(stored_leader(&connection, "build-group").as_deref(), Some("phoenix"));
+        // The first member by sort order is archived; the first active member leads.
+        assert_eq!(stored_leader(&connection, "marketing-team").as_deref(), Some("marketing"));
+        // Re-running the migration is idempotent and keeps an explicit choice.
+        connection.execute("UPDATE company_groups SET leader_agent_id='coder' WHERE group_id='build-group'", []).unwrap();
+        migrate(&connection).unwrap();
+        assert_eq!(stored_leader(&connection, "build-group").as_deref(), Some("coder"));
+    }
+
+    #[test]
+    fn removing_or_archiving_the_leader_reassigns_by_the_default_rule() {
+        let mut connection = legacy_directory_with_rooms();
+        migrate(&connection).unwrap();
+        connection.execute("UPDATE company_groups SET leader_agent_id='coder' WHERE group_id='build-group'", []).unwrap();
+        let tx = connection.transaction().unwrap();
+        tx.execute("DELETE FROM company_group_members WHERE group_id='build-group' AND agent_id='coder'", []).unwrap();
+        reassign_orphaned_group_leaders(&tx).unwrap();
+        tx.commit().unwrap();
+        assert_eq!(stored_leader(&connection, "build-group").as_deref(), Some("phoenix"));
+        connection.execute("UPDATE company_groups SET leader_agent_id='marketing' WHERE group_id='marketing-team'", []).unwrap();
+        let tx = connection.transaction().unwrap();
+        tx.execute("UPDATE company_agents SET lifecycle='archived' WHERE agent_id='marketing'", []).unwrap();
+        reassign_orphaned_group_leaders(&tx).unwrap();
+        tx.commit().unwrap();
+        // No active member remains: fall back to the first member at all.
+        assert_eq!(stored_leader(&connection, "marketing-team").as_deref(), Some("sales"));
+    }
+
+    #[test]
+    fn default_leader_for_new_groups_prefers_the_chief_of_staff() {
+        assert_eq!(default_leader_for(&["coder".into(), "phoenix".into()]).as_deref(), Some("phoenix"));
+        assert_eq!(default_leader_for(&["coder".into(), "frontend".into()]).as_deref(), Some("coder"));
+        assert_eq!(default_leader_for(&[]), None);
+    }
 
     #[test]
     fn founding_team_is_phoenix_plus_four_default_coworkers() {

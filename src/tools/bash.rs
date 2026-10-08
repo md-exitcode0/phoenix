@@ -191,6 +191,16 @@ fn bubblewrap_binary() -> Option<PathBuf> {
 }
 
 #[cfg(target_os = "linux")]
+fn sandbox_skills_root(existing: &[(PathBuf, PathBuf)]) -> Option<PathBuf> {
+    let root = crate::config::phoenix_home().join("skills");
+    let hidden = root.starts_with("/home") || root.starts_with("/tmp");
+    let plain_dir = std::fs::symlink_metadata(&root).is_ok_and(|meta| meta.is_dir())
+        && crate::config::private_io::reject_symlink_components(&root).is_ok();
+    (root.is_absolute() && hidden && plain_dir && !existing.iter().any(|(_, dest)| dest == &root))
+        .then_some(root)
+}
+
+#[cfg(target_os = "linux")]
 fn collect_overlay_directories(path: &Path, directories: &mut Vec<PathBuf>) -> Result<()> {
     let base = if path.starts_with("/home") {
         Path::new("/home")
@@ -334,6 +344,13 @@ fn bash_command(
                 readonly_mounts.push((source.clone(), source));
             }
         }
+    }
+    // Installed skills (including Phoenix's bundled motionmaxxing) ship
+    // scripts that agents run from the skill directory. /home and /tmp are
+    // fresh tmpfs mounts in the sandbox, so expose the global skills root
+    // read-only at its real path; nothing else of PHOENIX_HOME is visible.
+    if let Some(skills_root) = sandbox_skills_root(&readonly_mounts) {
+        readonly_mounts.push((skills_root.clone(), skills_root));
     }
     let cache_root = sandbox_cache_root(&workspace_root)?;
     let sandbox_home = PathBuf::from("/home/phoenix");

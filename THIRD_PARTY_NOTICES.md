@@ -13,6 +13,21 @@ are retained in `vendor/tastecode-design/` and `licenses/tastecode/`.
 See [docs/iris-design.md](docs/iris-design.md) for the integration boundary and
 [the package notices](vendor/tastecode-design/THIRD_PARTY_NOTICES.md) for details.
 
+## motionmaxxing motion-graphics skill
+
+Phoenix bundles the motionmaxxing skill from `Tejashmakwana/motionmaxxing`,
+revision `8c8ec0f2a6f6c9a0da15cd24f7b1298ab298368c`, unmodified except that the
+showcase media (`docs/media/`, `docs/hero/`, `studies/*.jpg`) is left out. It
+lives in `vendor/motionmaxxing/` (file hashes in `UPSTREAM.json`), is embedded
+in the Phoenix binary, and is installed to `~/.phoenix/skills/motionmaxxing/`
+the first time an agent calls the `motion_graphics` tool.
+
+Copyright Tejas Makwana. The skill is licensed under Apache License 2.0. It
+bundles GSAP 3.12.5 (GreenSock Standard "No Charge" License, not open source),
+three.js r186 and opentype.js 1.3.4 (MIT), and the Inter font (SIL OFL 1.1);
+each stays under its own license. The original LICENSE and NOTICE are retained
+in `vendor/motionmaxxing/` and `licenses/motionmaxxing/`.
+
 ## Banana reference photograph
 
 The reusable test input `artifacts/banana-reference/banana-reference.jpg` is

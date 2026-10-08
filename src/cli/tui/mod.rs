@@ -780,6 +780,8 @@ impl Tui {
             match message {
                 crate::session::Message::User { content } => {
                     self.flush_replay_tally(owner, &mut tally);
+                    let content = crate::runtime::postbox::strip_user_steer_marker(content)
+                        .unwrap_or(content.as_str());
                     self.feed.push(FeedItem::User(truncate(content, 600)));
                 }
                 crate::session::Message::Assistant { content } => {

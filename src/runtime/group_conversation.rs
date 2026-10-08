@@ -1,10 +1,10 @@
 //! First-class group conversation planning.
 //!
 //! A group is a canonical endless thread plus an ordered set of active
-//! coworkers. Phoenix is not an implicit relay: a user message wakes only the
-//! members it explicitly `@mentions`. Every awakened coworker reads the same
-//! canonical room transcript before replying, so groups do not need synthetic
-//! discussion rounds, delegation, or a hierarchy.
+//! coworkers with one leader. A user message that `@mentions` members wakes
+//! exactly those members; an unaddressed message wakes only the group leader,
+//! who coordinates the room (see `group_coordination`). Every awakened
+//! coworker reads the same canonical room transcript before replying.
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -31,6 +31,134 @@ fn mention_only_followup_keeps_substantive_requests_distinct() {
     for request in ["", "@", "hello @Theo", "@Theo stop", "@Theo continue", "a@b.com"] {
         assert!(!is_mention_only_followup(request));
     }
+}
+
+/// The runtime lane a room participant's turns run in (and are steered
+/// through): `orchestrator` for Phoenix, otherwise the specialist label.
+pub fn participant_lane(participant: &GroupParticipant) -> Option<String> {
+    if matches!(participant.internal_role.as_str(), "phoenix" | "orchestrator") {
+        return Some("orchestrator".to_string());
+    }
+    crate::runtime::delegation::specialist_from_talk_name(&participant.internal_role)
+        .map(|agent| crate::runtime::delegation::specialist_label(agent).to_string())
+}
+
+/// Separator of a race-fallback turn id: `<client turn id>.rf-<lane>`.
+pub const ROOM_FALLBACK_SEPARATOR: &str = ".rf-";
+
+/// Turn id of the normal turn started for `lane` when a room message could
+/// not be steered into it because its turn had just finished.
+pub fn room_fallback_turn_id(client_turn_id: &str, lane: &str) -> String {
+    format!("{client_turn_id}{ROOM_FALLBACK_SEPARATOR}{}", crate::runtime::postbox::base_agent(lane))
+}
+
+/// The authored room message a turn id belongs to. A race-fallback turn
+/// shares its message's single canonical transcript entry.
+pub fn room_boundary_turn_id(turn_id: &str) -> &str {
+    turn_id.split(ROOM_FALLBACK_SEPARATOR).next().unwrap_or(turn_id)
+}
+
+/// What one member gets when the user posts in a room that is working.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RoomDelivery {
+    /// Running: steer the message into its turn with this framing.
+    Steer(crate::runtime::postbox::RoomSteerKind),
+    /// Idle but must act: start a turn for it now (concurrently).
+    Start,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoomMemberDelivery {
+    pub agent_id: String,
+    pub lane: String,
+    pub delivery: RoomDelivery,
+}
+
+/// "Everyone hears everything, only some act." `actors` are the members that
+/// must act (the validated activation: the @mentioned members, everyone for
+/// `@everyone`/`@all`, or the leader for an unaddressed message). Every
+/// RUNNING member hears the message (actionable for actors, FYI for the
+/// rest); an idle actor is started; an idle non-actor is left asleep — it
+/// reads the message from the canonical transcript on its next turn.
+pub fn plan_room_delivery(
+    context: &GroupTurnContext,
+    actors: &[String],
+    everyone: bool,
+    running: impl Fn(&str) -> bool,
+) -> Vec<RoomMemberDelivery> {
+    use crate::runtime::postbox::RoomSteerKind as Kind;
+    let leader = context.leader_agent_id.as_deref();
+    let mentioned_any = context.participants.iter().any(|p| p.explicitly_mentioned);
+    let leader_solo = !everyone
+        && mentioned_any
+        && actors.len() == 1
+        && leader.is_some_and(|leader| actors[0] == leader);
+    let mut plan = Vec::new();
+    for participant in &context.participants {
+        let Some(lane) = participant_lane(participant) else { continue };
+        let is_leader = leader == Some(participant.agent_id.as_str());
+        let acts = actors.iter().any(|id| id == &participant.agent_id);
+        let delivery = match (acts, running(&lane)) {
+            (true, false) => RoomDelivery::Start,
+            (true, true) => RoomDelivery::Steer(if everyone {
+                if is_leader { Kind::EveryoneReplan } else { Kind::EveryoneAct }
+            } else if leader_solo {
+                Kind::LeaderSolo
+            } else if is_leader && !mentioned_any {
+                Kind::LeaderAct
+            } else {
+                Kind::MentionAct
+            }),
+            (false, true) => RoomDelivery::Steer(if is_leader && mentioned_any {
+                Kind::LeaderFyi
+            } else {
+                Kind::Fyi
+            }),
+            (false, false) => continue,
+        };
+        plan.push(RoomMemberDelivery { agent_id: participant.agent_id.clone(), lane, delivery });
+    }
+    plan
+}
+
+/// Narrow a validated activation to the idle actors that must be started
+/// while other members keep running. Dependencies among the started subset
+/// are kept; edges to members that are not started (they are running and got
+/// the message steered in) are dropped.
+pub fn narrow_activation(
+    intent: &GroupActivationIntent,
+    start: &[String],
+) -> GroupActivationIntent {
+    let active = intent
+        .active_agent_ids
+        .iter()
+        .filter(|id| start.contains(id))
+        .cloned()
+        .collect::<Vec<_>>();
+    if active == intent.active_agent_ids {
+        return intent.clone();
+    }
+    let edges = intent
+        .execution_dependencies
+        .clone()
+        .unwrap_or_else(|| legacy_wave_dependencies(&intent.execution_waves))
+        .into_iter()
+        .filter(|edge| active.contains(&edge.prerequisite) && active.contains(&edge.dependent))
+        .collect::<Vec<_>>();
+    let waves = dependency_waves(&active, &edges).unwrap_or_else(|_| vec![active.clone()]);
+    let mut narrowed = GroupActivationIntent {
+        inspection_participants: Default::default(),
+        tool_constraints: Default::default(),
+        group_id: intent.group_id.clone(),
+        roster_fingerprint: intent.roster_fingerprint.clone(),
+        selection: GroupActivationSelection::Explicit,
+        execution_mode: if edges.is_empty() { GroupExecutionMode::Parallel } else { GroupExecutionMode::Ordered },
+        execution_waves: if active.is_empty() { Vec::new() } else { waves },
+        execution_dependencies: Some(edges),
+        active_agent_ids: active,
+    };
+    narrowed.inherit_tool_constraints(intent);
+    narrowed
 }
 
 /// A required result, not a global barrier between unrelated coworkers.
@@ -81,9 +209,31 @@ pub struct GroupTurnContext {
     /// None denotes a legacy wave plan; Some(empty) is explicitly independent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub execution_dependencies: Option<Vec<GroupDependency>>,
+    /// Effective group leader (agent id) when this context was resolved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub leader_agent_id: Option<String>,
 }
 
 impl GroupTurnContext {
+    /// Resolve an actor label (agent id or internal role) to its agent id.
+    pub fn agent_id_for(&self, actor: &str) -> Option<&str> {
+        self.participants
+            .iter()
+            .find(|p| p.agent_id == actor || p.internal_role == actor
+                || (actor == "orchestrator" && p.internal_role == "phoenix"))
+            .map(|p| p.agent_id.as_str())
+    }
+    /// True when `actor` (agent id or internal role) leads this room.
+    pub fn is_leader(&self, actor: &str) -> bool {
+        match (self.leader_agent_id.as_deref(), self.agent_id_for(actor)) {
+            (Some(leader), Some(id)) => leader == id,
+            _ => false,
+        }
+    }
+    pub fn leader(&self) -> Option<&GroupParticipant> {
+        let leader = self.leader_agent_id.as_deref()?;
+        self.participants.iter().find(|p| p.agent_id == leader)
+    }
     /// Current scheduler facts must survive any transcript compaction or notes
     /// strategy. A prerequisite cannot wait for the work its return unlocks.
     pub fn publication_handoff_instruction(&self, actor: &str) -> Option<String> {
@@ -114,7 +264,13 @@ impl GroupTurnContext {
         let others = self.participants.iter().filter(|p| p.agent_id != me)
             .map(|p| format!("@{} ({})", p.display_name.split_whitespace().next().unwrap_or(&p.display_name), p.internal_role))
             .collect::<Vec<_>>().join(", ");
-        format!("GROUP ROOM \"{}\": you are speaking in a shared room the user can see. Teammates here: {}. To bring a teammate in, write @Name in your reply (for example \"@Leon can you take the visuals?\"); they wake up and answer in this same room under their own name. Never use the talk tool to reach someone in this room, and never claim a teammate joined unless they replied here. Do not repeat what a teammate already said in the room; build on it or stay brief.", self.group_name, if others.is_empty() { "none".to_string() } else { others })
+        let base = format!("GROUP ROOM \"{}\": you are speaking in a shared room the user can see. Teammates here: {}. To bring a teammate in, write @Name in your reply (for example \"@Leon can you take the visuals?\"); they wake up and answer in this same room under their own name. Never use the talk tool to reach someone in this room, and never claim a teammate joined unless they replied here. Do not repeat what a teammate already said in the room; build on it or stay brief.", self.group_name, if others.is_empty() { "none".to_string() } else { others });
+        // Group leader architecture: leader protocol / member assignment and
+        // the compact mission board ride on the same room block.
+        match super::group_coordination::coordination_block(self, me) {
+            Some(block) => format!("{base}\n\n{block}"),
+            None => base,
+        }
     }
     pub fn is_inspection(&self,actor:&str)->bool {
         let id=self.participants.iter().find(|p|p.agent_id==actor||p.internal_role==actor).map(|p|p.agent_id.as_str()).unwrap_or(actor);
@@ -468,7 +624,7 @@ pub fn resolve_group_turn(
     );
 
     let mentions = mentioned_tokens(user_message);
-    let mentions_everyone = mentions.iter().any(|mention| mention == "everyone");
+    let mentions_everyone = mentions.iter().any(|mention| is_everyone_mention(mention));
     let explicit_member_ping=members.iter().any(|member|snapshot.agents.iter()
         .find(|agent|agent.profile.agent_id==member.agent_id).is_some_and(|agent|
             [&agent.profile.agent_id,&agent.profile.internal_role,&agent.profile.display_name]
@@ -523,7 +679,10 @@ pub fn resolve_group_turn(
         "group `{group_id}` has no active members"
     );
 
+    let leader_agent_id = super::company_directory::effective_group_leader(snapshot, group_id)
+        .filter(|leader| participants.iter().any(|participant| &participant.agent_id == leader));
     Ok(GroupTurnContext {
+        leader_agent_id,
         tool_constraints: Default::default(),
         inspection_participants: Default::default(),
         group_id: group_id.to_string(),
@@ -553,13 +712,20 @@ pub fn preview_group_activation(
     let context = resolve_group_turn(snapshot, group_id, user_message)?;
     let selection = if mentioned_tokens(user_message)
         .iter()
-        .any(|mention| mention == "everyone")
+        .any(|mention| is_everyone_mention(mention))
     {
         GroupActivationSelection::Everyone
     } else {
         GroupActivationSelection::Explicit
     };
-    let active = context.explicitly_pinged().collect::<Vec<_>>();
+    let mut active = context.explicitly_pinged().collect::<Vec<_>>();
+    // Leader routing: an unaddressed message wakes only the group leader.
+    // Explicit @mentions (and @everyone) keep waking exactly those members.
+    if active.is_empty() {
+        if let Some(leader) = context.leader() {
+            active.push(leader);
+        }
+    }
     let active_agent_ids = active
         .iter()
         .map(|participant| participant.agent_id.clone())
@@ -1252,6 +1418,16 @@ fn mentioned_tokens(message: &str) -> Vec<String> {
         .collect()
 }
 
+/// `@everyone` and `@all` address the whole room.
+fn is_everyone_mention(mention: &str) -> bool {
+    matches!(mention, "everyone" | "all")
+}
+
+/// Does this room message address everyone (`@everyone` / `@all`)?
+pub fn addresses_everyone(message: &str) -> bool {
+    mentioned_tokens(message).iter().any(|mention| is_everyone_mention(mention))
+}
+
 fn normalized_mention(value: &str) -> String {
     value.trim().to_ascii_lowercase().replace([' ', '-'], "_")
 }
@@ -1437,6 +1613,7 @@ mod tests {
                     sort_order: 1,
                     canonical_session_id: Some("group-launch".into()),
                     metadata_json: r#"{"discussion_rounds":2}"#.into(),
+                    leader_agent_id: None,
                 },
                 archived_at: None,
                 delete_after: None,
@@ -1723,10 +1900,12 @@ mod tests {
     #[test]
     fn activation_preview_uses_stable_ids_and_revalidates_mutable_names() {
         let directory = snapshot();
-        let silent = preview_group_activation(&directory, "launch", "hello room").unwrap();
-        assert_eq!(silent.selection, GroupActivationSelection::Explicit);
-        assert!(silent.active_agent_ids.is_empty());
-        assert!(silent.active_display_names.is_empty());
+        // Unaddressed messages wake only the leader (default: first member
+        // by sort order when the chief of staff is not in the room).
+        let unaddressed = preview_group_activation(&directory, "launch", "hello room").unwrap();
+        assert_eq!(unaddressed.selection, GroupActivationSelection::Explicit);
+        assert_eq!(unaddressed.active_agent_ids, vec!["theo"]);
+        assert_eq!(unaddressed.active_display_names, vec!["Theo"]);
 
         let preview =
             preview_group_activation(&directory, "launch", "@nico please review").unwrap();
@@ -1763,10 +1942,20 @@ mod tests {
             vec![("nico", "Nicholas")]
         );
 
-        let silent = preview_group_activation(&directory, "launch", "hello room")
+        let unaddressed = preview_group_activation(&directory, "launch", "hello room")
             .unwrap()
             .intent();
-        let executable = resolve_group_turn_from_activation(&directory, &silent).unwrap();
+        let executable = resolve_group_turn_from_activation(&directory, &unaddressed).unwrap();
+        assert_eq!(
+            executable.explicitly_pinged().map(|p| p.agent_id.as_str()).collect::<Vec<_>>(),
+            vec!["theo"]
+        );
+        // A stored legacy silent intent (no members) still validates and stays silent.
+        let mut legacy_silent = unaddressed.clone();
+        legacy_silent.active_agent_ids.clear();
+        legacy_silent.execution_waves.clear();
+        legacy_silent.execution_dependencies = Some(Vec::new());
+        let executable = resolve_group_turn_from_activation(&directory, &legacy_silent).unwrap();
         assert_eq!(executable.explicitly_pinged().count(), 0);
     }
 
@@ -1793,6 +1982,46 @@ mod tests {
     }
 
     #[test]
+    fn unaddressed_messages_wake_only_the_leader_and_mentions_wake_only_the_mentioned() {
+        let mut directory = snapshot();
+        directory.groups[0].profile.leader_agent_id = Some("nico".into());
+        let unaddressed = preview_group_activation(&directory, "launch", "what should we ship?").unwrap();
+        assert_eq!(unaddressed.active_agent_ids, vec!["nico"]);
+        let context = resolve_group_turn(&directory, "launch", "").unwrap();
+        assert!(context.is_leader("coder"));
+        assert!(!context.is_leader("researcher"));
+        // Explicit mention of a non-leader does not force the leader in.
+        let mentioned = preview_group_activation(&directory, "launch", "@Theo dig into pricing").unwrap();
+        assert_eq!(mentioned.active_agent_ids, vec!["theo"]);
+        let everyone = preview_group_activation(&directory, "launch", "@everyone thoughts?").unwrap();
+        assert_eq!(everyone.active_agent_ids, vec!["theo", "nico"]);
+        // A stored leader that left the room falls back to the default rule.
+        directory.groups[0].profile.leader_agent_id = Some("ghost".into());
+        let fallback = preview_group_activation(&directory, "launch", "hello").unwrap();
+        assert_eq!(fallback.active_agent_ids, vec!["theo"]);
+    }
+
+    #[test]
+    fn chief_of_staff_leads_by_default_when_a_member() {
+        let mut directory = snapshot();
+        let mut phoenix = directory.agents[0].clone();
+        phoenix.profile.agent_id = "phoenix".into();
+        phoenix.profile.internal_role = "phoenix".into();
+        phoenix.profile.display_name = "Tibo".into();
+        directory.agents.push(phoenix);
+        let mut member = directory.members[0].clone();
+        member.agent_id = "phoenix".into();
+        member.sort_order = 9;
+        directory.members.push(member);
+        let preview = preview_group_activation(&directory, "launch", "plan the launch").unwrap();
+        assert_eq!(preview.active_agent_ids, vec!["phoenix"]);
+        let context = resolve_group_turn(&directory, "launch", "").unwrap();
+        assert!(context.is_leader("orchestrator"));
+        assert!(context.room_instruction("phoenix").contains("GROUP LEADER PROTOCOL"));
+        assert!(context.room_instruction("researcher").contains("GROUP MEMBER — Tibo leads"));
+    }
+
+    #[test]
     fn legacy_groups_larger_than_the_new_creation_cap_remain_readable() {
         let mut directory = snapshot();
         for index in 0..5 {
@@ -1814,4 +2043,146 @@ mod tests {
         assert_eq!(plan.participants.len(), 7);
         assert_eq!(plan.explicitly_pinged().count(), 7);
     }
+
+    // ── Room delivery while working: everyone hears, only some act ────────
+
+    /// Launch room plus a Phoenix leader (Tibo) and a frontend member (Leon).
+    fn led_snapshot() -> DirectorySnapshot {
+        let mut directory = snapshot();
+        for (id, role, name, order) in [("tibo", "phoenix", "Tibo", 0), ("leon", "frontend", "Leon", 3)] {
+            let mut agent = directory.agents[0].clone();
+            agent.profile.agent_id = id.into();
+            agent.profile.internal_role = role.into();
+            agent.profile.display_name = name.into();
+            agent.profile.icon_seed = id.into();
+            agent.profile.sort_order = order;
+            directory.agents.push(agent);
+            let mut member = directory.members[0].clone();
+            member.agent_id = id.into();
+            member.sort_order = if id == "tibo" { -1 } else { 3 };
+            directory.members.push(member);
+        }
+        directory.groups[0].profile.leader_agent_id = Some("tibo".into());
+        directory
+    }
+
+    /// Plan delivery for `message` with the given lanes running.
+    fn deliver(message: &str, running: &[&str]) -> Vec<(String, RoomDelivery)> {
+        let directory = led_snapshot();
+        let intent = preview_group_activation(&directory, "launch", message).unwrap().intent();
+        let context = resolve_group_turn(&directory, "launch", message).unwrap();
+        plan_room_delivery(&context, &intent.active_agent_ids, addresses_everyone(message), |lane| running.contains(&lane))
+            .into_iter()
+            .map(|member| (member.agent_id, member.delivery))
+            .collect()
+    }
+
+    use crate::runtime::postbox::RoomSteerKind as Kind;
+
+    #[test]
+    fn unaddressed_message_goes_to_the_running_leader_and_everyone_else_hears_it() {
+        let plan = deliver("make it dark mode", &["orchestrator", "coder", "frontend"]);
+        assert_eq!(plan, vec![
+            ("tibo".to_string(), RoomDelivery::Steer(Kind::LeaderAct)),
+            ("nico".to_string(), RoomDelivery::Steer(Kind::Fyi)),
+            ("leon".to_string(), RoomDelivery::Steer(Kind::Fyi)),
+        ]);
+        // Theo is idle and not addressed: not woken (reads the transcript later).
+        assert!(!plan.iter().any(|(id, _)| id == "theo"));
+    }
+
+    #[test]
+    fn unaddressed_message_starts_an_idle_leader() {
+        let plan = deliver("what's the status?", &["coder"]);
+        assert_eq!(plan, vec![
+            ("tibo".to_string(), RoomDelivery::Start),
+            ("nico".to_string(), RoomDelivery::Steer(Kind::Fyi)),
+        ]);
+        // Fully idle room: only the leader acts.
+        assert_eq!(deliver("hello team", &[]), vec![("tibo".to_string(), RoomDelivery::Start)]);
+    }
+
+    #[test]
+    fn mention_to_a_busy_member_is_top_priority_and_the_leader_only_hears_it() {
+        let plan = deliver("@Nico switch the API to GraphQL", &["orchestrator", "coder"]);
+        assert_eq!(plan, vec![
+            ("tibo".to_string(), RoomDelivery::Steer(Kind::LeaderFyi)),
+            ("nico".to_string(), RoomDelivery::Steer(Kind::MentionAct)),
+        ]);
+    }
+
+    #[test]
+    fn mention_to_an_idle_member_starts_it_while_another_member_keeps_running() {
+        let plan = deliver("@Leon sketch the landing page", &["coder"]);
+        assert_eq!(plan, vec![
+            ("nico".to_string(), RoomDelivery::Steer(Kind::Fyi)),
+            ("leon".to_string(), RoomDelivery::Start),
+        ]);
+        // Only Leon is started; the running member is not part of the new turn.
+        let directory = led_snapshot();
+        let intent = preview_group_activation(&directory, "launch", "@Leon sketch the landing page").unwrap().intent();
+        let narrowed = narrow_activation(&intent, &["leon".to_string()]);
+        assert_eq!(narrowed.active_agent_ids, vec!["leon".to_string()]);
+        resolve_group_turn_from_activation(&directory, &narrowed).expect("a started subset is a valid activation");
+    }
+
+    #[test]
+    fn several_mentions_each_act_and_the_leader_stays_out() {
+        let plan = deliver("@Theo find prior art and @Nico prototype it", &["orchestrator", "researcher"]);
+        assert_eq!(plan, vec![
+            ("tibo".to_string(), RoomDelivery::Steer(Kind::LeaderFyi)),
+            ("theo".to_string(), RoomDelivery::Steer(Kind::MentionAct)),
+            ("nico".to_string(), RoomDelivery::Start),
+        ]);
+    }
+
+    #[test]
+    fn everyone_and_all_steer_running_members_wake_idle_ones_and_replan() {
+        for message in ["@everyone switch to dark mode", "@all switch to dark mode"] {
+            let plan = deliver(message, &["orchestrator", "coder"]);
+            assert_eq!(plan, vec![
+                ("tibo".to_string(), RoomDelivery::Steer(Kind::EveryoneReplan)),
+                ("theo".to_string(), RoomDelivery::Start),
+                ("nico".to_string(), RoomDelivery::Steer(Kind::EveryoneAct)),
+                ("leon".to_string(), RoomDelivery::Start),
+            ], "{message}");
+        }
+        assert_eq!(deliver("@everyone hi", &[]).iter().filter(|(_, d)| *d == RoomDelivery::Start).count(), 4);
+    }
+
+    #[test]
+    fn leader_alone_answers_without_fan_out() {
+        let plan = deliver("@Tibo quick question: which DB?", &["orchestrator", "coder"]);
+        assert_eq!(plan, vec![
+            ("tibo".to_string(), RoomDelivery::Steer(Kind::LeaderSolo)),
+            ("nico".to_string(), RoomDelivery::Steer(Kind::Fyi)),
+        ]);
+        assert_eq!(deliver("@Tibo quick question", &[]), vec![("tibo".to_string(), RoomDelivery::Start)]);
+    }
+
+    #[test]
+    fn narrowing_keeps_only_edges_inside_the_started_subset() {
+        let directory = led_snapshot();
+        let message = "@Theo then @Nico then @Leon";
+        let intent = preview_group_activation(&directory, "launch", message).unwrap().intent();
+        assert!(!intent.execution_dependencies.as_ref().unwrap().is_empty());
+        let narrowed = narrow_activation(&intent, &["nico".to_string(), "leon".to_string()]);
+        assert_eq!(narrowed.active_agent_ids, vec!["nico".to_string(), "leon".to_string()]);
+        assert!(narrowed.execution_dependencies.as_ref().unwrap().iter()
+            .all(|edge| edge.prerequisite != "theo" && edge.dependent != "theo"));
+        resolve_group_turn_from_activation(&directory, &narrowed).unwrap();
+        // Nothing narrowed: the user's own plan is kept as is.
+        assert_eq!(narrow_activation(&intent, &intent.active_agent_ids.clone()), intent);
+    }
+
+    #[test]
+    fn race_fallback_turns_share_the_single_transcript_entry() {
+        let fallback = room_fallback_turn_id("turn_room_0003", "coder#2");
+        assert_eq!(fallback, "turn_room_0003.rf-coder");
+        assert_eq!(room_boundary_turn_id(&fallback), "turn_room_0003");
+        assert_eq!(room_boundary_turn_id("turn_room_0003"), "turn_room_0003");
+        // Still a valid client turn id (8..=128 of [A-Za-z0-9_.-]).
+        assert!((8..=128).contains(&fallback.len()) && fallback.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.')));
+    }
+
 }

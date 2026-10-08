@@ -5,17 +5,17 @@ Readable source of truth for Phoenix system prompts. Rust loads the active sourc
 | File | Agent |
 |------|--------|
 | [orchestrator_system.md](./orchestrator_system.md) | Phoenix: company coordination, synthesis, and accountable delivery |
-| [coder_system.md](./coder_system.md) | Leo's engineering craft |
-| [researcher_system.md](./researcher_system.md) | Theo's research craft |
+| [coder_system.md](./coder_system.md) | Engineering craft |
+| [researcher_system.md](./researcher_system.md) | Research craft |
 | [browser_system.md](./browser_system.md) | Universal private-browser operating contract |
 | [computer_use_system.md](./computer_use_system.md) | Universal native-desktop operating contract |
-| [frontend_system.md](./frontend_system.md) | Iris's product-design and frontend craft |
-| [presentation_system.md](./presentation_system.md) | Elena's knowledge and artifact craft |
+| [frontend_system.md](./frontend_system.md) | Product-design and frontend craft |
+| [presentation_system.md](./presentation_system.md) | Knowledge and artifact craft |
 | [database_system.md](./database_system.md) | Data craft used by the responsible coworker |
-| [hacker_system.md](./hacker_system.md) | Remy's defensive-security craft |
-| [critic_system.md](./critic_system.md) | Remy's adversarial review craft |
-| [tester_system.md](./tester_system.md) | Remy's test and verification craft |
-| [planner_system.md](./planner_system.md) | Maya's planning and coordination craft |
+| [hacker_system.md](./hacker_system.md) | Defensive-security craft |
+| [critic_system.md](./critic_system.md) | Adversarial review craft |
+| [tester_system.md](./tester_system.md) | Test and verification craft |
+| [planner_system.md](./planner_system.md) | Planning and coordination craft |
 
 **Archive:** [archive/2026-05-28-pre-block1/](./archive/2026-05-28-pre-block1/) — prompts replaced by the block-1 rewrite. The former LLM librarian prompt was retired when memory moved to Phoenix's deterministic knowledge graph.
 
@@ -23,7 +23,7 @@ Readable source of truth for Phoenix system prompts. Rust loads the active sourc
 
 Every built-in and future custom coworker also receives the shared `# Persistent completion discipline` from `src/runtime/shared_contract.rs`. Substantial work starts or resumes a durable Phoenix workflow goal, records observable acceptance outcomes, runs four craft passes, independently re-verifies returned work, and reconciles the latest request before completion. This uses Phoenix's native `work`/`todo_write`/evidence runtime, without a second repository gate file or external completion hook. Source provenance and required notices remain in `THIRD_PARTY_NOTICES.md`.
 
-Iris's integrated design process and local palette, typography, blueprint and copy
+The frontend coworker's integrated design process and local palette, typography, blueprint and copy
 tools are documented in `docs/iris-design.md`. The primary runtime contract is
 bounded, with at most one task-specific supplement. Product meaning and a fresh
 visitor's actual browser journey are part of design verification, not optional

@@ -2548,6 +2548,7 @@ mod ownership_tests {
             description: "Synthetic routing test".into(), color: "#334455".into(),
             icon_seed: "assignment".into(), lifecycle: LifecycleState::Active, pinned: false,
             sort_order: 0, canonical_session_id: Some("group-assignment-fixture".into()), metadata_json: "{}".into(),
+            leader_agent_id: None,
         }, vec!["coder".into(), "researcher".into()]).unwrap();
         let goal = owner.create_goal(GoalRequest { goal_id: Some("goal_named_group".into()),
             idempotency_key: Some("named-group".into()), contract: DurableWorkflowContract {

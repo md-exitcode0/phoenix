@@ -127,6 +127,9 @@ struct ScriptedProvider {
     request_image_counts: Mutex<Vec<usize>>,
     request_image_messages: Mutex<Vec<Vec<ChatMessage>>>,
     request_image_wire: Mutex<Vec<Vec<serde_json::Value>>>,
+    /// Side effects run while the Nth (0-based) provider request is in
+    /// flight — e.g. the user sending a message mid-turn.
+    during_request: Mutex<Vec<(usize, Box<dyn FnOnce() + Send>)>>,
 }
 
 impl ScriptedProvider {
@@ -144,7 +147,16 @@ impl ScriptedProvider {
             request_image_counts: Mutex::new(Vec::new()),
             request_image_messages: Mutex::new(Vec::new()),
             request_image_wire: Mutex::new(Vec::new()),
+            during_request: Mutex::new(Vec::new()),
         }
+    }
+
+    fn during_request(self, index: usize, hook: impl FnOnce() + Send + 'static) -> Self {
+        self.during_request
+            .lock()
+            .unwrap()
+            .push((index, Box::new(hook)));
+        self
     }
 
     fn agent_for(request: &CompletionRequest) -> String {
@@ -219,6 +231,18 @@ impl LLMProvider for ScriptedProvider {
                 .collect::<Vec<_>>()
                 .join("\n"),
         );
+        let request_index = self.request_texts.lock().unwrap().len() - 1;
+        let hooks = {
+            let mut pending = self.during_request.lock().unwrap();
+            let (due, later): (Vec<_>, Vec<_>) = pending
+                .drain(..)
+                .partition(|(index, _)| *index == request_index);
+            *pending = later;
+            due
+        };
+        for (_, hook) in hooks {
+            hook();
+        }
         let agent = Self::agent_for(&request);
         let mut scripts = self.scripts.lock().unwrap();
         let queue = scripts
@@ -1337,6 +1361,7 @@ fn context_window_caps_follow_the_agent_lane_without_globally_shrinking_coworker
         read_full_transcript: true,
         execution_dependencies: None,
         execution_waves: vec![],
+        leader_agent_id: None,
     };
     let grouped = mesh_runner(Arc::new(ScriptedProvider::new(vec![])), dir.path())
         .with_context_window(500_000)
@@ -1443,6 +1468,7 @@ fn group_shared_workspace_uses_only_canonical_room_context() {
         read_full_transcript: true,
         execution_dependencies: None,
         execution_waves: vec![vec!["phoenix".to_string()]],
+        leader_agent_id: None,
     };
     let provider: Arc<dyn LLMProvider> = Arc::new(ScriptedProvider::new(vec![]));
     let runner = MeshRunner::new(
@@ -2779,6 +2805,7 @@ async fn group_assignment_returns_to_owner_before_final_answer() {
         canonical_session_id: session_id.clone(), participants,
         discussion_rounds: 1, read_full_transcript: true,
         execution_dependencies: None, execution_waves: vec![],
+        leader_agent_id: None,
     };
     let provider = Arc::new(ScriptedProvider::new(vec![
         ("Orchestrator", vec![
@@ -3869,4 +3896,131 @@ async fn managed_iris_not_design_restores_normal_tools_and_final_without_project
     assert_eq!(users, vec![request]);
     println!("MANAGED_IRIS_NOT_DESIGN {}", serde_json::json!({"provider_rounds":4,"outcome":"not_design",
         "normal_tools_executed":["design_reference","read"],"project_unchanged":true,"user_finals":1}));
+}
+
+#[tokio::test]
+async fn room_fyi_reaches_a_running_member_as_context_exactly_once() {
+    let home = tempfile::tempdir().unwrap();
+    let _home = crate::config::test_env::PhoenixHomeGuard::set_private(home.path());
+    let workspace = tempfile::tempdir().unwrap();
+    std::fs::write(workspace.path().join("notes.txt"), "draft notes").unwrap();
+    let session_id = format!("mesh-room-steer-{}", uuid::Uuid::new_v4());
+    const SAID: &str = "@Leon make the hero dark mode";
+    let steer_session = session_id.clone();
+    let provider = Arc::new(
+        ScriptedProvider::new(vec![(
+            "Orchestrator",
+            vec![
+                tool_envelope("read", serde_json::json!({"path": "notes.txt"})),
+                final_envelope("notes summarized", "Summarized the notes."),
+            ],
+        )])
+        .during_request(0, move || {
+            use crate::runtime::postbox::{steer_room_user, RoomSteerKind, RoomSteerOutcome};
+            assert_eq!(
+                steer_room_user(&steer_session, "orchestrator", "turn_room_mesh_01", RoomSteerKind::Fyi, SAID),
+                RoomSteerOutcome::Delivered
+            );
+        }),
+    );
+    // The lane is live for the whole turn (a room member's turn registers it).
+    let _live = crate::runtime::postbox::active_turn_guard(&session_id, "orchestrator");
+    let runner = MeshRunner::new(
+        Arc::clone(&provider) as Arc<dyn LLMProvider>,
+        workspace.path().to_path_buf(),
+        home.path().to_path_buf(),
+        session_id.clone(),
+        orchestrator_spec(),
+    );
+    let mut gateway = Gateway::new(runner);
+    gateway.submit(AgentMessage::user_input(AgentAddress::Orchestrator, "summarize notes.txt"));
+    let outcome = tokio::time::timeout(std::time::Duration::from_secs(45), gateway.run())
+        .await
+        .expect("an FYI never starts or queues another turn");
+    assert_eq!(outcome.user_messages.len(), 1);
+    let requests = provider.request_texts.lock().unwrap().clone();
+    assert_eq!(requests.len(), 2);
+    assert!(!requests[0].contains(SAID));
+    assert_eq!(requests[1].matches(SAID).count(), 1);
+    let fyi = crate::runtime::postbox::RoomSteerKind::Fyi.marker();
+    assert!(requests[1].contains(fyi), "framed as context, not an order");
+    assert!(!requests[1].contains(crate::runtime::postbox::USER_STEER_MARKER));
+    let mut store = SessionStore::new(home.path().join("sessions"));
+    store.load_one_if_absent(&session_id).unwrap();
+    let persisted = store.get(&session_id).unwrap().messages.iter()
+        .filter(|message| matches!(message, Message::User { content } if content.starts_with(fyi) && content.contains(SAID)))
+        .count();
+    assert_eq!(persisted, 1);
+    assert!(crate::runtime::postbox::take_steer(&session_id, "orchestrator").is_empty());
+}
+
+#[tokio::test]
+async fn user_message_sent_mid_turn_reaches_the_next_request_exactly_once() {
+    let home = tempfile::tempdir().unwrap();
+    let _home = crate::config::test_env::PhoenixHomeGuard::set_private(home.path());
+    let workspace = tempfile::tempdir().unwrap();
+    std::fs::write(workspace.path().join("notes.txt"), "draft notes").unwrap();
+    std::fs::write(workspace.path().join("todo.txt"), "ship it").unwrap();
+    let session_id = format!("mesh-user-steer-{}", uuid::Uuid::new_v4());
+    const STEER: &str = "also count the lines in todo.txt";
+    let steer_session = session_id.clone();
+    let provider = Arc::new(
+        ScriptedProvider::new(vec![(
+            "Orchestrator",
+            vec![
+                tool_envelope("read", serde_json::json!({"path": "notes.txt"})),
+                tool_envelope("read", serde_json::json!({"path": "todo.txt"})),
+                final_envelope("notes summarized", "Summarized the notes and counted todo.txt: 1 line."),
+            ],
+        )])
+        // The user sends a message while the first model call is in flight.
+        .during_request(0, move || {
+            assert!(crate::runtime::postbox::steer_user(
+                &steer_session,
+                "orchestrator",
+                Some("turn_steer_mid_0001"),
+                STEER,
+            ));
+        }),
+    );
+    let runner = MeshRunner::new(
+        Arc::clone(&provider) as Arc<dyn LLMProvider>,
+        workspace.path().to_path_buf(),
+        home.path().to_path_buf(),
+        session_id.clone(),
+        orchestrator_spec(),
+    );
+    let mut gateway = Gateway::new(runner);
+    gateway.submit(AgentMessage::user_input(
+        AgentAddress::Orchestrator,
+        "summarize notes.txt",
+    ));
+    let outcome = tokio::time::timeout(std::time::Duration::from_secs(45), gateway.run())
+        .await
+        .expect("the steered turn must keep going without a separate queued turn");
+    assert_eq!(outcome.user_messages.len(), 1);
+
+    let requests = provider.request_texts.lock().unwrap().clone();
+    assert_eq!(requests.len(), 3, "the message must not start or queue another turn");
+    assert!(!requests[0].contains(STEER));
+    for request in &requests[1..] {
+        assert_eq!(
+            request.matches(STEER).count(),
+            1,
+            "a mid-turn message is in every later request exactly once: {request}"
+        );
+        assert!(request.contains(crate::runtime::postbox::USER_STEER_MARKER));
+    }
+    assert!(!crate::runtime::postbox::has_pending_steer(&session_id, "orchestrator"));
+
+    let mut store = SessionStore::new(home.path().join("sessions"));
+    store.load_one_if_absent(&session_id).unwrap();
+    let messages = &store.get(&session_id).unwrap().messages;
+    let steered = messages
+        .iter()
+        .filter(|message| matches!(message, Message::User { content }
+            if crate::runtime::postbox::strip_user_steer_marker(content) == Some(STEER)))
+        .count();
+    assert_eq!(steered, 1, "the transcript holds the message once, as a user message");
+    assert!(!messages.iter().any(|message| matches!(message, Message::Talk { body, .. } if body.contains(STEER))));
 }

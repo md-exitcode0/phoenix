@@ -8903,6 +8903,10 @@ fn keep_recent_complete_context_turns(
 /// Split the private model-facing attachment envelope from the authored text.
 /// Canvas projects the paths back into typed chips and thumbnails; backend
 /// prompt instructions must never appear as user-written conversation copy.
+/// Mirror of `phoenix::runtime::postbox::USER_STEER_MARKER` (this crate never
+/// links the agent). Keep the two strings identical.
+const USER_STEER_MARKER: &str = "[New message from the user while you were working — read it now; it may correct, add to, or replace the current task]";
+
 fn canvas_user_message_parts(text: &str) -> (String, Vec<PickedComposerAttachment>) {
     const MARKER: &str = "\n\n[The user attached the following item(s) to THIS message. ";
     let Some(marker_at) = text.rfind(MARKER) else {
@@ -9517,6 +9521,13 @@ fn session_context_get_blocking_at(
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .trim();
+                // A message the user sent while the agent was working is
+                // persisted with the runtime's steer marker. It is an authored
+                // message: show it (without the marker) inside its turn.
+                let (raw_text, steered) = match raw_text.strip_prefix(USER_STEER_MARKER) {
+                    Some(rest) => (rest.trim(), true),
+                    None => (raw_text, false),
+                };
                 let (text, attachments) = canvas_user_message_parts(raw_text);
                 let text = text.trim();
                 if text.is_empty() || compaction_text(text) {
@@ -9536,6 +9547,13 @@ fn session_context_get_blocking_at(
                     serde_json::json!({
                         "role": "user", "text": text,
                         "turn_id": turn_id, "origin": origin,
+                    })
+                } else if steered {
+                    serde_json::json!({
+                        "role": "user",
+                        "text": text,
+                        "attachments": attachments,
+                        "steered": true,
                     })
                 } else {
                     serde_json::json!({
@@ -12400,6 +12418,28 @@ waiting
         let rows = session_context_get_blocking_at(&home, "agent-phoenix".into(), &canvas_owner(CanvasConversationOwnerKind::Agent, "phoenix")).unwrap();
         let prompts: Vec<_> = rows.iter().filter(|row| row["role"] == "user").map(|row| row["text"].as_str().unwrap_or("")).collect();
         assert_eq!(prompts, ["Animate the marks", "Layer one morphs in while layer two morphs out."]);
+        std::fs::remove_dir_all(home).unwrap();
+    }
+
+    #[test]
+    fn a_user_message_delivered_mid_turn_shows_once_without_its_marker() {
+        let home = isolated_dir("user-steer-marker");
+        seed_canvas_owner_directory(&home, &[("phoenix", Some("agent-phoenix"))], &[]);
+        std::fs::create_dir_all(home.join("sessions")).unwrap();
+        let steered = format!("{}\nUse the blue palette instead.", crate::USER_STEER_MARKER);
+        std::fs::write(home.join("sessions/agent-phoenix.json"), serde_json::to_vec(&serde_json::json!({
+            "messages": [
+                {"type":"User","content":"Restyle the page"},
+                {"type":"User","content":steered},
+                {"type":"Assistant","content":"Done in blue."}
+            ]
+        })).unwrap()).unwrap();
+        let rows = session_context_get_blocking_at(&home, "agent-phoenix".into(), &canvas_owner(CanvasConversationOwnerKind::Agent, "phoenix")).unwrap();
+        let users: Vec<_> = rows.iter().filter(|row| row["role"] == "user").collect();
+        assert_eq!(users.len(), 2, "{rows:?}");
+        assert_eq!(users[1]["text"], "Use the blue palette instead.");
+        assert_eq!(users[1]["steered"], true);
+        assert!(users[0].get("steered").is_none());
         std::fs::remove_dir_all(home).unwrap();
     }
 

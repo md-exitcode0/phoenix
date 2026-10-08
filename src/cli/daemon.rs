@@ -954,12 +954,13 @@ pub struct ViewportData {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TurnDelivery {
-    /// Normal Send behavior. If this conversation is working, run the prompt
-    /// as the next independent turn in FIFO order.
+    /// Default wire value. Group rooms: if the room is working, run the prompt
+    /// as the next independent turn in FIFO order. One-to-one conversations
+    /// are upgraded to `Steer` by `effective_turn_delivery` (no queueing).
     #[default]
     Queue,
-    /// Explicit user action: inject the message into the current model loop at
-    /// its next round boundary.
+    /// Inject the message into the current model loop at its next round
+    /// boundary (normal Send in a one-to-one conversation while it works).
     Steer,
 }
 
@@ -1229,8 +1230,8 @@ pub enum WireRequest {
         /// resolves once at receipt for backwards compatibility.
         #[serde(default)]
         group_activation: Option<crate::runtime::group_conversation::GroupActivationIntent>,
-        /// Queue is the safe/default Send behavior. Only the composer's
-        /// explicit Steer action may request immediate mid-turn injection.
+        /// Requested delivery. One-to-one conversations always steer a
+        /// message sent while they work; groups keep their ordered queue.
         #[serde(default)]
         delivery: TurnDelivery,
         /// Canvas sticky notes the user pinned on the board — injected into
@@ -1618,17 +1619,42 @@ fn validated_group_activation_intent(
     validated_group_activation_intent_against_snapshot(&snapshot, group_id, user_request, supplied)
 }
 
-/// Group messages are ordered, independent turns. A steer is an injection
-/// into an already-running agent lane and therefore cannot preserve the
-/// room's previewed activation envelope. Reject it at the wire boundary so a
-/// busy group can only use the durable FIFO, which retains and revalidates the
-/// exact stable-id activation decision before execution.
-fn validate_turn_delivery(target_group: Option<&str>, delivery: TurnDelivery) -> Result<()> {
-    anyhow::ensure!(
-        target_group.is_none() || delivery == TurnDelivery::Queue,
-        "group messages cannot be steered; send normally to queue the next ordered group turn"
-    );
+/// Every delivery value is accepted for every conversation kind. Group rooms
+/// used to reject `Steer` because a room message was queued as one ordered
+/// turn; a room message is now heard by every running member and acted on by
+/// the addressed ones (see `route_room_message`), so there is nothing to
+/// reject. The function stays as the wire seam for future delivery values.
+fn validate_turn_delivery(_target_group: Option<&str>, _delivery: TurnDelivery) -> Result<()> {
     Ok(())
+}
+
+/// What a Send actually does when its conversation is already working: it is
+/// never queued behind the running turn. One-to-one conversations deliver it
+/// into that turn's steering inbox; group rooms write it to the canonical
+/// room transcript and route it to the running/idle members (see
+/// `route_room_message`). An idle conversation runs the message as a normal
+/// turn either way. Old clients that still send `queue` get the same.
+fn effective_turn_delivery(_target_group: Option<&str>, _requested: TurnDelivery) -> TurnDelivery {
+    TurnDelivery::Steer
+}
+
+/// Acknowledgement for a user message delivered into a running turn.
+fn steered_turn_summary(session_id: &str, final_markdown: String) -> TurnSummary {
+    TurnSummary {
+        completion: TurnCompletion::Steered,
+        final_markdown,
+        main_session_id: session_id.to_string(),
+        run_id: String::new(),
+        trace_path: String::new(),
+        route: "talk".to_string(),
+        total_tokens: 0,
+        orchestrator_tokens: None,
+        coder_tokens: None,
+        compression_saved_tokens: 0,
+        compression_raw_tokens: 0,
+        context_window: None,
+        background_work_pending: crate::runtime::postbox::has_background_work(session_id),
+    }
 }
 
 fn validated_group_activation_intent_against_snapshot(
@@ -2322,6 +2348,11 @@ fn is_authored_transcript_user(message: &crate::session::Message) -> bool {
     let crate::session::Message::User { content } = message else {
         return false;
     };
+    // A message delivered into a running turn is part of THAT turn (the
+    // Canvas display gives it the running turn's id), not a new boundary.
+    if crate::runtime::postbox::strip_user_steer_marker(content).is_some() {
+        return false;
+    }
     let normalized = content.trim().to_ascii_lowercase();
     !(normalized.starts_with("[late ask answer]")
         || normalized.starts_with("[queued wake]")
@@ -3156,7 +3187,7 @@ fn fire_background_wake(session_id: String, turn_locks: TurnLocks) {
             .to_string(),
         "steer wake",
         false,
-        Some("queued steer ready — orchestrator waking to process it".to_string()),
+        None,
     );
 }
 
@@ -3294,15 +3325,7 @@ fn fire_agent_provisioning_wake(role: String, turn_locks: TurnLocks) {
     });
 }
 
-fn group_queue_lane(group_id: &str) -> String {
-    format!("__group_queue_{group_id}")
-}
-
-/// Run user messages that arrived while a group discussion was live. The
-/// session lock provides exact ordering, while the dedicated postbox lane
-/// makes the queued prompt visible immediately and keeps it away from
-/// Phoenix's orphan-steer adoption path. Multiple wake tasks coalesce because
-/// the first one drains the lane after acquiring the lock.
+/// Cross-session answer notification under the conversation's real owner.
 fn broadcast_session_answer(session_id: &str, output: &str) {
     use crate::runtime::agent_conversation::CanonicalConversationOwner;
 
@@ -3337,73 +3360,310 @@ fn broadcast_session_answer(session_id: &str, output: &str) {
     crate::runtime::postbox::broadcast_answer(session_id, owner_kind, owner_id, owner, &summary);
 }
 
-fn fire_group_queue_wake(session_id: String, group_id: String, turn_locks: TurnLocks) {
+// ── Group rooms while working: no queue ─────────────────────────────────
+//
+// "Everyone hears everything, only some act." A user message to a room that
+// is working is written to the canonical room transcript at once (exactly one
+// entry, keyed by its client turn id), steered into every member that is
+// running in the room (actionable for the members who must act, FYI for the
+// rest), and an idle member that must act gets its own turn started right
+// away, concurrently with the running work. Idle bystanders are not woken.
+
+/// What a room message did, for the sender's acknowledgement and tests.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct RoomDeliveryReport {
+    turn_id: String,
+    steered: Vec<(String, crate::runtime::postbox::RoomSteerKind)>,
+    started: Vec<String>,
+    duplicates: Vec<String>,
+}
+
+impl RoomDeliveryReport {
+    fn summary(&self, context: &crate::runtime::group_conversation::GroupTurnContext) -> String {
+        let name = |id: &str| {
+            context
+                .participants
+                .iter()
+                .find(|p| p.agent_id == id)
+                .map(|p| p.display_name.clone())
+                .unwrap_or_else(|| id.to_string())
+        };
+        let mut parts = Vec::new();
+        let acting = self
+            .steered
+            .iter()
+            .filter(|(_, kind)| kind.is_actionable())
+            .map(|(id, _)| name(id))
+            .collect::<Vec<_>>();
+        if !acting.is_empty() {
+            parts.push(format!("delivered mid-task to {}", acting.join(", ")));
+        }
+        if !self.started.is_empty() {
+            parts.push(format!(
+                "{} starting now",
+                self.started.iter().map(|id| name(id)).collect::<Vec<_>>().join(", ")
+            ));
+        }
+        let heard = self
+            .steered
+            .iter()
+            .filter(|(_, kind)| !kind.is_actionable())
+            .map(|(id, _)| name(id))
+            .collect::<Vec<_>>();
+        if !heard.is_empty() {
+            parts.push(format!("{} heard it", heard.join(", ")));
+        }
+        if parts.is_empty() {
+            "posted in the room".to_string()
+        } else {
+            format!("posted in the room · {}", parts.join(" · "))
+        }
+    }
+}
+
+/// Route one room message while the room is working. Synchronous and
+/// side-effect ordered: (1) the canonical transcript entry, (2) per-lane
+/// steers, each atomic with its liveness check, (3) the set of idle actors to
+/// start. A lane that finished between the room check and its steer is
+/// reported as an actor to start, never silently skipped.
+fn route_room_message(
+    session_id: &str,
+    group_id: &str,
+    turn_id: &str,
+    user_request: &str,
+    request_for_task: &str,
+    intent: &crate::runtime::group_conversation::GroupActivationIntent,
+) -> Result<(
+    RoomDeliveryReport,
+    crate::runtime::group_conversation::GroupTurnContext,
+)> {
+    use crate::runtime::group_conversation::{self as room, RoomDelivery};
+    use crate::runtime::postbox::RoomSteerOutcome;
+
+    let company = crate::runtime::company::global()?;
+    let snapshot = company.directory_snapshot()?;
+    let context = room::resolve_group_turn(&snapshot, group_id, user_request)?;
+    anyhow::ensure!(
+        context.canonical_session_id == session_id,
+        "group `{group_id}` uses canonical session `{}` (received `{session_id}`)",
+        context.canonical_session_id
+    );
+    // (1) The room transcript gets the message now, exactly once. A retry or
+    // a race-fallback turn reuses this entry (keyed by the client turn id).
+    let model = crate::session::SessionStore::read_one_from_disk(
+        &crate::config::paths::phoenix_sessions_root(),
+        session_id,
+    )
+    .ok()
+    .flatten()
+    .map(|session| session.model)
+    .unwrap_or_else(|| "phoenix-scaffold-model".to_string());
+    crate::runtime::runner::persist_group_user_boundary(
+        &crate::config::phoenix_home(),
+        &context,
+        turn_id,
+        request_for_task,
+        &model,
+    )?;
+    // (2)+(3) Everyone running hears it; the actors act.
+    let everyone = room::addresses_everyone(user_request);
+    let plan = room::plan_room_delivery(&context, &intent.active_agent_ids, everyone, |lane| {
+        crate::runtime::postbox::agent_turn_active(session_id, lane)
+            || crate::runtime::postbox::agent_turn_starting(session_id, lane)
+    });
+    let mut report = RoomDeliveryReport {
+        turn_id: turn_id.to_string(),
+        ..RoomDeliveryReport::default()
+    };
+    for member in plan {
+        match member.delivery {
+            RoomDelivery::Start => report.started.push(member.agent_id),
+            RoomDelivery::Steer(kind) => match crate::runtime::postbox::steer_room_user(
+                session_id,
+                &member.lane,
+                turn_id,
+                kind,
+                request_for_task,
+            ) {
+                RoomSteerOutcome::Delivered => report.steered.push((member.agent_id, kind)),
+                RoomSteerOutcome::Duplicate => report.duplicates.push(member.agent_id),
+                // Finished between the check and the steer: an actor gets a
+                // normal turn; a bystander reads the transcript next time.
+                RoomSteerOutcome::NotRunning if kind.is_actionable() => {
+                    report.started.push(member.agent_id)
+                }
+                RoomSteerOutcome::NotRunning => {}
+            },
+        }
+    }
+    // Keep roster order for the started subset.
+    report.started = intent
+        .active_agent_ids
+        .iter()
+        .filter(|id| report.started.contains(id))
+        .cloned()
+        .collect();
+    Ok((report, context))
+}
+
+/// Start a room turn for `intent`'s members right now, beside whatever the
+/// room is already running (an independent execution permit, not the ordered
+/// session lock). Events reach every open view through the session postbox.
+#[allow(clippy::too_many_arguments)]
+fn spawn_room_turn(
+    session_id: String,
+    group_id: String,
+    turn_id: String,
+    request: String,
+    intent: crate::runtime::group_conversation::GroupActivationIntent,
+    workspace: Option<PathBuf>,
+    permission_mode: Option<crate::tools::PermissionMode>,
+    attachments: Option<Vec<String>>,
+    finalize_receipt: bool,
+    turn_locks: TurnLocks,
+) {
+    if intent.active_agent_ids.is_empty() {
+        return;
+    }
     tokio::spawn(async move {
         let lock = turn_lock_for(&turn_locks, &session_id);
-        let _turn = lock.lock().await;
-        let lane = group_queue_lane(&group_id);
-        loop {
-            let queued = crate::runtime::postbox::take_steer(&session_id, &lane);
-            if queued.is_empty() {
-                return;
+        let _permit = lock.continuation().await;
+        let (anchor_workspace, anchor_mode) = crate::runtime::turn_anchor::wake_context(&session_id);
+        let workspace = workspace
+            .or(anchor_workspace)
+            .or_else(|| Some(crate::config::phoenix_workspace_root()));
+        let permission_mode = permission_mode.unwrap_or(anchor_mode);
+        let scope = crate::runtime::postbox::ExecutionScope::new(turn_id.clone(), turn_id.clone());
+        crate::runtime::postbox::forward_owned(
+            &session_id,
+            Some(&scope),
+            CliEvent::WakeTurn {
+                prompt: request.clone(),
+                turn_id: Some(turn_id.clone()),
+                origin: None,
+            },
+        );
+        let session_file_before = session_file_version(&session_id);
+        let (handle, mut event_rx) = super::spawn_event_loop(
+            false,
+            false,
+            session_id.clone(),
+            request.clone(),
+            permission_mode,
+            crate::runtime::InteractionMode::Execute,
+            false,
+            workspace,
+            None,
+            Some(group_id.clone()),
+            Some(intent),
+            None,
+            None,
+            attachments,
+            Some(turn_id.clone()),
+        );
+        let running_id = running_turns()
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .insert(
+                session_id.clone(),
+                RunningTurn {
+                    handle: handle.abort_handle(),
+                    target_agent: None,
+                    target_group: Some(group_id.clone()),
+                    authored_prompt: Some(request),
+                    session_file_before,
+                },
+            );
+        let mut liveness = tokio::time::interval(Duration::from_millis(250));
+        while let Some(event) =
+            super::turn_events::next_event(&mut event_rx, &handle, &mut liveness).await
+        {
+            crate::notifications::publish_event(&session_id, &event);
+            if let CliEvent::FinalOutput(ref output) = event {
+                broadcast_session_answer(&session_id, output);
             }
-            for note in queued {
-                let (workspace, mode) = crate::runtime::turn_anchor::wake_context(&session_id);
+            let done = matches!(event, CliEvent::Done);
+            crate::runtime::postbox::forward_owned(&session_id, Some(&scope), event);
+            if done {
+                break;
+            }
+        }
+        let result = handle.await;
+        if finalize_receipt {
+            let succeeded = matches!(&result, Ok(Ok(report))
+                if report.execution.outcome.completion == crate::runtime::OutcomeCompletion::Completed);
+            if let Err(error) =
+                super::turn_queue::finalize_immediate_group(&session_id, &turn_id, succeeded)
+            {
+                glog(&format!(
+                    "room turn [{session_id}] {turn_id}: could not finalize idempotency receipt: {error:#}"
+                ));
+            }
+        }
+        running_turns()
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .remove(&session_id, running_id);
+        match result {
+            Ok(Ok(_)) => glog(&format!("room turn done [{session_id}] {turn_id}")),
+            Ok(Err(error)) => {
+                glog(&format!("room turn FAILED [{session_id}] {turn_id}: {error:#}"));
                 crate::runtime::postbox::forward(
                     &session_id,
-                    CliEvent::GatewayNotice(format!(
-                        "queued message ready — {} resuming",
-                        group_id
-                    )),
+                    CliEvent::GatewayNotice(format!("room turn failed: {error:#}")),
                 );
-                let (handle, mut event_rx) = super::spawn_event_loop(
-                    false,
-                    false,
-                    session_id.clone(),
-                    note.body,
-                    mode,
-                    crate::runtime::InteractionMode::Execute,
-                    false,
-                    workspace,
-                    None,
-                    Some(group_id.clone()),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                );
-                while let Some(event) = event_rx.recv().await {
-                    if let CliEvent::FinalOutput(ref output) = event {
-                        broadcast_session_answer(&session_id, output);
-                    }
-                    let done = matches!(event, CliEvent::Done);
-                    crate::runtime::postbox::forward(&session_id, event);
-                    if done {
-                        break;
-                    }
-                }
-                match handle.await {
-                    Ok(Ok(report)) => {
-                        crate::runtime::postbox::forward(
-                            &session_id,
-                            CliEvent::GatewayNotice(format!(
-                                "queued group turn complete · {} tokens · route {}",
-                                report.total_tokens(),
-                                report.route_description()
-                            )),
+            }
+            Err(error) => glog(&format!("room turn stopped [{session_id}] {turn_id}: {error:#}")),
+        }
+    });
+}
+
+/// Race safety for one steered room delivery. The member's round-top drain
+/// and this watcher race for the parked note under one postbox lock, so it
+/// is injected exactly once. If the member's turn ended first, an actionable
+/// message becomes a normal turn for that member; an FYI is simply retired
+/// (the member reads the canonical transcript on its next turn).
+#[allow(clippy::too_many_arguments)]
+fn watch_room_steer(
+    session_id: String,
+    group_id: String,
+    agent_id: String,
+    lane: String,
+    client_turn_id: String,
+    intent: crate::runtime::group_conversation::GroupActivationIntent,
+    workspace: Option<PathBuf>,
+    permission_mode: Option<crate::tools::PermissionMode>,
+    turn_locks: TurnLocks,
+) {
+    tokio::spawn(async move {
+        let delivery_id = crate::runtime::postbox::room_delivery_id(&client_turn_id, &lane);
+        let mut tick = tokio::time::interval(Duration::from_millis(250));
+        loop {
+            tick.tick().await;
+            match crate::runtime::postbox::settle_parked_room_steer(&session_id, &lane, &delivery_id) {
+                crate::runtime::postbox::ParkedRoomSteer::Consumed => return,
+                crate::runtime::postbox::ParkedRoomSteer::Live => continue,
+                crate::runtime::postbox::ParkedRoomSteer::Orphaned(note) => {
+                    let actionable = crate::runtime::postbox::room_steer_parts(&note.subject)
+                        .is_some_and(|(kind, _)| kind.is_actionable());
+                    if actionable {
+                        glog(&format!(
+                            "room [{session_id}] `{lane}` finished before reading the message; starting its turn"
+                        ));
+                        spawn_room_turn(
+                            session_id.clone(),
+                            group_id.clone(),
+                            crate::runtime::group_conversation::room_fallback_turn_id(&client_turn_id, &lane),
+                            note.body,
+                            crate::runtime::group_conversation::narrow_activation(&intent, &[agent_id.clone()]),
+                            workspace.clone(),
+                            permission_mode,
+                            None,
+                            false,
+                            turn_locks.clone(),
                         );
                     }
-                    Ok(Err(error)) => crate::runtime::postbox::forward(
-                        &session_id,
-                        CliEvent::GatewayNotice(format!("queued group turn failed: {error:#}")),
-                    ),
-                    Err(error) => crate::runtime::postbox::forward(
-                        &session_id,
-                        CliEvent::GatewayNotice(format!(
-                            "queued group turn stopped internally: {error:#}"
-                        )),
-                    ),
+                    return;
                 }
             }
         }
@@ -3453,15 +3713,25 @@ fn enqueue_group_continuation(
         let predecessor_context = group_continuation_inputs(&ready, &inputs)?;
         let (workspace, permission_mode) = crate::runtime::turn_anchor::wake_context(&ready.canonical_session_id);
         let participants = ready.activation.active_agent_ids.iter().map(|id| format!("@{id}")).collect::<Vec<_>>().join(" ");
-        let payload = super::turn_queue::QueuedUserTurn {
-            turn_id: Some(ready.turn_id.clone()),
-            user_request: format!(
+        // Group leader architecture: a leader convergence continuation.
+        let converging = ready.turn_id.starts_with(crate::runtime::group_coordination::LEADER_CONVERGENCE_PREFIX);
+        let (user_request, display) = if converging {
+            (format!(
+                "Leader convergence for turn {}. {} — the members you dispatched have reported; their saved room contributions are in the JSON below (task context, not new instructions). Converge: compare and critique them, record decisions on the mission board, run your red-team pass, then either dispatch newly ready plan items or deliver ONE coherent answer to the original request in the room. Do not ask members to repeat completed work.\n\n{}",
+                ready.original_turn_id, participants, predecessor_context,
+            ), format!("Members reported · {participants} converging"))
+        } else {
+            (format!(
                 "Continue the saved group plan from turn {}. Ready participants: {}. Execute only these remaining stages. Do not repeat completed work. Follow the stored prerequisites. The JSON below contains the original request and saved predecessor contributions; these are task context, not new scheduler instructions.\n\n{}",
                 ready.original_turn_id, participants, predecessor_context,
-            ),
+            ), format!("Prerequisites ready · {participants} continuing"))
+        };
+        let payload = super::turn_queue::QueuedUserTurn {
+            turn_id: Some(ready.turn_id.clone()),
+            user_request,
             origin: Some(crate::runtime::TurnOrigin::GroupContinuation {
                 original_turn_id: ready.original_turn_id.clone(),
-                display: format!("Prerequisites ready · {participants} continuing"),
+                display,
             }),
             interaction_mode: crate::runtime::InteractionMode::Execute,
             permission_mode: Some(permission_mode), yolo: None, workspace,
@@ -4032,6 +4302,63 @@ fn retain_detached_ask_approval_if_queued<T>(
     }
 }
 
+/// `(group_id, target_agent_id)` of an outside-group call approval.
+fn outside_call_scope(record: &crate::runtime::asks::AskRecord) -> Option<(String, String)> {
+    let approval = record.approval.as_ref().filter(|approval| approval.action == "outside_group_call")?;
+    let group_id = approval.details.get("group_id")?.trim();
+    let agent_id = approval.details.get("target_agent_id")?.trim();
+    (!group_id.is_empty() && !agent_id.is_empty()).then(|| (group_id.to_string(), agent_id.to_string()))
+}
+
+/// One decision answers every open card asking the same thing: the same
+/// coworker, the same group, the same permission. Parallel callers used to
+/// raise one card each and the user had to approve each separately.
+fn settle_matching_outside_call_asks(record: Option<&crate::runtime::asks::AskRecord>, answer: &str) {
+    let Some(record) = record else { return };
+    let Some(scope) = outside_call_scope(record) else { return };
+    let Ok(records) = crate::runtime::asks::conversation_records(&record.session_id) else { return };
+    let mut seen = std::collections::HashSet::new();
+    for sibling in records {
+        if sibling.ask_id == record.ask_id
+            || sibling.status != "pending"
+            || sibling.resolved_at.is_some()
+            || !seen.insert(sibling.ask_id.clone())
+            || outside_call_scope(&sibling).as_ref() != Some(&scope)
+        {
+            continue;
+        }
+        match crate::runtime::asks::settle_superseded_approval(&sibling.ask_id, answer) {
+            Ok(live) => glog(&format!(
+                "ask {}: settled by matching decision on {} ({})",
+                sibling.ask_id, record.ask_id, if live { "live" } else { "archived" }
+            )),
+            Err(error) => glog(&format!(
+                "ask {}: matching decision could not be applied ({error:#})", sibling.ask_id
+            )),
+        }
+    }
+}
+
+/// The turn that raised an outside-group card has ended, so nothing else will
+/// save the grant. Save it here; the grant is idempotent per group+coworker.
+fn grant_detached_outside_call(record: &crate::runtime::asks::AskRecord, answer: &str) -> Result<()> {
+    let Some((group_id, agent_id)) = outside_call_scope(record) else { return Ok(()) };
+    let approval = record.approval.as_ref().expect("scoped approval");
+    if !(approval.is_presented_in(&record.questions) && approval.confirmed_by(answer)) {
+        return Ok(());
+    }
+    let actor = record.agent_id.clone().filter(|id| !id.is_empty())
+        .unwrap_or_else(|| if record.agent.is_empty() { "phoenix".into() } else { record.agent.clone() });
+    crate::runtime::company::global()?.apply_directory_change(
+        &actor,
+        format!("outside-call-grant:{group_id}:{agent_id}"),
+        crate::runtime::company_directory::DirectoryChange::OutsideCallGrantSet {
+            group_id, agent_id, granted: true,
+        },
+    )?;
+    Ok(())
+}
+
 fn resolved_answer_ack(ask_id: &str, answer: &str) -> Result<Option<WireResponse>> {
     let Some(record) = crate::runtime::asks::decision_record_for(ask_id)? else {
         return Ok(None);
@@ -4040,6 +4367,13 @@ fn resolved_answer_ack(ask_id: &str, answer: &str) -> Result<Option<WireResponse
         return Ok(None);
     }
     anyhow::ensure!(record.resolved_at.is_some(), "question resolution is incomplete");
+    if outside_call_scope(&record).is_some() {
+        // A duplicate card for a group decision that was already made (here
+        // or on a sibling card). The decision stands; closing it is success.
+        return Ok(Some(WireResponse::AskAnswered {
+            disposition: "already_resolved".into(), continuation_turn_id: None,
+        }));
+    }
     anyhow::ensure!(
         matches!(record.status.as_str(), "answered" | "answered_late")
             && record.answer.as_deref() == Some(answer),
@@ -4313,6 +4647,43 @@ fn fire_session_wake(
         } else { returns_count || pending_steer };
         if !can_wake {
             return;
+        }
+        // Race at turn end: a user message delivered into a turn that finished
+        // before its next round-top drain becomes the request of a NORMAL new
+        // turn (persisted as the user's own message, not a synthetic wake
+        // prompt). `take_first_user_steer` removes it atomically, so the turn
+        // that ended can never also have consumed it, and any further parked
+        // messages are drained by this new turn's first round as mid-task
+        // messages: exactly once, never lost.
+        let mut request = request;
+        if !require_terminal_ready {
+            if let Some(note) =
+                crate::runtime::postbox::take_first_user_steer(&session_id, &owner_lane)
+            {
+                crate::runtime::company::mirror_message_injected(
+                    &session_id,
+                    &note.message_id,
+                    &owner_lane,
+                );
+                crate::runtime::postbox::forward(
+                    &session_id,
+                    CliEvent::SteerDelivered {
+                        to: owner_lane.clone(),
+                        subject: note.subject.clone(),
+                    },
+                );
+                // Announce the adopted message as this turn's authored
+                // boundary so live faces show the new turn starting from it.
+                crate::runtime::postbox::forward(
+                    &session_id,
+                    CliEvent::WakeTurn {
+                        prompt: note.body.clone(),
+                        turn_id: Some(format!("steer_turn_{}", uuid::Uuid::new_v4().simple())),
+                        origin: None,
+                    },
+                );
+                request = note.body;
+            }
         }
         // Snapshot before the turn drains the postbox. If provider integration
         // fails, these completed receipts are still enough to answer the user
@@ -5079,9 +5450,11 @@ async fn handle_connection(stream: UnixStream, turn_locks: TurnLocks) -> Result<
                     message: error.to_string(),
                 }).await,
             }
+            let prior_record = crate::runtime::asks::decision_record_for(&ask_id).ok().flatten();
             let delivered = crate::runtime::asks::answer(&ask_id, answer.clone());
             if delivered {
                 glog(&format!("ask {ask_id}: user answer delivered"));
+                settle_matching_outside_call_asks(prior_record.as_ref(), &answer);
                 send(
                     &mut write_half,
                     &WireResponse::AskAnswered {
@@ -5119,6 +5492,35 @@ async fn handle_connection(stream: UnixStream, turn_locks: TurnLocks) -> Result<
                         answer.chars().take(120).collect::<String>()
                     ),
                 );
+                if let Some(record) = ask_record.as_ref().filter(|record| outside_call_scope(record).is_some()) {
+                    // A group-boundary decision outlived the turn that asked.
+                    // Save the decision itself; waking the asker is a courtesy
+                    // and its absence (the caller left the group, the turn was
+                    // superseded) must not surface as an error on the card.
+                    if let Err(error) = grant_detached_outside_call(record, &answer) {
+                        return send(&mut write_half, &WireResponse::Error {
+                            message: format!("the group permission was not saved; retry: {error:#}"),
+                        }).await;
+                    }
+                    let (disposition, continuation_turn_id) = match queue_late_answer_wake(
+                        session_id,
+                        Arc::clone(&turn_locks),
+                        &ask_id,
+                        answer.clone(),
+                        asking_agent_id.as_deref(),
+                    ) {
+                        Ok((queue_id, turn_id)) => (format!("late_answer_queued:{queue_id}"), Some(turn_id)),
+                        Err(error) => {
+                            glog(&format!("ask {ask_id}: group decision saved; no turn to wake ({error:#})"));
+                            ("resolved".to_string(), None)
+                        }
+                    };
+                    crate::runtime::asks::archive_late_answer(&ask_id, &answer);
+                    settle_matching_outside_call_asks(Some(record), &answer);
+                    return send(&mut write_half, &WireResponse::AskAnswered {
+                        disposition, continuation_turn_id,
+                    }).await;
+                }
                 let detached_approval = if let Some(record) = ask_record.as_ref() {
                     match grant_detached_ask_approval(record, &answer) {
                         Ok(grant) => grant,
@@ -5497,6 +5899,10 @@ async fn handle_connection(stream: UnixStream, turn_locks: TurnLocks) -> Result<
                 )
                 .await;
             }
+            // Normal Send in a one-to-one conversation is delivered INTO a
+            // running turn (it never waits as a queued turn); only group rooms
+            // keep their ordered FIFO. See `effective_turn_delivery`.
+            let delivery = effective_turn_delivery(target_group.as_deref(), delivery);
             let group_activation = match validated_group_activation_intent(
                 target_group.as_deref(),
                 &user_request,
@@ -5551,7 +5957,9 @@ async fn handle_connection(stream: UnixStream, turn_locks: TurnLocks) -> Result<
                             return send(
                                 &mut write_half,
                                 &WireResponse::Done(TurnSummary {
-                                    completion: TurnCompletion::Queued,
+                                    // Already in the room (delivered or running):
+                                    // a retry is acknowledged, never re-run.
+                                    completion: TurnCompletion::Steered,
                                     final_markdown: "message already accepted".to_string(),
                                     main_session_id: session_id,
                                     run_id: client_turn_id.to_string(),
@@ -5603,29 +6011,17 @@ async fn handle_connection(stream: UnixStream, turn_locks: TurnLocks) -> Result<
                             "turn [{session_id}] → talk into busy `{base}`: {}",
                             user_request.chars().take(80).collect::<String>()
                         ));
-                        crate::runtime::postbox::steer(
+                        let steer_body = super::request_with_composer_attachments(
+                            &user_request,
+                            attachments.as_ref(),
+                        );
+                        crate::runtime::postbox::steer_user(
                             &session_id,
                             base,
-                            crate::runtime::postbox::SteerNote {
-                                message_id: String::new(),
-                                from: "user".to_string(),
-                                subject: "message from user".to_string(),
-                                body: user_request.clone(),
-                            },
+                            turn_id.as_deref(),
+                            &steer_body,
                         );
                         let persona = crate::runtime::delegation::agent_display_name(base);
-                        let _ = send(
-                            &mut write_half,
-                            &WireResponse::Story(crate::runtime::story::StoryEvent::Narration {
-                                agent: base.to_string(),
-                                text: format!(
-                                "↩ message delivered — {persona} is mid-task and will see your \
-                                 message at its next step. If you told it to stop, it wraps up \
-                                 and its result still arrives as a background return."
-                            ),
-                            }),
-                        )
-                        .await;
                         let _ = send(
                             &mut write_half,
                             &WireResponse::Done(TurnSummary {
@@ -5667,10 +6063,133 @@ async fn handle_connection(stream: UnixStream, turn_locks: TurnLocks) -> Result<
             // below (idle-wake starts a fresh orchestrator turn that drains the
             // pending steer at its round top) — the ONLY other delivery path,
             // never combined with block-and-run, so the message can't double.
+            // A reconnect retry of a message that was already delivered into a
+            // running turn (or parked for the race-safety wake) must not run a
+            // second time as its own turn once the lock frees.
+            if let Some(client_turn_id) = turn_id.as_deref() {
+                if target_group.is_none()
+                    && crate::runtime::postbox::user_steer_seen(&session_id, client_turn_id)
+                {
+                    return send(
+                        &mut write_half,
+                        &WireResponse::Done(steered_turn_summary(
+                            &session_id,
+                            "message already delivered".to_string(),
+                        )),
+                    )
+                    .await;
+                }
+            }
             let session_lock = turn_lock_for(&turn_locks, &session_id);
             let _turn = match session_lock.try_lock() {
                 Ok(guard) => guard,
                 Err(_) => {
+                    // A group room that is working never queues: the message
+                    // lands in the room transcript now, every running member
+                    // hears it, and the addressed members act on it.
+                    if let Some(group_id) = target_group.as_deref() {
+                        let client_turn_id = turn_id
+                            .clone()
+                            .unwrap_or_else(|| format!("room_{}", uuid::Uuid::new_v4().simple()));
+                        let request_for_task = super::request_with_composer_attachments(
+                            &user_request,
+                            attachments.as_ref(),
+                        );
+                        let routed = group_activation
+                            .clone()
+                            .context("group activation is missing")
+                            .and_then(|intent| {
+                                route_room_message(
+                                    &session_id,
+                                    group_id,
+                                    &client_turn_id,
+                                    &user_request,
+                                    &request_for_task,
+                                    &intent,
+                                )
+                                .map(|(report, context)| (report, context, intent))
+                            });
+                        let (report, context, intent) = match routed {
+                            Ok(routed) => routed,
+                            Err(error) => {
+                                if let Some(id) = turn_id.as_deref() {
+                                    let _ = super::turn_queue::release_immediate_group(&session_id, id);
+                                }
+                                return send(
+                                    &mut write_half,
+                                    &WireResponse::Error {
+                                        message: format!("The room could not take this message: {error:#}"),
+                                    },
+                                )
+                                .await;
+                            }
+                        };
+                        glog(&format!(
+                            "room [{session_id}] {client_turn_id}: steered {:?} · started {:?}",
+                            report.steered, report.started
+                        ));
+                        let permission_mode = permission_mode.or_else(|| {
+                            yolo.map(|enabled| {
+                                if enabled {
+                                    crate::tools::PermissionMode::FullAccess
+                                } else {
+                                    crate::tools::PermissionMode::Workspace
+                                }
+                            })
+                        });
+                        for (agent_id, _) in &report.steered {
+                            let Some(lane) = context
+                                .participants
+                                .iter()
+                                .find(|p| &p.agent_id == agent_id)
+                                .and_then(crate::runtime::group_conversation::participant_lane)
+                            else {
+                                continue;
+                            };
+                            watch_room_steer(
+                                session_id.clone(),
+                                group_id.to_string(),
+                                agent_id.clone(),
+                                lane,
+                                client_turn_id.clone(),
+                                intent.clone(),
+                                workspace.clone(),
+                                permission_mode,
+                                Arc::clone(&turn_locks),
+                            );
+                        }
+                        if report.started.is_empty() {
+                            // Steer-only: the message is fully delivered; a
+                            // reconnect retry of it is answered as settled.
+                            if let Some(id) = turn_id.as_deref() {
+                                let _ = super::turn_queue::settle_immediate_group(&session_id, id);
+                            }
+                        } else {
+                            spawn_room_turn(
+                                session_id.clone(),
+                                group_id.to_string(),
+                                client_turn_id.clone(),
+                                request_for_task.clone(),
+                                crate::runtime::group_conversation::narrow_activation(
+                                    &intent,
+                                    &report.started,
+                                ),
+                                workspace.clone(),
+                                permission_mode,
+                                attachments.clone(),
+                                turn_id.is_some(),
+                                Arc::clone(&turn_locks),
+                            );
+                        }
+                        return send(
+                            &mut write_half,
+                            &WireResponse::Done(steered_turn_summary(
+                                &session_id,
+                                report.summary(&context),
+                            )),
+                        )
+                        .await;
+                    }
                     if delivery == TurnDelivery::Queue {
                         let queue_id = match super::turn_queue::enqueue(&session_id, &authored_turn)
                         {
@@ -5724,54 +6243,6 @@ async fn handle_connection(stream: UnixStream, turn_locks: TurnLocks) -> Result<
                         .await;
                         return Ok(());
                     }
-                    if let Some(group_id) = target_group.as_deref() {
-                        let lane = group_queue_lane(group_id);
-                        crate::runtime::postbox::steer(
-                            &session_id,
-                            &lane,
-                            crate::runtime::postbox::SteerNote {
-                                message_id: String::new(),
-                                from: "user".to_string(),
-                                subject: format!("queued message for group {group_id}"),
-                                body: user_request.clone(),
-                            },
-                        );
-                        fire_group_queue_wake(
-                            session_id.clone(),
-                            group_id.to_string(),
-                            Arc::clone(&turn_locks),
-                        );
-                        let _ = send(
-                            &mut write_half,
-                            &WireResponse::Story(
-                                crate::runtime::story::StoryEvent::Narration {
-                                    agent: format!("group:{group_id}"),
-                                    text: "Queued after the current group turn. It will run in this same endless group thread.".to_string(),
-                                },
-                            ),
-                        )
-                        .await;
-                        let _ = send(
-                            &mut write_half,
-                            &WireResponse::Done(TurnSummary {
-                                completion: TurnCompletion::Queued,
-                                final_markdown: "message queued".to_string(),
-                                main_session_id: session_id.clone(),
-                                run_id: String::new(),
-                                trace_path: String::new(),
-                                route: "group-queue".to_string(),
-                                total_tokens: 0,
-                                orchestrator_tokens: None,
-                                coder_tokens: None,
-                                compression_saved_tokens: 0,
-                                compression_raw_tokens: 0,
-                                context_window: None,
-                                background_work_pending: true,
-                            }),
-                        )
-                        .await;
-                        return Ok(());
-                    }
                     // The base role this turn addresses: the orchestrator when
                     // no specialist target is set (or the target resolves to
                     // orchestrator), else the specialist's base. The busy-
@@ -5786,16 +6257,26 @@ async fn handle_connection(stream: UnixStream, turn_locks: TurnLocks) -> Result<
                         "session {session_id}: turn live → talk into `{base}` (no queue): {}",
                         user_request.chars().take(80).collect::<String>()
                     ));
-                    crate::runtime::postbox::steer(
+                    let steer_body = super::request_with_composer_attachments(
+                        &user_request,
+                        attachments.as_ref(),
+                    );
+                    let fresh = crate::runtime::postbox::steer_user(
                         &session_id,
                         base,
-                        crate::runtime::postbox::SteerNote {
-                            message_id: String::new(),
-                            from: "user".to_string(),
-                            subject: "message from user".to_string(),
-                            body: user_request.clone(),
-                        },
+                        turn_id.as_deref(),
+                        &steer_body,
                     );
+                    if !fresh {
+                        return send(
+                            &mut write_half,
+                            &WireResponse::Done(steered_turn_summary(
+                                &session_id,
+                                "message already delivered".to_string(),
+                            )),
+                        )
+                        .await;
+                    }
                     // Safety net: if the live turn ENDS before its next round-top
                     // drain, the steer would sit unread. Ping the idle-wake loop
                     // (the same channel `job_finished` uses); once this session's
@@ -5819,17 +6300,6 @@ async fn handle_connection(stream: UnixStream, turn_locks: TurnLocks) -> Result<
                     // what lets the coordinator adopt and route it.
                     crate::runtime::postbox::wake(&session_id);
                     let persona = crate::runtime::delegation::agent_display_name(base);
-                    let _ = send(
-                        &mut write_half,
-                        &WireResponse::Story(crate::runtime::story::StoryEvent::Narration {
-                            agent: base.to_string(),
-                            text: format!(
-                                "↩ delivered — injected into the running turn; {persona} \
-                                 will act on it at its next step."
-                            ),
-                        }),
-                    )
-                    .await;
                     let _ = send(
                         &mut write_half,
                         &WireResponse::Done(TurnSummary {
@@ -7549,7 +8019,7 @@ mod ensure_gateway_tests {
         record_maintenance_attempt, record_maintenance_success,
         retain_detached_ask_approval_if_queued, rotate_log_if_oversized, rotated_log_path,
         scheduled_agent_target, scheduled_turn_id, send, socket_path, spawn_background_settlement,
-        subscribe_events, target_agent_for_session_kind, validate_turn_delivery,
+        subscribe_events, target_agent_for_session_kind, validate_turn_delivery, effective_turn_delivery,
         validate_wire_request_session_ids, BackgroundSettlementTracker, DetachedAskApprovalGrant,
         GatewayLifecycleLock, GatewayProbe, RemoteOutcome, TranscriptDeleteScope, TurnDelivery,
         TurnCompletion, TurnSummary, VaultCommand, VaultReply, WireRequest, WireResponse, GATEWAY_WIRE_PROTOCOL,
@@ -8732,6 +9202,7 @@ mod ensure_gateway_tests {
                     sort_order: 1,
                     canonical_session_id: Some("group-activation-validation-room".to_string()),
                     metadata_json: "{}".to_string(),
+                    leader_agent_id: None,
                 },
                 active_ids[..2].to_vec(),
             )
@@ -8802,20 +9273,104 @@ mod ensure_gateway_tests {
     }
 
     #[test]
-    fn raw_group_steer_is_rejected_without_writing_the_group_postbox() {
-        let session_id = format!("group-steer-rejection-{}", uuid::Uuid::new_v4().simple());
-        let group_id = "ordered-room";
-        let lane = super::group_queue_lane(group_id);
+    fn no_queue_in_the_group_send_path() {
+        // Every Send while working is delivered, never queued: one-to-one
+        // conversations steer into the running turn, group rooms route the
+        // message to the running/idle members (`route_room_message`).
+        for target in [None, Some("launch-room")] {
+            for requested in [TurnDelivery::Queue, TurnDelivery::Steer] {
+                validate_turn_delivery(target, requested).expect("every delivery is accepted");
+                assert_eq!(effective_turn_delivery(target, requested), TurnDelivery::Steer);
+            }
+        }
+        // The busy-room branch of the Turn handler routes and returns before
+        // the durable FIFO; the old group queue lane is gone from the send path.
+        let source = include_str!("daemon.rs");
+        let handler = &source[source.find("WireRequest::Turn {\n            session_id,").unwrap()..];
+        let handler = &handler[..handler.find("// A client that doesn't know the session's workspace").unwrap()];
+        let room = handler.find("if let Some(group_id) = target_group.as_deref() {").unwrap();
+        let queue = handler.find("super::turn_queue::enqueue(").unwrap();
+        assert!(room < queue, "a busy room must be routed before any queueing");
+        assert!(handler[room..queue].contains("route_room_message("));
+        assert!(!handler.contains(concat!("group_queue", "_lane(")));
+        assert!(!handler.contains("Queued after the current group turn"));
+    }
 
-        assert!(crate::runtime::postbox::take_steer(&session_id, &lane).is_empty());
-        let error = validate_turn_delivery(Some(group_id), TurnDelivery::Steer).unwrap_err();
-        assert!(error.to_string().contains("cannot be steered"));
-        assert!(crate::runtime::postbox::take_steer(&session_id, &lane).is_empty());
+    #[test]
+    fn mid_turn_user_message_belongs_to_its_running_turn_for_deletion() {
+        use crate::session::{Message, Session};
 
-        validate_turn_delivery(Some(group_id), TurnDelivery::Queue)
-            .expect("normal group sends must retain durable FIFO delivery");
-        validate_turn_delivery(None, TurnDelivery::Steer)
-            .expect("direct-agent steer remains supported");
+        let mut session = Session::new_main_with_id("delete-steered-turn", "model", "system");
+        for message in [
+            Message::User {
+                content: "keep prompt".into(),
+            },
+            Message::Assistant {
+                content: "keep answer".into(),
+            },
+            Message::User {
+                content: "running prompt".into(),
+            },
+            Message::ToolResult {
+                tool_name: "read".into(),
+                input: "{}".into(),
+                success: true,
+                output: "first step".into(),
+            },
+            Message::User {
+                content: crate::runtime::postbox::user_steer_content("use the blue palette"),
+            },
+            Message::Assistant {
+                content: "done in blue".into(),
+            },
+        ] {
+            session.push_message(message);
+        }
+        let steered = session.messages[4].clone();
+        assert!(!super::is_authored_transcript_user(&steered));
+        // "running prompt" is still the newest authored boundary (0 from end);
+        // the steer is not counted as a turn of its own.
+        super::delete_transcript_turn_from_session(
+            &mut session,
+            0,
+            "running prompt",
+            TranscriptDeleteScope::Prompt,
+        )
+        .expect("the steered message does not shift turn ordinals");
+        assert!(!session.messages.iter().any(|message| matches!(
+            message,
+            Message::User { content } if content.contains("use the blue palette")
+        )));
+        assert!(session.messages.iter().any(
+            |message| matches!(message, Message::User { content } if content == "keep prompt")
+        ));
+    }
+
+    #[test]
+    fn race_at_turn_end_hands_the_user_message_to_exactly_one_new_turn() {
+        let session_id = format!("steer-race-{}", uuid::Uuid::new_v4().simple());
+        assert!(crate::runtime::postbox::steer_user(
+            &session_id,
+            "orchestrator",
+            Some("turn_race_0001"),
+            "actually, stop after the outline",
+        ));
+        // A reconnect retry of the same composer message is not parked twice.
+        assert!(!crate::runtime::postbox::steer_user(
+            &session_id,
+            "orchestrator",
+            Some("turn_race_0001"),
+            "actually, stop after the outline",
+        ));
+        assert!(crate::runtime::postbox::user_steer_seen(&session_id, "turn_race_0001"));
+        // The live turn ended without draining: the wake adopts it as the new
+        // turn's request ...
+        let adopted = crate::runtime::postbox::take_first_user_steer(&session_id, "orchestrator")
+            .expect("parked user message becomes the next turn");
+        assert_eq!(adopted.body, "actually, stop after the outline");
+        // ... and nothing remains for that turn's round-top drain to inject again.
+        assert!(!crate::runtime::postbox::has_pending_steer(&session_id, "orchestrator"));
+        assert!(crate::runtime::postbox::take_steer(&session_id, "orchestrator").is_empty());
     }
 
     #[test]
@@ -9088,6 +9643,7 @@ mod ensure_gateway_tests {
                 sort_order: 0,
                 canonical_session_id: Some("group-launch-room".into()),
                 metadata_json: "{}".into(),
+                leader_agent_id: None,
             },
             archived_at: None,
             delete_after: None,

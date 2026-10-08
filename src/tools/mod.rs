@@ -53,6 +53,7 @@ pub mod recall;
 pub mod remote_runner;
 mod reverse_skill;
 mod routine;
+pub mod motion_graphics;
 pub mod skills;
 mod str_replace;
 mod talk;
@@ -1560,6 +1561,9 @@ impl ToolExecutor {
             "bash" => parse_and_run(call.input, |input| {
                 bash::execute_cancellable(fs_root, confined, input, cancellation)
             }),
+            "motion_graphics" => parse_and_run(call.input, |input| {
+                motion_graphics::execute_cancellable(fs_root, confined, input, cancellation)
+            }),
             "background_terminal" => parse_and_run(call.input, |input: bash::BashInput| {
                 bash::validate_input(fs_root, confined, &input)?;
                 let session=self.session_id.as_deref().context("background terminal needs an owning conversation")?;
@@ -2441,6 +2445,10 @@ const KNOWN_TOOLS: &[(&str, &str)] = &[
     (
         "image_analyze",
         "Read/understand any image file with the vision model — caption, verbatim text, or answer a question.",
+    ),
+    (
+        "motion_graphics",
+        "Make motion graphics, animation and video with the bundled motionmaxxing workflow: guide, render, and scripted gates.",
     ),
     (
         "skill",

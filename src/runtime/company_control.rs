@@ -428,6 +428,10 @@ pub enum CompanyDirectoryCommand {
         members: Vec<String>,
         #[serde(default)]
         settings: GroupConversationSettings,
+        /// Group leader; must be one of `members`. Defaults to the chief of
+        /// staff (`phoenix`) when a member, else the first member.
+        #[serde(default)]
+        leader_agent_id: Option<String>,
     },
     UpdateAgent {
         agent_id: String,
@@ -446,10 +450,18 @@ pub enum CompanyDirectoryCommand {
         color: Option<String>,
         icon_seed: Option<String>,
         settings: Option<GroupConversationSettings>,
+        /// Optional leader change; must be a current active member.
+        #[serde(default)]
+        leader_agent_id: Option<String>,
     },
     SetGroupMembers {
         group_id: String,
         members: Vec<GroupMemberInput>,
+    },
+    /// Change a group's leader (must be a current active member).
+    SetGroupLeader {
+        group_id: String,
+        leader_agent_id: String,
     },
     SetPinned {
         item: SidebarItemKey,
@@ -639,6 +651,7 @@ fn execute_with(
             icon_seed,
             members,
             settings,
+            leader_agent_id,
         } => {
             let snapshot = store.directory_snapshot()?;
             let name = if name.trim().is_empty() {
@@ -669,6 +682,7 @@ fn execute_with(
                     sort_order,
                     canonical_session_id: Some(format!("group-{group_id}")),
                     metadata_json: settings.validated_json()?,
+                    leader_agent_id: leader_agent_id.filter(|id| !id.trim().is_empty()),
                 },
                 members,
             )?;
@@ -716,6 +730,7 @@ fn execute_with(
             color,
             icon_seed,
             settings,
+            leader_agent_id,
         } => {
             let metadata_json = settings
                 .map(|settings| settings.validated_json())
@@ -729,9 +744,18 @@ fn execute_with(
                 icon_seed.and_then(|seed| safe_id(&seed)),
                 metadata_json,
             )?;
+            if let Some(leader) = leader_agent_id.filter(|id| !id.trim().is_empty()) {
+                store.set_group_leader("user", &group_id, &leader)?;
+            }
         }
         CompanyDirectoryCommand::SetGroupMembers { group_id, members } => {
             store.set_group_members("user", &group_id, members)?;
+        }
+        CompanyDirectoryCommand::SetGroupLeader {
+            group_id,
+            leader_agent_id,
+        } => {
+            store.set_group_leader("user", &group_id, &leader_agent_id)?;
         }
         CompanyDirectoryCommand::SetPinned { item, pinned } => {
             store.set_sidebar_item_pinned("user", &item, pinned)?;
@@ -1717,6 +1741,7 @@ mod tests {
                 icon_seed: "generated-room".to_string(),
                 members,
                 settings: GroupConversationSettings::default(),
+                leader_agent_id: None,
             },
         )
         .unwrap();
@@ -1783,6 +1808,7 @@ mod tests {
                 icon_seed: "launch-eyes".to_string(),
                 members: vec!["planner".to_string(), "coder".to_string()],
                 settings: GroupConversationSettings::default(),
+                leader_agent_id: None,
             },
         )
         .unwrap();
@@ -1819,6 +1845,7 @@ mod tests {
                     read_full_transcript: false,
                     ..GroupConversationSettings::default()
                 }),
+                leader_agent_id: None,
             },
         )
         .unwrap();
@@ -1975,6 +2002,7 @@ mod tests {
                 icon_seed: "launch".to_string(),
                 members: vec!["coder".to_string(), "researcher".to_string()],
                 settings: GroupConversationSettings::default(),
+                leader_agent_id: None,
             },
         )
         .unwrap();
@@ -2038,6 +2066,7 @@ mod tests {
                     read_full_transcript: true,
                     ..GroupConversationSettings::default()
                 },
+                leader_agent_id: None,
             },
         )
         .is_err());
@@ -2130,6 +2159,7 @@ mod tests {
                 icon_seed: "group-Design / QA 🚀".to_string(),
                 members: vec!["frontend".to_string(), "coder".to_string()],
                 settings: GroupConversationSettings::default(),
+                leader_agent_id: None,
             },
         )
         .unwrap();
@@ -2168,6 +2198,7 @@ mod tests {
                     sort_order: 0,
                     canonical_session_id: None,
                     metadata_json: "{}".to_string(),
+                    leader_agent_id: None,
                 },
                 archived_at: None,
                 delete_after: None,

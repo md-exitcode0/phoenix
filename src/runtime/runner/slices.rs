@@ -243,6 +243,9 @@ fn reserve_saved_group_pings(
         if !group.participants.iter().any(|member| member.agent_id == *agent_id) { continue; }
         for target in crate::runtime::group_conversation::authored_ping_targets(body, &group.participants) {
             if target.agent_id == *agent_id { continue; }
+            // Group leader architecture: a leader assignment whose plan
+            // dependencies are unfinished stays asleep until they are done.
+            if crate::runtime::group_coordination::ping_is_gated(company, group, agent_id, &target.agent_id) { continue; }
             if company.reserve_group_ping(group, turn_id, agent_id, message_id, target)? {
                 added.push(target.agent_id.clone());
             }
@@ -696,6 +699,9 @@ pub(crate) fn persist_group_user_boundary(
     model: &str,
 ) -> Result<()> {
     const MARKER: &str = "__phoenix_group_user_boundary";
+    // A room message is written to the canonical transcript exactly once:
+    // the race-fallback turn started for a member reuses that entry.
+    let turn_id = crate::runtime::group_conversation::room_boundary_turn_id(turn_id);
     // A newly created directory entry reserves its canonical identity, not a
     // transcript file. The first authored boundary creates that file. Read
     // this session only; corrupt/unreadable data must not be treated as new.
@@ -1585,6 +1591,12 @@ impl AgentRunner {
                     {
                         return Ok(Vec::new());
                     }
+                    // Group leader architecture: queued leader assignments
+                    // are appended to the leader's visible room reply.
+                    let leader_dispatch = crate::runtime::group_coordination::with_leader_dispatches(
+                        crate::runtime::company::global()?.as_ref(), group, &task.id, &speaker.agent_id, message,
+                    )?;
+                    let message = leader_dispatch.as_ref().map(|(amended, _)| amended).unwrap_or(message);
                     // Commit before emitting; an unrelated slow coworker must
                     // not hide this completed contribution from the room.
                     let (receipts, mut committed_events) = persist_group_messages_with_events(
@@ -1593,6 +1605,11 @@ impl AgentRunner {
                         &task.id,
                         std::slice::from_ref(message),
                     )?;
+                    if let Some((_, ids)) = &leader_dispatch {
+                        crate::runtime::company::global()?.with_coordination(|connection| {
+                            crate::runtime::group_coordination::mark_dispatches_posted(connection, ids)
+                        })?;
+                    }
                     let (_, message_id) = receipts
                         .first()
                         .context("group contribution has no durable receipt")?;
@@ -1632,6 +1649,15 @@ impl AgentRunner {
                         state: if !retained_ownership { "continued" } else if new_pending_ask.is_some() { "waiting_user" } else if failed { "blocked" } else { "done" }.to_string(),
                         detail: if !retained_ownership { "Answer received; this task continues in its queued successor" } else if new_pending_ask.is_some() { "Waiting for your answer; other independent coworkers can continue" } else if failed { "Partial evidence saved; this task did not finish" } else { "Contribution saved" }.to_string(),
                     })?;
+                    if retained_ownership && !failed && new_pending_ask.is_none() {
+                        // A finished member contribution completes its ready
+                        // plan items, which can release gated dependents below.
+                        if let Err(error) = crate::runtime::group_coordination::complete_member_items(
+                            crate::runtime::company::global()?.as_ref(), group, &speaker.agent_id, message_id,
+                        ) {
+                            tracing::warn!("group mission board update failed: {error:#}");
+                        }
+                    }
                     persisted.extend(receipts);
                     group_messages_already_shown = true;
                     let new_pings = reserve_saved_group_pings(&self.state_root,
@@ -1745,6 +1771,19 @@ impl AgentRunner {
                             detail: "Stopped without a persisted contribution".to_string(),
                         });
                     }
+                }
+                // Group leader architecture: once every member the leader
+                // dispatched has reported, wake the leader to converge.
+                match crate::runtime::group_coordination::queue_leader_convergence(
+                    crate::runtime::company::global()?.as_ref(), group, &task.id,
+                ) {
+                    Ok(true) => self.emit(CliEvent::GatewayNotice(
+                        "Members reported; the group leader will converge next".to_string(),
+                    )),
+                    Ok(false) => {}
+                    Err(error) => self.emit(CliEvent::GatewayNotice(format!(
+                        "The group leader's convergence turn could not be queued: {error:#}"
+                    ))),
                 }
             }
         } else if let Some(owner) = accountable_owner.as_ref() {
@@ -2049,6 +2088,38 @@ mod accountability_tests {
     use super::*;
 
     #[test]
+    fn room_message_is_persisted_once_across_retries_and_race_fallback_turns() {
+        use crate::runtime::group_conversation::{GroupParticipant, GroupTurnContext};
+        let directory = tempfile::tempdir().unwrap();
+        let participant = GroupParticipant {
+            agent_id: "nico".into(), internal_role: "coder".into(), display_name: "Nico".into(),
+            role_title: String::new(), color: String::new(), icon_seed: "nico".into(), avatar: None,
+            member_role: "member".into(), history_access: crate::runtime::company_directory::HistoryAccess::Full,
+            history_start_message_index: 0, explicitly_mentioned: true,
+        };
+        let group = GroupTurnContext {
+            tool_constraints: Default::default(), inspection_participants: Default::default(),
+            group_id: "steer-room".into(), group_name: "Steer room".into(),
+            canonical_session_id: "group-steer-room".into(), participants: vec![participant],
+            discussion_rounds: 1, read_full_transcript: true, execution_waves: vec![],
+            execution_dependencies: Some(vec![]), leader_agent_id: None,
+        };
+        let message = "@Nico make it dark mode";
+        // Send-time write, a reconnect retry, the started turn's own boundary,
+        // and a race-fallback turn for the member: one transcript entry.
+        for turn in ["turn_room_once", "turn_room_once",
+            &crate::runtime::group_conversation::room_fallback_turn_id("turn_room_once", "coder")] {
+            persist_group_user_boundary(directory.path(), &group, turn, message, "test").unwrap();
+        }
+        let session = SessionStore::read_one_from_disk(&directory.path().join("sessions"), "group-steer-room").unwrap().unwrap();
+        let users = session.messages.iter().filter(|m| matches!(m, Message::User { content } if content == message)).count();
+        assert_eq!(users, 1);
+        persist_group_user_boundary(directory.path(), &group, "turn_room_next", "next message", "test").unwrap();
+        let session = SessionStore::read_one_from_disk(&directory.path().join("sessions"), "group-steer-room").unwrap().unwrap();
+        assert_eq!(session.messages.iter().filter(|m| matches!(m, Message::User { .. })).count(), 2);
+    }
+
+    #[test]
     fn failed_group_contribution_never_unlocks_dependents_after_reopen() {
         use crate::runtime::company::CompanyStore;
         use crate::runtime::group_conversation::{GroupActivationIntent, GroupDependency, GroupParticipant, GroupTurnContext, GroupMemberActivationState as State};
@@ -2070,6 +2141,7 @@ mod accountability_tests {
                 discussion_rounds:1, read_full_transcript:false,
                 execution_waves:vec![vec!["theo".into(), "leo".into()], vec!["iris".into()]],
                 execution_dependencies:Some(edges.clone()),
+                leader_agent_id: None,
             };
             let intent: GroupActivationIntent = serde_json::from_value(serde_json::json!({
                 "group_id":group.group_id, "roster_fingerprint":"fixture-roster", "active_agent_ids":["theo","iris","leo"],
@@ -2405,6 +2477,7 @@ mod accountability_tests {
             canonical_session_id: "group-packet-room".into(), participants: vec![],
             discussion_rounds: 1, read_full_transcript: false, execution_waves: vec![],
             execution_dependencies: Some(vec![]),
+            leader_agent_id: None,
         };
         for (id, role) in [("theo", "researcher"), ("iris", "frontend"), ("leo", "coder")] {
             group.participants.push(GroupParticipant { agent_id: id.into(), internal_role: role.into(),
@@ -2497,6 +2570,7 @@ mod accountability_tests {
             group_id:"ping-room".into(),name:"Marketing Team".into(),description:"test".into(),
             color:"#123456".into(),icon_seed:"test".into(),lifecycle:LifecycleState::Active,
             pinned:false,sort_order:1,canonical_session_id:Some("group-ping-room".into()),metadata_json:"{}".into(),
+            leader_agent_id: None,
         },vec!["phoenix".into(),"researcher".into()]).unwrap();
         let snapshot=company.directory_snapshot().unwrap();
         let prompt="@phoenix could you ping theo in this conv";
@@ -2550,6 +2624,7 @@ mod accountability_tests {
             read_full_transcript: true,
             execution_dependencies: None,
             execution_waves: Vec::new(),
+            leader_agent_id: None,
         };
 
         persist_group_user_boundary(
@@ -2634,6 +2709,7 @@ mod accountability_tests {
             read_full_transcript: true,
             execution_dependencies: None,
             execution_waves: vec![vec!["agent-iris-stable".to_string()]],
+            leader_agent_id: None,
         };
         let response = AgentMessage::talk(
             AgentAddress::Specialist(SubAgentType::Frontend),

@@ -55,6 +55,7 @@ pub fn tool_definition(name: &str) -> Option<ToolDefinition> {
         "design_website" => design_website(),
         "image_gen" => image_gen(),
         "image_analyze" => image_analyze(),
+        "motion_graphics" => motion_graphics(),
         "skill" => skill(),
         "skill_install" => skill_install(),
         "skill_search" => skill_search(),
@@ -498,6 +499,38 @@ fn skill_install() -> ToolDefinition {
     }
 }
 
+fn motion_graphics() -> ToolDefinition {
+    ToolDefinition {
+        name: "motion_graphics".into(),
+        description: "Phoenix's motion-graphics workflow (the bundled motionmaxxing skill: a senior motion director's playbook, a seek-safe GSAP runtime, deterministic Chrome→ffmpeg rendering, and scripted review gates). When: ANY time motion, animation or video would help the result — launch films, promos, product/feature reveals, brand stings, logo animations, kinetic type, social ads, UI demo videos, animated heroes, loading, intro or transition animations, animated explainers. Prefer it over hand-rolled CSS keyframes, ad-hoc canvas loops, or raw ffmpeg; for in-app micro-interactions, still load its timing (`guide` file `motion`) instead of guessing eases and durations. Flow: `guide` (SKILL.md + Phoenix adapter; then load references on demand with `file`, e.g. `idea`, `world`, `motion`, `ui-demo`, `transitions`, `close`) → `check` (Node 22+/Chrome/ffmpeg/Python; reports what is missing instead of failing) → `start` (copies the film template and runtime into `project`, default `film/`) → write STORYBOARD.md and build `index.html` → `still` (PNG stills at `times`) → `review` (draft render + look.py + lint.mjs: returns G0/G2/G3/G5 and the contact sheet; then open look/sheet.jpg with image_analyze for G1/G4) → `render` (final, with `audio`/`shutter`/`grain`) → `look` (with `expect_audio`). `script` runs any other skill script (brand.mjs to capture a site's brand, fetch_logo.mjs, precedent.py, voice.py for ElevenLabs VO/SFX/music, sync.mjs, mix.py, imagegen.py, blind_review.py) with `args`. Returns output file paths and gate results; a failing gate is fixed, never argued. When NOT: a static image (image_gen) or a static page with no motion.".into(),
+        parameters: serde_json::json!({
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": ["guide", "check", "start", "still", "review", "render", "look", "lint", "script"], "description": "Step to run. Default `guide`."},
+                "project": {"type": "string", "description": "Film project folder, workspace-relative. Default `film`."},
+                "file": {"type": "string", "description": "guide: skill file to load, e.g. `motion`, `idea`, `references/world.md`, `runtime/README.md`, `taste/verdicts.md`. Omit for SKILL.md."},
+                "html": {"type": "string", "description": "Composition to render/lint. Default `<project>/index.html`."},
+                "video": {"type": "string", "description": "render/review: output video (default `<project>/final.mp4`; review `<project>/draft.mp4`). look: the video to inspect."},
+                "times": {"type": "string", "description": "still: comma-separated seconds (default `0.5,2,4`). lint: sample times."},
+                "scale": {"type": "number", "description": "Render pixel scale (review defaults to 0.5 for fast drafts)."},
+                "fps": {"type": "number"},
+                "from": {"type": "number", "description": "Render only from this second (hero beats, slow WebGL)."},
+                "to": {"type": "number", "description": "Render only up to this second."},
+                "audio": {"type": "string", "description": "render: mixed audio file to mux (workspace path)."},
+                "shutter": {"type": "number", "description": "render: shutter angle for motion blur (smooth-clock films only), e.g. 180."},
+                "subframes": {"type": "integer", "description": "render: subframes per frame with shutter (default 8)."},
+                "grain": {"type": "number", "description": "render: film grain 0.03-0.06 on gradient/photo/3D films."},
+                "expect": {"type": "number", "description": "look/review: planned length in seconds (G0 length check)."},
+                "expect_audio": {"type": "boolean", "description": "look/review: require a non-silent audio track."},
+                "script": {"type": "string", "description": "script: one of providers.sh, brand.mjs, fetch_logo.mjs, precedent.py, imagegen.py, voice.py, sync.mjs, mix.py, render.mjs, look.py, lint.mjs, blind_review.py."},
+                "args": {"type": "array", "items": {"type": "string"}, "description": "script: arguments, passed verbatim (workspace-relative paths)."},
+                "force": {"type": "boolean", "description": "start: replace an existing index.html with the template."},
+                "timeout_secs": {"type": "integer", "description": "Ceiling for this step (max 600). Render long films in --from/--to ranges."}
+            }
+        }),
+    }
+}
+
 fn skill_search() -> ToolDefinition {
     ToolDefinition {
         name: "skill_search".into(),
@@ -886,10 +919,12 @@ fn talk() -> ToolDefinition {
             "type": "object",
             "properties": {
                 "intent": {"type":"string", "enum":["question","task"], "description":"Use question for a genuine unresolved question, required when asking the caller of your current assignment. Finished deliverables and review verdicts use final_answer, never a new question."},
-                "to": {"type": "string", "minLength": 1, "description": "Active coworker role/id or human name, resolved at execution time. Founding examples: orchestrator/Phoenix, planner/Maya, coder/Leo, researcher/Theo, frontend/Iris, presentation/Elena, finance/Vera, critic/Remy, scribe/Nico, sales/Owen, marketing/June, or personal_logistics/Cleo. Responsibility aliases such as operations, security, documents, CRM, and publishing also resolve. Hidden craft specialists and custom coworkers resolve the same way."},
+                "to": {"type": "string", "minLength": 1, "description": "Active coworker role/id or human name, resolved at execution time. Use the role ids and names from YOUR TEAM in your context (role ids such as orchestrator, coder, researcher, frontend, critic, marketing). Responsibility aliases such as operations, security, documents, CRM, and publishing also resolve. Hidden craft specialists and custom coworkers resolve the same way."},
                 "subject": {"type": "string", "description": "Log title only."},
                 "body": {"type": "string", "description": "Objective, scope, evidence, deliverable, verification, constraints."},
-                "mode": {"type": "integer", "enum": [1, 2], "description": "1 = a real answer is required and returns once to this sender; 2 = one-way task/notice with no acknowledgement loop."}
+                "mode": {"type": "integer", "enum": [1, 2], "description": "1 = a real answer is required and returns once to this sender; 2 = one-way task/notice with no acknowledgement loop."},
+                "room_mode": {"type": "string", "enum": ["request", "assign", "broadcast", "escalate"], "description": "Group rooms only. request (default) = one teammate outside this room. assign = group leader posts a visible assignment that wakes the named member. broadcast = leader posts to the room and wakes the named member or everyone (to: \"everyone\"). escalate = a member reaches the leader; the leader escalates to the user with ask_user."},
+                "plan_item_id": {"type": "string", "description": "Group rooms only: mission-board plan item this assignment covers."}
             },
             "required": ["to", "subject", "body", "mode"]
         }),

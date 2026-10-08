@@ -1,6 +1,6 @@
-# Kombai Skills Pack — Distilled Playbook for Iris
+# Kombai Skills Pack — Distilled Playbook for the frontend coworker
 **Date:** 2026-07-17 (UTC)
-**Purpose:** A compact, machine-usable pack of Kombai's design principles, skill-like instructions, and redesign playbook that Iris can load to build websites and UI at Kombai's quality bar.
+**Purpose:** A compact, machine-usable pack of Kombai's design principles, skill-like instructions, and redesign playbook that the frontend coworker can load to build websites and UI at Kombai's quality bar.
 **Source:** Distilled from 49 docs.kombai.com pages + kombai.com main site (see kombai-docs-full-extract-2026-07-17.md and kombai-methodology-synthesis-2026-07-17.md for full citations)
 
 ---
@@ -21,19 +21,19 @@ Use when your design system is settled and every token must be locked down.
 - **Structure:** Theme name, Fonts, Typography, Primary Color, Secondary Color, Neutrals, Errors, Backgrounds, Borders, Shadow, Spacing & Radius
 - **How to create:** Extract from an existing website, extract from a design, or generate via chat
 - **Key property:** Token changes propagate automatically to every applied design
-- **Rule for Iris:** Before designing anything new, define a Theme. Store as CSS custom properties or a design token file. This is the foundation — everything inherits from it.
+- **Rule for the frontend coworker:** Before designing anything new, define a Theme. Store as CSS custom properties or a design token file. This is the foundation — everything inherits from it.
 
 ### Tier 2: STYLE GUIDE (lightweight, visual identity)
 Use when speed matters more than precision, or when exploring visual directions.
 - **Structure:** Name, Colors (primary/secondary/tertiary/neutral + hex), Typography (Headline/Body/Label + font + size), Spacing, Radius, Additional Instructions (freeform text for LLM)
 - **How to create:** Build from scratch, import from a design, or import from a URL
 - **Key property:** Regenerates the design to match parameters while preserving layout and content
-- **Rule for Iris:** When you don't have time for a full Theme, start with a Style Guide. Define: a seed color, a palette, typography pairing, corner radius preference, and 3-5 design instructions (e.g., "generous whitespace," "dark theme with one accent," "no gradients on text").
+- **Rule for the frontend coworker:** When you don't have time for a full Theme, start with a Style Guide. Define: a seed color, a palette, typography pairing, corner radius preference, and 3-5 design instructions (e.g., "generous whitespace," "dark theme with one accent," "no gradients on text").
 
 ### Tier 3: BLOCK (reusable UI patterns)
 Use to reuse specific UI structures or layout patterns.
 - **Structure:** Entire design or section stored for reuse — navigation bars, card layouts, hero sections, pricing tables
-- **Rule for Iris:** Once you've designed a good component, save it as a reusable Block. Build a Block library so future designs remix existing patterns instead of starting from scratch. A Block should be self-contained — its own layout, styles, and content structure.
+- **Rule for the frontend coworker:** Once you've designed a good component, save it as a reusable Block. Build a Block library so future designs remix existing patterns instead of starting from scratch. A Block should be self-contained — its own layout, styles, and content structure.
 
 ---
 
@@ -42,7 +42,7 @@ Use to reuse specific UI structures or layout patterns.
 - **Variants** = how many independent design options to generate from one prompt. Each takes a genuinely different visual direction (not just color swaps — different layout structures, density, visual hierarchy).
 - **Passes** = how thoroughly each design is refined. More passes = more refinement iterations.
 - **Default:** 1 Variant with 3 refinement passes.
-- **Rule for Iris:** Never generate one design and call it done. Generate 2-3 variants with genuinely different visual directions. Compare side by side. Pick the strongest, then run 2-3 refinement passes:
+- **Rule for the frontend coworker:** Never generate one design and call it done. Generate 2-3 variants with genuinely different visual directions. Compare side by side. Pick the strongest, then run 2-3 refinement passes:
   - Pass 1: Fix obvious issues (overflow, alignment, spacing)
   - Pass 2: Polish details (hover states, transitions, micro-interactions)
   - Pass 3: Consistency check (does it match the Theme/Style Guide?)
@@ -59,7 +59,7 @@ Use to reuse specific UI structures or layout patterns.
 6. **Consistency:** Design system adherence — are there deviations in design usage across pages?
 7. **Performance:** Rendering impact — bundle size issues, optimization opportunities.
 
-**Rule for Iris:** Every design must pass all 7 checks before being considered done. Create a checklist. If any axis fails, fix it before shipping. This is non-negotiable — it's what separates Kombai-quality output from AI slop.
+**Rule for the frontend coworker:** Every design must pass all 7 checks before being considered done. Create a checklist. If any axis fails, fix it before shipping. This is non-negotiable — it's what separates Kombai-quality output from AI slop.
 
 ---
 
@@ -79,7 +79,7 @@ Wireframe rules:
 - Label components with [REUSE] (exists in codebase) or [NEW] badges
 - Use **realistic placeholder content** — actual table headers, form labels, card descriptions that reflect what the real UI would display. NOT "Lorem ipsum."
 
-**Rule for Iris:** Never start designing without answering these 5 questions first. Generate 3 structural variants. Use realistic content. Label which components can be reused vs. which are new.
+**Rule for the frontend coworker:** Never start designing without answering these 5 questions first. Generate 3 structural variants. Use realistic content. Label which components can be reused vs. which are new.
 
 ---
 
@@ -138,7 +138,7 @@ When suggesting themes, consider the mood:
 - Modern & Tech
 - Warm & Friendly
 
-**Rule for Iris:** Before generating a design, identify the target mood. This shapes color, typography, density, and motion choices.
+**Rule for the frontend coworker:** Before generating a design, identify the target mood. This shapes color, typography, density, and motion choices.
 
 ---
 
@@ -177,7 +177,7 @@ Rules are always on. Skills are contextual (fetched on demand when they match th
 - @Excalidraw — hand-drawn wireframes/diagrams
 - @Figma — Figma design links
 
-**Rule for Iris:** When asking for a design or code change, attach the relevant context. Don't make the agent guess what you're referring to.
+**Rule for the frontend coworker:** When asking for a design or code change, attach the relevant context. Don't make the agent guess what you're referring to.
 
 ---
 
@@ -186,7 +186,7 @@ Rules are always on. Skills are contextual (fetched on demand when they match th
 - **Inspirations:** Curated universal design references (not project-specific)
 - **Templates:** Production-ready templates that can be remixed into projects
 
-**Rule for Iris:** Build and maintain a curated inspiration library. When starting a new design, reference existing high-quality designs rather than generating from scratch. Save your best work as templates for future projects.
+**Rule for the frontend coworker:** Build and maintain a curated inspiration library. When starting a new design, reference existing high-quality designs rather than generating from scratch. Save your best work as templates for future projects.
 
 ---
 
@@ -196,7 +196,7 @@ Rules are always on. Skills are contextual (fetched on demand when they match th
 - Reads tech stack from existing repo, asks to confirm first time, then codes using your stack and reusable code
 - Works as VS Code / Cursor / Devin Desktop extension
 
-**Rule for Iris:** Before generating code, confirm the project's tech stack. Use existing components, hooks, and utilities. Don't invent new patterns when the project already has established ones.
+**Rule for the frontend coworker:** Before generating code, confirm the project's tech stack. Use existing components, hooks, and utilities. Don't invent new patterns when the project already has established ones.
 
 ---
 

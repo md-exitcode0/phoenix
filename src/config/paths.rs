@@ -256,6 +256,60 @@ const HISTORICAL_PROMPT_SEEDS: &[(&str, &str)] = &[
         "personal_logistics_system.md",
         "630c8ff0452bad8a6df533e878002d9eaa8093e9d2a07b9a4d63979bb361eb99",
     ),
+    // Shipped defaults immediately before the runtime-roster rewrite (YOUR TEAM
+    // block; no compiled teammate names). Unedited copies refresh to the new text.
+    (
+        "orchestrator_system.md",
+        "5106d03f46f9120dc036f9473ae26b80e0c90283d99507d866572e8142f82d7b",
+    ),
+    (
+        "coder_system.md",
+        "064018a5b63a917906aa89d0a725a89683dc9b42382865e1b7cdf5fac3630116",
+    ),
+    (
+        "browser_system.md",
+        "43a0c42fb377c73a3bc6fad49cb43b9b3151df8186e00e51a7266f7c381c55a0",
+    ),
+    (
+        "researcher_system.md",
+        "a5c94f0592375ed9191dea93ca623777c53801db2f82160aad430a02a9e0cba5",
+    ),
+    (
+        "frontend_system.md",
+        "ac764158d6ed9c8f994c0837155276bda5d57c256708ee748ca876bcba81a62f",
+    ),
+    (
+        "presentation_system.md",
+        "1cc3177303253da3b760f39e794c0ae5e4984ac137d5f17a473a71f6e09c7b32",
+    ),
+    (
+        "critic_system.md",
+        "2c35cdf98ac1d94406758b78e16ebff2a623a36bd93991721df87ba618dffa01",
+    ),
+    (
+        "planner_system.md",
+        "d74b87a4f2ca24379e1baba129f97781cc636ee593748f416986131efa7379cd",
+    ),
+    (
+        "scribe_system.md",
+        "3912f2a1469cf0f1f54e97f2731c88e2811208977829f3a9571af278fcfff266",
+    ),
+    (
+        "finance_system.md",
+        "dfe6213252e0bfc090faaa42b285a0dbeeb75538d23da581aadb5b78ea5e239d",
+    ),
+    (
+        "marketing_system.md",
+        "a5e0601521cc5f46f6661230b84d1f735e8fee6ac04e251702666f442ac76c19",
+    ),
+    (
+        "sales_system.md",
+        "3ca1272eebb9578848d8b53b6d7f3ffc312e7892665a59d1869f50dde5aacb65",
+    ),
+    (
+        "personal_logistics_system.md",
+        "91c29af37052f3f87874aefd04fef486c772dd3548697f5c9bd207426f65920b",
+    ),
 ];
 
 const DEFAULT_PROMPT_OVERLAYS: &[(&str, &str)] = &[
@@ -340,7 +394,7 @@ Everything Phoenix knows and does lives here, per directory:
 | `config.toml` | Provider, models, temperature, reasoning effort, context window |
 | `auth-profiles.json` | Stored auth (API keys / OAuth profiles) |
 | `memory/` | Persistent memory: `HOT/` `WARM/` `COLD/` tiers + `knowledge/`. `.access.json` is the usage ledger that drives tier promotion |
-| `skills/` | Installed skills — one portable `SKILL.md` package per directory |
+| `skills/` | Installed skills — one portable `SKILL.md` package per directory (Phoenix installs its bundled `motionmaxxing` here the first time `motion_graphics` runs) |
 | `prompts/` | Editable system-prompt overlays seeded from Phoenix defaults; edit `<agent>_system.md` here to override without recompiling |
 | `archive/prompt-overlays/` | Byte-exact older Phoenix defaults retained before an automatic prompt refresh; user-edited overlays are never refreshed |
 | `checkpoints/` | Shadow copies of files the agent edited, per turn — `phoenix rewind` restores them |

@@ -105,15 +105,18 @@
         <button id="workingElsewhereBanner" class="working-elsewhere-banner" type="button" hidden></button>
         <section id="conversationFeed" class="conversation-feed" aria-live="polite" aria-label="Conversation"></section>
         <nav id="conversationPromptRail" class="conversation-prompt-rail" aria-label="Your recent prompts" hidden></nav>
-        <button id="jumpLatest" class="jump-latest" type="button" hidden>
-          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5"/></svg><span>Back to latest</span>
-        </button>
         <div id="composerFade" class="composer-fade" hidden></div>
       </div>
 
       
 
       <section id="composerZone" class="composer-zone">
+        <!-- Anchored to the top of the composer block (above approval cards and
+             the waiting-requests pill), not to the feed, so it never sits
+             under them. -->
+        <button id="jumpLatest" class="jump-latest" type="button" hidden>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5"/></svg><span>Back to latest</span>
+        </button>
         <div id="approvalStack" class="approval-stack"></div>
 
         <details id="queueBlock" class="status-block queue-block" hidden>

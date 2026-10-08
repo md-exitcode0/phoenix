@@ -65,7 +65,7 @@ mod tests {
 
     #[test]
     fn frontend_host_role_defers_design_to_the_managed_phase_contract() {
-        assert!(SYSTEM_PROMPT.starts_with("You are Iris, the Product Design and Frontend coworker"));
+        assert!(SYSTEM_PROMPT.starts_with("You are the Product Design and Frontend coworker"));
         assert!(SYSTEM_PROMPT.contains("current phase prompt and selected reference images"));
         assert!(SYSTEM_PROMPT.contains("validating each result"));
         assert!(SYSTEM_PROMPT.contains("no user-facing design-mode toggle"));

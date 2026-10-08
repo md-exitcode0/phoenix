@@ -481,17 +481,34 @@ pub fn assemble_prompt_with_context(
             runtime_ctx.push_str(&hint);
         }
     }
-    // Route memory (plan 016): recurring jobs carry a one-line receipt of
-    // what this job cost down each lane, an open route proposal to race (if
-    // the reflector opened one), and the best previous answer as a bar to
-    // beat. Orchestrator only — it picks routes and owns the user-facing bar.
-    if spec.name == "Orchestrator" {
-        // Plan 019: custom specialists exist only in the registry, so the
-        // roster block is injected per turn — the orchestrator must know a
-        // teammate exists to ever talk to it.
-        {
-            let custom = crate::sub_agents::registry::production_custom_roster();
-            if !custom.is_empty() {
+    // YOUR TEAM: the live company directory, injected per turn for EVERY
+    // agent. Teammate names are user-editable runtime data, so no prompt file
+    // hardcodes them; this block is where every coworker (including itself,
+    // marked "(you)") learns the current names. Custom specialists live in
+    // the registry (plan 019) and are folded in, deduped by role id.
+    {
+        let custom = crate::sub_agents::registry::production_custom_roster();
+        let team = crate::runtime::company::global_if_initialized()
+            .and_then(|company| company.directory_snapshot().ok())
+            .map(|snapshot| {
+                snapshot
+                    .agents
+                    .into_iter()
+                    .map(|record| record.profile)
+                    .collect::<Vec<_>>()
+            });
+        let self_key = match (&task.agent, &spec.target) {
+            (Some(agent), _) => agent.internal_role.clone(),
+            (None, AgentTargetSpec::Orchestrator) => "orchestrator".to_string(),
+            (None, AgentTargetSpec::Specialist(agent)) => {
+                crate::runtime::delegation::specialist_label(*agent).to_string()
+            }
+        };
+        match team.and_then(|agents| render_team_block(&agents, &self_key, &custom)) {
+            Some(block) => runtime_ctx.push_str(&block),
+            // Directory unavailable: keep the pre-directory behaviour so the
+            // orchestrator still knows every custom teammate exists.
+            None if spec.name == "Orchestrator" && !custom.is_empty() => {
                 runtime_ctx.push_str(
                     "\n\nCUSTOM SPECIALISTS (created via create_agent — valid `talk` targets like any teammate):",
                 );
@@ -499,6 +516,7 @@ pub fn assemble_prompt_with_context(
                     runtime_ctx.push_str(&format!("\n- `{role}` — {description}"));
                 }
             }
+            None => {}
         }
     }
     // "Lost in the middle": LLMs recall the START and END of a long context far
@@ -616,6 +634,95 @@ pub fn assemble_prompt_with_context(
         ),
         tail: durable_todos,
     }
+}
+
+/// The talk id a directory row answers to. The chief of staff's directory
+/// row is `phoenix`, but `talk` addresses it as `orchestrator`.
+fn team_talk_id(profile: &crate::runtime::company_directory::AgentProfile) -> &str {
+    if profile.agent_id == "phoenix" || profile.internal_role == "phoenix" {
+        "orchestrator"
+    } else {
+        profile.internal_role.as_str()
+    }
+}
+
+/// Render the per-turn YOUR TEAM block from directory profiles. Pure (no
+/// global store) so it is unit-testable. Only active agents are listed,
+/// ordered by `sort_order`; the reading agent's own row is marked "(you)".
+/// `self_key` may be an agent id, an internal role, or `orchestrator`.
+/// `extra_custom` rows (registry custom specialists) are appended only when
+/// the directory does not already list that role. Returns `None` when there
+/// is nobody to list, so the caller can fall back.
+pub(crate) fn render_team_block(
+    agents: &[crate::runtime::company_directory::AgentProfile],
+    self_key: &str,
+    extra_custom: &[(String, String)],
+) -> Option<String> {
+    use crate::runtime::company_directory::LifecycleState;
+    let mut active: Vec<&crate::runtime::company_directory::AgentProfile> = agents
+        .iter()
+        .filter(|profile| profile.lifecycle == LifecycleState::Active)
+        .collect();
+    active.sort_by(|a, b| {
+        a.sort_order
+            .cmp(&b.sort_order)
+            .then_with(|| a.display_name.cmp(&b.display_name))
+    });
+    fn flat(text: &str) -> String {
+        text.split_whitespace().collect::<Vec<_>>().join(" ")
+    }
+    let key = self_key.trim();
+    let extras: Vec<&(String, String)> = extra_custom
+        .iter()
+        .filter(|(role, _)| {
+            !agents.iter().any(|profile| {
+                profile.internal_role.eq_ignore_ascii_case(role)
+                    || profile.agent_id.eq_ignore_ascii_case(role)
+            })
+        })
+        .collect();
+    if active.is_empty() && extras.is_empty() {
+        return None;
+    }
+    let mut out = String::from(
+        "\n\nYOUR TEAM (live directory; use these names, `talk` takes the role id):",
+    );
+    let mut own_name = None;
+    for profile in active.iter().copied() {
+        let talk_id = team_talk_id(profile);
+        let name = match profile.display_name.trim() {
+            "" => talk_id.to_string(),
+            name => name.to_string(),
+        };
+        let is_self = !key.is_empty()
+            && (profile.agent_id.eq_ignore_ascii_case(key)
+                || profile.internal_role.eq_ignore_ascii_case(key)
+                || talk_id.eq_ignore_ascii_case(key));
+        let you = if is_self {
+            own_name = Some(name.clone());
+            " (you)"
+        } else {
+            ""
+        };
+        out.push_str(&format!(
+            "\n- {name} (`{talk_id}`), {}: {}{you}",
+            flat(&profile.role_title),
+            flat(&profile.description),
+        ));
+    }
+    for (role, description) in extras {
+        let you = if role.eq_ignore_ascii_case(key) { " (you)" } else { "" };
+        out.push_str(&format!(
+            "\n- {role} (`{role}`), Custom specialist: {}{you}",
+            flat(description)
+        ));
+    }
+    if let Some(name) = own_name {
+        out.push_str(&format!(
+            "\nYou are {name}. Use the names above, never an older name you remember."
+        ));
+    }
+    Some(out)
 }
 
 /// Assemble the alternate provider-native prompt view without weakening the
@@ -1346,6 +1453,11 @@ mod tests {
                 let assembled = assemble_prompt(spec, &task, &LoadedMemories::default(), &session);
                 assert!(assembled.system_prompt.contains("Visual-design gate"));
                 assert!(assembled.system_prompt.contains("`taste/SKILL.md`"));
+                assert!(assembled.system_prompt.contains("Motion gate"));
+                assert!(assembled
+                    .system_prompt
+                    .contains("whenever motion, animation or video output would help"));
+                assert!(assembled.system_prompt.contains("`motion_graphics`"));
                 assert!(assembled
                     .system_prompt
                     .contains("applies to every coworker"));
@@ -1630,15 +1742,90 @@ mod tests {
         );
     }
 
+    fn team_profile(
+        agent_id: &str,
+        internal_role: &str,
+        display_name: &str,
+        role_title: &str,
+        sort_order: i64,
+        lifecycle: crate::runtime::company_directory::LifecycleState,
+    ) -> crate::runtime::company_directory::AgentProfile {
+        crate::runtime::company_directory::AgentProfile {
+            agent_id: agent_id.to_string(),
+            internal_role: internal_role.to_string(),
+            display_name: display_name.to_string(),
+            role_title: role_title.to_string(),
+            description: format!("Owns {role_title}.\n  Second line."),
+            color: "#000000".to_string(),
+            icon_seed: agent_id.to_string(),
+            kind: crate::runtime::company_directory::AgentKind::ResponsibilityOwner,
+            lifecycle,
+            pinned: false,
+            sort_order,
+            canonical_session_id: None,
+            browser_profile_id: format!("agent-{agent_id}"),
+            metadata_json: "{}".to_string(),
+        }
+    }
+
+    #[test]
+    fn your_team_lists_live_names_role_ids_and_marks_the_reader() {
+        use crate::runtime::company_directory::LifecycleState;
+        let agents = vec![
+            team_profile("frontend", "frontend", "Leon Lin", "Product Design & Frontend", 2, LifecycleState::Active),
+            team_profile("phoenix", "phoenix", "Tibo", "Chief of Staff", 0, LifecycleState::Active),
+            team_profile("coder", "coder", "Robin", "Engineering", 1, LifecycleState::Active),
+            team_profile("marketing", "marketing", "June", "Publishing & Content", 3, LifecycleState::Dormant),
+            team_profile("growth", "growth", "Avery", "Growth", 4, LifecycleState::Active),
+        ];
+        let custom = vec![
+            ("growth".to_string(), "duplicate of a directory row".to_string()),
+            ("tax_helper".to_string(), "files quarterly taxes".to_string()),
+        ];
+
+        let block = render_team_block(&agents, "coder", &custom).unwrap();
+        assert!(block.contains(
+            "YOUR TEAM (live directory; use these names, `talk` takes the role id):"
+        ));
+        assert!(block.contains("\n- Tibo (`orchestrator`), Chief of Staff: Owns Chief of Staff. Second line."));
+        assert!(block.contains("\n- Robin (`coder`), Engineering: Owns Engineering. Second line. (you)"));
+        assert!(block.contains("\n- Leon Lin (`frontend`), Product Design & Frontend:"));
+        assert!(block.contains("\n- Avery (`growth`), Growth:"));
+        assert!(block.contains("\n- tax_helper (`tax_helper`), Custom specialist: files quarterly taxes"));
+        assert!(!block.contains("June"), "dormant agents are not on the live team");
+        assert!(!block.contains("duplicate of a directory row"), "custom rows dedupe by role id");
+        assert_eq!(block.matches("(you)").count(), 1);
+        assert!(block.contains("You are Robin."));
+        // sort_order decides the order, not input order.
+        let tibo = block.find("Tibo").unwrap();
+        let robin = block.find("Robin").unwrap();
+        let leon = block.find("Leon Lin").unwrap();
+        assert!(tibo < robin && robin < leon);
+
+        // The chief of staff's directory row is `phoenix`; turns key it as
+        // `orchestrator` or `phoenix`, and both mark the same row.
+        for key in ["orchestrator", "phoenix"] {
+            let block = render_team_block(&agents, key, &[]).unwrap();
+            assert!(block.contains("Tibo (`orchestrator`), Chief of Staff: Owns Chief of Staff. Second line. (you)"));
+            assert_eq!(block.matches("(you)").count(), 1);
+            assert!(block.contains("You are Tibo."));
+        }
+
+        // Nobody to list: the caller falls back to the registry roster.
+        assert!(render_team_block(&[], "coder", &[]).is_none());
+        let dormant_only = vec![agents[3].clone()];
+        assert!(render_team_block(&dormant_only, "coder", &[]).is_none());
+    }
+
     #[test]
     fn lean_prompt_files_have_required_agent_roles() {
         let coder = include_str!("../../prompts/coder_system.md");
-        assert!(coder.starts_with("You are Leo, the Engineering coworker"));
+        assert!(coder.starts_with("You are the Engineering coworker"));
         assert!(coder.contains("Skill-first is a hard rule"));
         assert!(coder.contains("Run the smallest useful verification"));
 
         let orchestrator = include_str!("../../prompts/orchestrator_system.md");
-        assert!(orchestrator.starts_with("You are Phoenix"));
+        assert!(orchestrator.starts_with("You are the chief of staff"));
         assert!(orchestrator.contains("researcher"));
         assert!(orchestrator.contains("browser"));
         assert!(orchestrator.contains("skill_search"));
@@ -1648,7 +1835,8 @@ mod tests {
         assert!(researcher.contains("different angles and conditions"));
 
         let frontend = include_str!("../../prompts/frontend_system.md");
-        assert!(frontend.contains("use Theo as a research partner"));
+        assert!(frontend.contains("use the researcher as a research partner"));
+        assert!(frontend.starts_with("You are the Product Design and Frontend coworker"));
         assert!(frontend.contains("structurally different layouts"));
 
         let browser = include_str!("../../prompts/browser_system.md");

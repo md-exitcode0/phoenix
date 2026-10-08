@@ -143,7 +143,7 @@ struct PendingCompletedJob {
 
 /// A mid-task message for a WORKING specialist (orchestrator `talk` with
 /// a talk to a busy target) — injected into the target's running turn at its next round.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SteerNote {
     pub message_id: String,
     pub from: String,
@@ -195,6 +195,10 @@ struct SessionBox {
     task_boundaries: VecDeque<JournalEvent>,
     completed_scopes: std::collections::HashSet<ExecutionScope>,
     steer: HashMap<String, Vec<SteerNote>>,
+    /// Client turn ids of user messages already accepted as mid-turn steers
+    /// (bounded). A reconnect retry of the same composer send must not be
+    /// injected twice.
+    user_steer_ids: VecDeque<String>,
 }
 
 fn replayable(event: &CliEvent) -> bool {
@@ -684,7 +688,9 @@ pub fn agent_turn_active(session_id: &str, agent: &str) -> bool {
 pub fn has_pending_steer(session_id: &str, agent: &str) -> bool {
     let base = base_agent(agent).to_string();
     with_box(session_id, |sbox| {
-        sbox.steer.get(&base).is_some_and(|notes| !notes.is_empty())
+        sbox.steer
+            .get(&base)
+            .is_some_and(|notes| notes.iter().any(|note| !is_room_steer(note)))
     })
 }
 
@@ -711,8 +717,14 @@ pub fn rehome_orphan_steers(session_id: &str, owner: &str) -> usize {
             if base == &owner || base.starts_with("__group_queue_") || live.contains(base) {
                 continue;
             }
-            orphans.append(notes);
+            // Group-room deliveries belong to their exact member lane; the
+            // room watcher settles them (start a turn or retire an FYI).
+            let (room, other): (Vec<_>, Vec<_>) =
+                notes.drain(..).partition(is_room_steer);
+            *notes = room;
+            orphans.extend(other);
         }
+        sbox.steer.retain(|_, notes| !notes.is_empty());
         let moved = orphans.len();
         if moved > 0 {
             sbox.steer.entry(owner).or_default().extend(orphans);
@@ -1577,6 +1589,311 @@ pub fn take_steer(session_id: &str, agent: &str) -> Vec<SteerNote> {
     let base = base_agent(agent).to_string();
     with_box(session_id, |sbox| {
         sbox.steer.remove(&base).unwrap_or_default()
+    })
+}
+
+/// Prefix of a user message that was delivered into a turn that was already
+/// running. It is persisted with the message (so history keeps the real order
+/// and the model sees why a user line appears between tool calls), and it is
+/// deliberately NOT one of the internal runtime prefixes that transcript
+/// renderers hide: this is an authored user message.
+pub const USER_STEER_MARKER: &str = "[New message from the user while you were working — read it now; it may correct, add to, or replace the current task]";
+
+const USER_STEER_ID_CAP: usize = 256;
+
+/// The durable/model form of a mid-turn user message.
+pub fn user_steer_content(body: &str) -> String {
+    format!("{USER_STEER_MARKER}\n{body}")
+}
+
+/// The authored text of a persisted mid-turn user message, or `None` when the
+/// content is an ordinary user message.
+pub fn strip_user_steer_marker(content: &str) -> Option<&str> {
+    let content = content.trim_start();
+    std::iter::once(USER_STEER_MARKER)
+        .chain(RoomSteerKind::ALL.iter().map(|kind| kind.marker()))
+        .find_map(|marker| content.strip_prefix(marker))
+        .map(|rest| rest.strip_prefix('\n').unwrap_or(rest))
+}
+
+/// Model/durable form of any user-authored steer note: a one-to-one message
+/// keeps the original marker; a group-room delivery is framed by its kind
+/// (actionable vs FYI) so a member that was not addressed never mistakes the
+/// room message for an order.
+pub fn user_steer_content_for(note: &SteerNote) -> String {
+    match room_steer_parts(&note.subject) {
+        Some((kind, _)) => format!("{}\n{}", kind.marker(), note.body),
+        None => user_steer_content(&note.body),
+    }
+}
+
+/// Deliver a user-authored composer message into the running turn owned by
+/// `agent` (the steering inbox). `client_turn_id` is the composer's durable
+/// message id: a retry of an id already accepted returns `false` and parks
+/// nothing, so a reconnect can never inject the same message twice.
+pub fn steer_user(
+    session_id: &str,
+    agent: &str,
+    client_turn_id: Option<&str>,
+    body: &str,
+) -> bool {
+    if let Some(id) = client_turn_id.map(str::trim).filter(|id| !id.is_empty()) {
+        let fresh = with_box(session_id, |sbox| {
+            if sbox.user_steer_ids.iter().any(|seen| seen == id) {
+                return false;
+            }
+            sbox.user_steer_ids.push_back(id.to_string());
+            while sbox.user_steer_ids.len() > USER_STEER_ID_CAP {
+                sbox.user_steer_ids.pop_front();
+            }
+            true
+        });
+        if !fresh {
+            return false;
+        }
+    }
+    steer(
+        session_id,
+        agent,
+        SteerNote {
+            message_id: String::new(),
+            from: "user".to_string(),
+            subject: "message from user".to_string(),
+            body: body.to_string(),
+        },
+    );
+    true
+}
+
+/// Was this composer message id already accepted as a mid-turn steer?
+pub fn user_steer_seen(session_id: &str, client_turn_id: &str) -> bool {
+    with_box(session_id, |sbox| {
+        sbox.user_steer_ids.iter().any(|seen| seen == client_turn_id)
+    })
+}
+
+/// Remove and return the OLDEST user-authored note waiting in `agent`'s lane,
+/// leaving coworker/watcher notes (and any later user notes) in place. Used
+/// when the turn a user message was meant for ended before its next round-top
+/// drain: that message then becomes the request of a normal new turn, and the
+/// new turn's own round-top drain picks up whatever is still parked. The
+/// removal is atomic under the session mutex, so the message is delivered
+/// exactly once whichever path wins.
+pub fn take_first_user_steer(session_id: &str, agent: &str) -> Option<SteerNote> {
+    let base = base_agent(agent).to_string();
+    with_box(session_id, |sbox| {
+        let lane = sbox.steer.get_mut(&base)?;
+        let index = lane
+            .iter()
+            .position(|note| note.from == "user" && !is_room_steer(note))?;
+        let note = lane.remove(index);
+        if lane.is_empty() {
+            sbox.steer.remove(&base);
+        }
+        Some(note)
+    })
+}
+
+// ── Group rooms: everyone hears everything, only some act ──────────────
+//
+// A user message in a group room is written to the canonical room transcript
+// once, at send time. Every member whose turn is running in that room gets it
+// steered into the running turn through its own lane (keyed by the canonical
+// session + agent lane): actionable for the members who must act, FYI for the
+// rest. Each per-lane delivery is idempotent by `<client turn id>@<lane>`.
+
+/// Subject prefix of a group-room steer note: `room-steer:<kind>:<delivery id>`.
+pub const ROOM_STEER_SUBJECT_PREFIX: &str = "room-steer:";
+
+/// How a room message is framed for one running member.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RoomSteerKind {
+    /// Unaddressed message, delivered to the running leader: act on it.
+    LeaderAct,
+    /// The member was @mentioned: top-priority, act on it now.
+    MentionAct,
+    /// `@everyone` / `@all`, delivered to a running member: act in your area.
+    EveryoneAct,
+    /// `@everyone` / `@all`, delivered to the running leader: re-plan.
+    EveryoneReplan,
+    /// Only the leader was @mentioned: answer alone, no fan-out.
+    LeaderSolo,
+    /// Not addressed to this member: context only.
+    Fyi,
+    /// Members were @mentioned; the running leader only keeps the board straight.
+    LeaderFyi,
+}
+
+impl RoomSteerKind {
+    pub const ALL: [RoomSteerKind; 7] = [
+        Self::LeaderAct,
+        Self::MentionAct,
+        Self::EveryoneAct,
+        Self::EveryoneReplan,
+        Self::LeaderSolo,
+        Self::Fyi,
+        Self::LeaderFyi,
+    ];
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::LeaderAct => "leader-act",
+            Self::MentionAct => "mention-act",
+            Self::EveryoneAct => "everyone-act",
+            Self::EveryoneReplan => "everyone-replan",
+            Self::LeaderSolo => "leader-solo",
+            Self::Fyi => "fyi",
+            Self::LeaderFyi => "leader-fyi",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|kind| kind.as_str() == value)
+    }
+
+    /// Must the receiving member act on this message?
+    pub fn is_actionable(self) -> bool {
+        !matches!(self, Self::Fyi | Self::LeaderFyi)
+    }
+
+    /// The persisted/model header. Never one of the hidden runtime prefixes:
+    /// this is an authored user message (in the member's own working session;
+    /// the canonical room transcript holds the plain message exactly once).
+    pub fn marker(self) -> &'static str {
+        match self {
+            Self::LeaderAct => "[New room message from the user while you were working — not addressed to anyone, so it is yours as group leader. Act on it now: it may correct, add to, or replace the current request. If it changes the plan, update the board and adjust assignments; members who are working have already heard it.]",
+            Self::MentionAct => "[TOP PRIORITY — the user just @mentioned you in the room while you were working. Act on this message before anything else; it may correct, add to, or replace your current task. Reply to it in the room.]",
+            Self::EveryoneAct => "[The user just addressed @everyone in the room while you were working. Act on it now for your own area; it may correct, add to, or replace your current task. The leader re-plans around it.]",
+            Self::EveryoneReplan => "[The user just addressed @everyone in the room while you were working. Every member has it and acts on it in their own area. As leader, re-plan now: update the brief/plan, adjust assignments and claims so nobody collides, then carry on.]",
+            Self::LeaderSolo => "[The user just @mentioned only you in the room while you were working. Answer it yourself — do not dispatch, assign, or fan it out to members.]",
+            Self::Fyi => "[FYI — the user just said this in the room. It was not addressed to you and someone else is handling it: do not reply to it or start new work for it. If it changes the work you are doing right now (for example a new requirement on what you are building), adapt immediately.]",
+            Self::LeaderFyi => "[FYI for the leader — the user just said this in the room to specific members, who own it and act on it directly. Do not take over, redo, or reassign that work. Only keep the board straight: record it (decide / plan item / claims) so claims do not collide.]",
+        }
+    }
+}
+
+/// Per-lane idempotency key of one room delivery.
+pub fn room_delivery_id(client_turn_id: &str, lane: &str) -> String {
+    format!("{}@{}", client_turn_id.trim(), base_agent(lane))
+}
+
+fn room_steer_subject(kind: RoomSteerKind, delivery_id: &str) -> String {
+    format!("{ROOM_STEER_SUBJECT_PREFIX}{}:{delivery_id}", kind.as_str())
+}
+
+/// `(kind, delivery id)` of a room steer subject.
+pub fn room_steer_parts(subject: &str) -> Option<(RoomSteerKind, &str)> {
+    let rest = subject.strip_prefix(ROOM_STEER_SUBJECT_PREFIX)?;
+    let (kind, id) = rest.split_once(':')?;
+    Some((RoomSteerKind::parse(kind)?, id))
+}
+
+pub fn is_room_steer(note: &SteerNote) -> bool {
+    note.from == "user" && room_steer_parts(&note.subject).is_some()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RoomSteerOutcome {
+    /// Parked in the running lane; its next round-top drain injects it.
+    Delivered,
+    /// This exact (message, lane) was already delivered: nothing parked.
+    Duplicate,
+    /// The lane is not running any more: the caller falls back (starts a
+    /// normal turn for an actionable target; an FYI needs nothing — the
+    /// member reads the transcript on its next turn).
+    NotRunning,
+}
+
+/// Steer one room message into `lane`'s running turn, atomically with the
+/// liveness check: the lane is checked and the note parked under the same
+/// postbox lock, so a finished lane is reported as `NotRunning` instead of
+/// receiving a note nobody drains.
+pub fn steer_room_user(
+    session_id: &str,
+    lane: &str,
+    client_turn_id: &str,
+    kind: RoomSteerKind,
+    body: &str,
+) -> RoomSteerOutcome {
+    let base = base_agent(lane).to_string();
+    let delivery_id = room_delivery_id(client_turn_id, &base);
+    let outcome = with_box(session_id, |sbox| {
+        if sbox.user_steer_ids.iter().any(|seen| seen == &delivery_id) {
+            return RoomSteerOutcome::Duplicate;
+        }
+        let live = sbox.active_turns.get(&base).is_some_and(|count| *count > 0)
+            || sbox.starting_turns.get(&base).is_some_and(|tokens| !tokens.is_empty());
+        if !live {
+            return RoomSteerOutcome::NotRunning;
+        }
+        sbox.user_steer_ids.push_back(delivery_id.clone());
+        while sbox.user_steer_ids.len() > USER_STEER_ID_CAP {
+            sbox.user_steer_ids.pop_front();
+        }
+        let note = SteerNote {
+            message_id: String::new(),
+            from: "user".to_string(),
+            subject: room_steer_subject(kind, &delivery_id),
+            body: body.to_string(),
+        };
+        let queue = sbox.steer.entry(base.clone()).or_default();
+        // An actionable user message goes ahead of coworker chatter; FYI
+        // context keeps arrival order behind it.
+        let index = if kind.is_actionable() {
+            queue.iter().position(|queued| !(queued.from == "user" && room_steer_parts(&queued.subject).is_some_and(|(k, _)| k.is_actionable()))).unwrap_or(queue.len())
+        } else {
+            queue.len()
+        };
+        queue.insert(index, note);
+        RoomSteerOutcome::Delivered
+    });
+    if outcome == RoomSteerOutcome::Delivered {
+        crate::runtime::journal::record(
+            session_id,
+            "room_steer",
+            &base,
+            &format!("{}: {}", kind.as_str(), body),
+        );
+    }
+    outcome
+}
+
+/// Where a parked room delivery stands.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParkedRoomSteer {
+    /// The running turn drained it (or it was never parked).
+    Consumed,
+    /// Still parked and the lane is still running: its next round takes it.
+    Live,
+    /// The lane's turn ended before draining it. The note has been REMOVED
+    /// here, atomically, so no later turn can also inject it; the caller
+    /// owns the fallback (start a turn for an actionable target).
+    Orphaned(SteerNote),
+}
+
+/// Race safety for a room delivery. Exactly one of the turn's round-top
+/// drain and this call ever gets the note.
+pub fn settle_parked_room_steer(session_id: &str, lane: &str, delivery_id: &str) -> ParkedRoomSteer {
+    let base = base_agent(lane).to_string();
+    with_box(session_id, |sbox| {
+        let Some(queue) = sbox.steer.get_mut(&base) else {
+            return ParkedRoomSteer::Consumed;
+        };
+        let Some(index) = queue.iter().position(|note| {
+            note.from == "user" && room_steer_parts(&note.subject).is_some_and(|(_, id)| id == delivery_id)
+        }) else {
+            return ParkedRoomSteer::Consumed;
+        };
+        let live = sbox.active_turns.get(&base).is_some_and(|count| *count > 0)
+            || sbox.starting_turns.get(&base).is_some_and(|tokens| !tokens.is_empty());
+        if live {
+            return ParkedRoomSteer::Live;
+        }
+        let note = queue.remove(index);
+        if queue.is_empty() {
+            sbox.steer.remove(&base);
+        }
+        ParkedRoomSteer::Orphaned(note)
     })
 }
 
@@ -2716,4 +3033,157 @@ mod tests {
         }
         assert!(rx.try_recv().is_err());
     }
+
+    #[test]
+    fn user_steer_marker_round_trips_and_is_not_an_internal_prefix() {
+        let content = user_steer_content("use tabs, not spaces");
+        assert_eq!(strip_user_steer_marker(&content), Some("use tabs, not spaces"));
+        assert_eq!(strip_user_steer_marker("use tabs, not spaces"), None);
+        // Transcript renderers hide these runtime envelopes; the steer marker
+        // must never collide with them or the user's message would vanish.
+        let lower = content.to_ascii_lowercase();
+        for hidden in ["[late ask answer]", "[queued wake]", "queued prompt queued_", "[background return]", "[user steer]"] {
+            assert!(!lower.starts_with(hidden), "{hidden}");
+        }
+    }
+
+    #[test]
+    fn user_steers_dedupe_by_client_id_and_leave_coworker_notes_in_the_lane() {
+        let sid = format!("postbox-user-steer-{}", uuid::Uuid::new_v4());
+        steer(
+            &sid,
+            "orchestrator",
+            SteerNote {
+                message_id: String::new(),
+                from: "coder".to_string(),
+                subject: "status".to_string(),
+                body: "halfway".to_string(),
+            },
+        );
+        assert!(steer_user(&sid, "orchestrator", Some("turn_a"), "first"));
+        assert!(!steer_user(&sid, "orchestrator", Some("turn_a"), "first"));
+        assert!(steer_user(&sid, "orchestrator", Some("turn_b"), "second"));
+        // Legacy callers without an id are never deduped.
+        assert!(steer_user(&sid, "orchestrator", None, "third"));
+
+        let first = take_first_user_steer(&sid, "orchestrator").unwrap();
+        assert_eq!(first.body, "first");
+        let rest = take_steer(&sid, "orchestrator");
+        let bodies = rest.iter().map(|note| note.body.as_str()).collect::<Vec<_>>();
+        assert_eq!(bodies, vec!["halfway", "second", "third"]);
+        assert!(take_first_user_steer(&sid, "orchestrator").is_none());
+    }
+    // ── Group rooms: everyone hears everything, only some act ──────────
+
+    #[test]
+    fn room_steer_reaches_a_busy_lane_and_reports_an_idle_one() {
+        let sid = format!("room-steer-busy-{}", uuid::Uuid::new_v4());
+        let _theo = active_turn_guard(&sid, "researcher");
+        assert_eq!(
+            steer_room_user(&sid, "researcher", "turn_room_0001", RoomSteerKind::MentionAct, "use the dark palette"),
+            RoomSteerOutcome::Delivered
+        );
+        // Idle target: nothing is parked; the caller starts a turn instead.
+        assert_eq!(
+            steer_room_user(&sid, "coder", "turn_room_0001", RoomSteerKind::Fyi, "use the dark palette"),
+            RoomSteerOutcome::NotRunning
+        );
+        assert!(take_steer(&sid, "coder").is_empty());
+        let notes = take_steer(&sid, "researcher");
+        assert_eq!(notes.len(), 1);
+        assert!(is_room_steer(&notes[0]));
+        assert_eq!(room_steer_parts(&notes[0].subject).map(|(kind, _)| kind), Some(RoomSteerKind::MentionAct));
+    }
+
+    #[test]
+    fn room_steer_is_idempotent_per_lane_not_per_message() {
+        let sid = format!("room-steer-dedupe-{}", uuid::Uuid::new_v4());
+        let _theo = active_turn_guard(&sid, "researcher");
+        let _robin = active_turn_guard(&sid, "coder");
+        // One message reaches every running lane once ...
+        assert_eq!(steer_room_user(&sid, "researcher", "turn_room_0002", RoomSteerKind::Fyi, "hi"), RoomSteerOutcome::Delivered);
+        assert_eq!(steer_room_user(&sid, "coder", "turn_room_0002", RoomSteerKind::MentionAct, "hi"), RoomSteerOutcome::Delivered);
+        // ... and a retry of the same message never parks a second copy.
+        assert_eq!(steer_room_user(&sid, "researcher", "turn_room_0002", RoomSteerKind::Fyi, "hi"), RoomSteerOutcome::Duplicate);
+        assert_eq!(steer_room_user(&sid, "coder#2", "turn_room_0002", RoomSteerKind::MentionAct, "hi"), RoomSteerOutcome::Duplicate);
+        assert_eq!(take_steer(&sid, "researcher").len(), 1);
+        assert_eq!(take_steer(&sid, "coder").len(), 1);
+    }
+
+    #[test]
+    fn room_steer_framing_separates_fyi_from_actionable() {
+        let note = |kind: RoomSteerKind| SteerNote {
+            message_id: String::new(),
+            from: "user".into(),
+            subject: room_steer_subject(kind, "turn_x@coder"),
+            body: "make it dark mode".into(),
+        };
+        let fyi = user_steer_content_for(&note(RoomSteerKind::Fyi));
+        assert!(fyi.starts_with("[FYI"));
+        assert!(fyi.contains("not addressed to you"));
+        assert!(fyi.contains("adapt immediately"));
+        let act = user_steer_content_for(&note(RoomSteerKind::MentionAct));
+        assert!(act.starts_with("[TOP PRIORITY"));
+        let leader_fyi = user_steer_content_for(&note(RoomSteerKind::LeaderFyi));
+        assert!(leader_fyi.contains("Do not take over"));
+        assert!(leader_fyi.contains("record it"));
+        assert!(user_steer_content_for(&note(RoomSteerKind::LeaderSolo)).contains("do not dispatch"));
+        assert!(user_steer_content_for(&note(RoomSteerKind::EveryoneReplan)).contains("re-plan"));
+        for kind in RoomSteerKind::ALL {
+            let content = user_steer_content_for(&note(kind));
+            assert_eq!(strip_user_steer_marker(&content), Some("make it dark mode"));
+            assert_eq!(kind.is_actionable(), !matches!(kind, RoomSteerKind::Fyi | RoomSteerKind::LeaderFyi));
+            assert_eq!(RoomSteerKind::parse(kind.as_str()), Some(kind));
+            let lower = content.to_ascii_lowercase();
+            for hidden in ["[late ask answer]", "[queued wake]", "[background return]", "[user steer]"] {
+                assert!(!lower.starts_with(hidden));
+            }
+        }
+        // A one-to-one note keeps the original marker.
+        let direct = SteerNote { message_id: String::new(), from: "user".into(), subject: "message from user".into(), body: "x".into() };
+        assert_eq!(user_steer_content_for(&direct), user_steer_content("x"));
+    }
+
+    #[test]
+    fn room_steer_race_falls_back_exactly_once() {
+        let sid = format!("room-steer-race-{}", uuid::Uuid::new_v4());
+        let delivery = room_delivery_id("turn_room_race", "coder");
+        {
+            let _robin = active_turn_guard(&sid, "coder");
+            assert_eq!(steer_room_user(&sid, "coder", "turn_room_race", RoomSteerKind::MentionAct, "add tests"), RoomSteerOutcome::Delivered);
+            // Still running: its next round-top drain owns the note.
+            assert_eq!(settle_parked_room_steer(&sid, "coder", &delivery), ParkedRoomSteer::Live);
+        }
+        // The turn ended before draining it: the watcher takes it (once) and
+        // starts a normal turn; nothing remains for any later drain.
+        let ParkedRoomSteer::Orphaned(note) = settle_parked_room_steer(&sid, "coder", &delivery) else {
+            panic!("an undrained note of a finished lane is orphaned");
+        };
+        assert_eq!(note.body, "add tests");
+        assert_eq!(settle_parked_room_steer(&sid, "coder", &delivery), ParkedRoomSteer::Consumed);
+        assert!(take_steer(&sid, "coder").is_empty());
+
+        // The other order: the running turn drains first, the watcher no-ops.
+        let delivery = room_delivery_id("turn_room_race_2", "coder");
+        let _robin = active_turn_guard(&sid, "coder");
+        assert_eq!(steer_room_user(&sid, "coder", "turn_room_race_2", RoomSteerKind::MentionAct, "add docs"), RoomSteerOutcome::Delivered);
+        assert_eq!(take_steer(&sid, "coder").len(), 1);
+        assert_eq!(settle_parked_room_steer(&sid, "coder", &delivery), ParkedRoomSteer::Consumed);
+    }
+
+    #[test]
+    fn room_steers_are_never_adopted_by_one_to_one_wake_paths() {
+        let sid = format!("room-steer-isolated-{}", uuid::Uuid::new_v4());
+        {
+            let _robin = active_turn_guard(&sid, "coder");
+            assert_eq!(steer_room_user(&sid, "coder", "turn_room_iso", RoomSteerKind::Fyi, "fyi"), RoomSteerOutcome::Delivered);
+        }
+        // Not a wake reason, not re-homed to the owner, not adopted as a turn.
+        assert!(!has_pending_steer(&sid, "coder"));
+        assert_eq!(rehome_orphan_steers_to_orchestrator(&sid), 0);
+        assert!(take_first_user_steer(&sid, "coder").is_none());
+        assert!(take_first_user_steer(&sid, "orchestrator").is_none());
+        assert_eq!(take_steer(&sid, "coder").len(), 1, "it stays for the room watcher");
+    }
+
 }

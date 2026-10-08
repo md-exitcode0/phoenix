@@ -89,6 +89,11 @@ html.is-scrolling .flame-avatar,html.is-scrolling .flame-avatar *,html.is-scroll
 .view-menu button.on{color:var(--ink)}
 .chrome-drag{min-width:0;flex:1;height:100%}
 .chrome-drag{-webkit-app-region:drag}
+/* The whole empty top bar moves the frameless window (Electron reads
+   -webkit-app-region; Tauri reads data-tauri-drag-region on the bar and its
+   spacer). Every interactive child opts back out so clicks still land. */
+.window-chrome{-webkit-app-region:drag}
+.window-chrome :is(button,a,input,select,textarea,label,summary,[role="button"],[role="menu"],[role="menuitem"],[role="tab"],[role="tablist"],[contenteditable],[tabindex]:not([tabindex="-1"]),.chrome-menus,.chrome-controls,.view-menu,.inspection-tabbar){-webkit-app-region:no-drag}
 .chrome-controls{display:flex;align-items:center;gap:4px;-webkit-app-region:no-drag}
 .chrome-controls button{width:28px;height:22px;display:grid;place-items:center;border-radius:6px;color:var(--ink-faint)}
 .chrome-controls button:hover{background:var(--hover);color:var(--ink)}
@@ -351,6 +356,7 @@ body.sidebar-collapsed .conversation-header{padding-left:58px}
 .group-roster-popover{width:min(352px,calc(100vw - 20px));padding:8px}
 .group-roster-head{display:flex;align-items:center;gap:10px;padding:5px 5px 8px 7px;border-bottom:1px solid var(--line)}.group-roster-head>span{min-width:0;flex:1}.group-roster-head strong,.group-roster-head small{display:block}.group-roster-head strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.group-roster-head small{margin-top:3px;color:var(--ink-faint);font-size:9px}.group-roster-head>button{width:30px;min-height:30px;padding:0;display:grid;place-items:center}.group-roster-head>button svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.4}
 .group-roster-list{max-height:min(430px,65vh);display:grid;gap:4px;padding-top:6px;overflow:auto}.group-roster-row{min-width:0;display:grid;grid-template-columns:35px minmax(0,1fr);gap:9px;padding:8px;border-radius:10px}.group-roster-row:hover{background:var(--hover)}.group-roster-avatar{width:35px;height:35px;display:grid;place-items:center}.group-roster-avatar>svg,.group-roster-avatar>.custom-avatar-shell{width:35px;height:35px}.group-roster-row>span{min-width:0}.group-roster-row strong,.group-roster-row small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.group-roster-row strong{font-size:11px}.group-roster-row small{margin-top:2px;color:var(--ink-soft);font-size:9px}.group-roster-row p{margin:5px 0 0;color:var(--ink-faint);font-size:9px;line-height:1.35}.group-roster-empty{padding:20px 8px;color:var(--ink-faint);font-size:10px;text-align:center}
+.group-leader-badge{display:inline-block;margin-left:5px;padding:1px 5px;border-radius:999px;background:var(--hover);color:var(--ink-soft);font-size:8px;font-style:normal;font-weight:600;letter-spacing:.02em;vertical-align:1px}.group-leader-field select{width:100%}
 .sidebar-review-stage{height:calc(100% - 48px);display:grid;place-items:center}
 .review-watermark{display:flex;flex-direction:column;align-items:center;gap:11px;color:var(--ink-faint);opacity:.42}
 .review-watermark svg{width:38px;height:38px;fill:currentColor;stroke:none}.review-watermark span{font-size:10px}

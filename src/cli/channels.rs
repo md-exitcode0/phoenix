@@ -792,6 +792,9 @@ async fn run_turn_with_questions(config: ChannelConfig, turn_id: String, text: S
                         // notice. The channel projection strips raw details.
                         TurnCompletion::Completed | TurnCompletion::Incomplete => Ok(summary.final_markdown),
                         TurnCompletion::Queued => journal.final_answer(&config, &turn_id, &turn_id, updates.as_ref()).await,
+                        // Sent while the agent was already working: delivered
+                        // into that running task, whose own answer follows.
+                        TurnCompletion::Steered => Ok("Got it — I've added that to what I'm working on now.".to_string()),
                         _ => anyhow::bail!("Gateway did not confirm completion or a correlated queued request"),
                     };
                 }

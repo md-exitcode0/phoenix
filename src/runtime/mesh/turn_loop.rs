@@ -1343,7 +1343,12 @@ impl MeshRunner {
                 }
             }
         }
-        _active_turn = if matches!(addr, AgentAddress::Specialist(_)) {
+        // In a group room the leader can be Phoenix itself: its lane must be
+        // visible as running too, so a room message can be steered into it
+        // (keyed by canonical session + lane) instead of starting a new turn.
+        _active_turn = if matches!(addr, AgentAddress::Specialist(_))
+            || (self.group_context.is_some() && matches!(addr, AgentAddress::Orchestrator))
+        {
             Some(crate::runtime::postbox::active_turn_guard_from_start(
                 &self.main_session_id,
                 &addr.label(),
@@ -2223,6 +2228,29 @@ impl MeshRunner {
                             &note.message_id,
                             &addr.label(),
                         );
+                        // A message the USER sent while this turn was running
+                        // is an authored user message, not coworker traffic:
+                        // persist it as one (history keeps its real position
+                        // inside the turn) and append it to this turn's native
+                        // tail so the very next model request ends with it.
+                        // `prompt_session` stays frozen like every other
+                        // current-turn row; compaction rebases from `session`,
+                        // which already holds it, so it is never sent twice.
+                        if note.from == "user" {
+                            // One-to-one: the mid-task marker. Group room:
+                            // actionable or FYI framing for this member.
+                            let content =
+                                crate::runtime::postbox::user_steer_content_for(&note);
+                            session.push_message(Message::User {
+                                content: content.clone(),
+                            });
+                            native_tool_messages.push(ChatMessage::user(content));
+                            self.emit(CliEvent::SteerDelivered {
+                                to: addr.label(),
+                                subject: note.subject.clone(),
+                            });
+                            continue;
+                        }
                         // Steers remain visible to the agent, but the runtime
                         // never turns one into a timed forced halt.
                         let suffix = "(This arrived WHILE you are working. Apply the correction or redirect on your next action.)".to_string();
@@ -2276,6 +2304,10 @@ impl MeshRunner {
             executor.retain_supported_desktop_tools(&mut request_tools);
             if let Some(group)=&self.group_context {
                 request_tools.retain(|tool|group.permits_tool(&addr.label(),&tool.name));
+                // Group leader architecture: room-scoped mission board / claims tool.
+                if group.leader_agent_id.is_some() && !request_tools.iter().any(|tool| tool.name == "group_board") {
+                    request_tools.push(crate::runtime::group_coordination::group_board_tool_definition());
+                }
             }
             if matches!(addr, AgentAddress::Specialist(agent) if crate::sub_agents::volume_worker::is_agent(*agent))
             {
@@ -3793,12 +3825,23 @@ impl MeshRunner {
                         if let Some(family) = crate::tools::deferral::family_of(&call.tool_name) {
                             loaded_tool_families.insert(family.to_string());
                         }
-                        if call.tool_name == "talk" && self.group_context.as_ref().is_some_and(|group| {
-                            call.input.get("to").and_then(|to| to.as_str()).is_some_and(|to| group.names_member(to))
-                        }) {
-                            push_round_feedback(&mut session,&mut native_tool_messages,call_id,&call.tool_name,
-                                "That teammate is in this room. Do not use talk for them: write @Name in your reply instead, and they will answer here in the room. No message was sent.");
-                            continue;
+                        // Group leader architecture: in-room talk (member rejection,
+                        // leader assign/broadcast, escalate) and the group_board tool.
+                        if let Some(group) = self.group_context.as_ref().filter(|_| matches!(call.tool_name.as_str(), "talk" | "group_board")) {
+                            let room_turn = self.group_authored_turn_id.lock().unwrap_or_else(|p| p.into_inner()).clone();
+                            let handled = if call.tool_name == "group_board" {
+                                Some(crate::runtime::group_coordination::handle_group_board_call(group, &addr.label(), room_turn.as_deref(), &call.input))
+                            } else {
+                                crate::runtime::group_coordination::intercept_room_talk(group, &addr.label(), room_turn.as_deref(), &call.input)
+                            };
+                            if let Some(result) = handled {
+                                if result.starts_with("error:") || result.contains("No message was sent") {
+                                    push_round_feedback(&mut session,&mut native_tool_messages,call_id,&call.tool_name,&result);
+                                } else {
+                                    Self::push_tool_outcome(&mut session,&mut native_tool_messages,call_id,&call.tool_name,&call.input.to_string(),true,&result);
+                                }
+                                continue;
+                            }
                         }
                         if self.group_context.as_ref().is_some_and(|group|!group.permits_tool(&addr.label(),&call.tool_name)) {
                             push_round_feedback(&mut session,&mut native_tool_messages,call_id,&call.tool_name,

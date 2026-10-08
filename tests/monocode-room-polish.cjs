@@ -90,9 +90,65 @@ async function main() {
     assert.equal(result.logoSize,"18px");
     assert.ok(result.logoTop >= 0 && result.logoTop < 40,"Collapsed logo stays inside the top band");
     assert.ok(result.folded&&result.workOpened&&result.workClosed,"Answer arrow opens and closes the real MonoCode work trace");
+    const motion = await evaluate(`(async () => {
+      const t=window.MonocodeRoomTest,d=t.ui.state.view.directory,group=d.groups[0];
+      const ids=d.members.filter(m=>m.group_id===group.group_id).map(m=>m.agent_id);
+      group.leader_agent_id=ids.at(-1);
+      await t.ui.selectItem({kind:'group',id:group.group_id});
+      t.syncGroupPals({status:'working',active_agent_ids:[ids[0]]});
+      const host=document.getElementById('groupPals');
+      const leader=host.querySelector('[data-seat="leader"]').dataset.agent;
+      const leaderSize=parseFloat(getComputedStyle(host.querySelector('[data-seat="leader"]')).width);
+      const chatHeroSize=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mc-hero-diameter'));
+      const peerSize=parseFloat(getComputedStyle(host.querySelector('.pal-seat:not([data-seat="leader"])')).width);
+      const before=[...host.querySelectorAll('.pal-seat')].map(n=>n.dataset.agent);
+      const peerSpeaking=!!host.querySelector('.pal-seat.speaking[data-agent="'+ids[0]+'"]');
+      t.syncGroupPals({status:'working',active_agent_ids:[group.leader_agent_id]});
+      const stableSeats=JSON.stringify(before)===JSON.stringify([...host.querySelectorAll('.pal-seat')].map(n=>n.dataset.agent));
+      t.ui.configureItem({kind:'group',id:group.group_id});
+      const picker=document.querySelector('[data-group-leader]');
+      const pickerValue=picker.value,pickerOptions=[...picker.options].map(o=>o.value);
+      t.ui.closeModal();
+      const jump=document.getElementById('jumpLatest');jump.hidden=false;
+      const anchored=jump.parentElement.id==='composerZone';
+      const aboveComposer=jump.getBoundingClientRect().bottom<=document.getElementById('composerZone').getBoundingClientRect().top;
+      await t.ui.selectItem({kind:'agent',id:ids[0]});
+      t.clearFeed();t.state.activeTurnId='motion-direct';t.state.displayRows=[];
+      t.state.attachments=[];t.state.mentions=[];t.renderComposerText('Use the blue palette instead.');
+      t.setWorking(true);t.syncSendMode();
+      const sendNow=document.getElementById('sendButton').getAttribute('aria-label').startsWith('Send now');
+      const queueBefore=t.state.queuedDrafts.size;
+      await t.submitTurn();
+      const bubble=document.querySelector('.user-message.steered-message');
+      const immediate=!!bubble&&bubble.textContent.includes('Use the blue palette instead.')&&!!bubble.querySelector('.steered-label');
+      const notQueued=t.state.queuedDrafts.size===queueBefore&&document.getElementById('queueBlock').hidden;
+      const stillWorking=t.state.working;
+      const composerCleared=!document.getElementById('composerInput').value;
+      return {leader,expectedLeader:group.leader_agent_id,leaderSize,chatHeroSize,peerSize,peerSpeaking,stableSeats,pickerValue,pickerOptions,expectedMembers:ids,anchored,aboveComposer,sendNow,immediate,notQueued,stillWorking,composerCleared};
+    })()`);
+    console.log(JSON.stringify({motion},null,2));
+    assert.equal(motion.leader,motion.expectedLeader,'Configured group leader owns the central seat');
+    assert.equal(motion.leaderSize,motion.chatHeroSize,'Room leader matches the regular chat hero');
+    assert.equal(motion.peerSize,66,'Room coworkers are three times the original 22px');
+    assert.ok(motion.peerSpeaking&&motion.stableSeats,'Speaking highlights preserve stable seats');
+    assert.equal(motion.pickerValue,motion.expectedLeader,'Configure dialog preserves the leader');
+    assert.deepEqual(motion.pickerOptions.sort(),motion.expectedMembers.sort(),'Leader picker contains exactly the room members');
+    assert.ok(motion.anchored&&motion.aboveComposer,'Back to latest stays above the composer');
+    assert.ok(motion.sendNow&&motion.immediate&&motion.notQueued&&motion.stillWorking&&motion.composerCleared,'A working direct conversation receives its new message immediately');
     if (process.env.PHOENIX_TEST_SCREENSHOT) {
+      await evaluate(`(async()=>{const t=window.MonocodeRoomTest;await t.ui.selectItem({kind:'group',id:t.ui.state.view.directory.groups[0].group_id});t.syncGroupPals();})()`);
       const screenshot=await command("Page.captureScreenshot",{format:"png"});
       fs.writeFileSync(process.env.PHOENIX_TEST_SCREENSHOT,Buffer.from(screenshot.data,"base64"));
+      if (process.env.PHOENIX_TEST_NARROW_SCREENSHOT) {
+        await command("Emulation.setDeviceMetricsOverride",{width:480,height:900,deviceScaleFactor:1,mobile:false});
+        await sleep(350);
+        const narrow=await evaluate(`(()=>{const host=document.getElementById('groupPals'),stage=document.getElementById('conversationStage').getBoundingClientRect(),body=document.getElementById('conversationBody').getBoundingClientRect(),faces=[...host.querySelectorAll('.pal-seat')].map(n=>n.getBoundingClientRect());return {stage:host.dataset.stage,inside:faces.every(r=>r.left>=stage.left&&r.right<=stage.right),aboveMessages:faces.every(r=>r.bottom<=body.top),sizes:faces.map(r=>Math.round(r.width))};})()`);
+        assert.ok(narrow.inside&&narrow.aboveMessages,'Enlarged room avatars fit the narrow stage and stay above messages');
+        assert.ok(narrow.sizes.every(size=>size===66||size===115),'Narrow layout keeps the enlarged avatar sizes');
+        console.log(JSON.stringify({narrow},null,2));
+        const narrowShot=await command("Page.captureScreenshot",{format:"png"});
+        fs.writeFileSync(process.env.PHOENIX_TEST_NARROW_SCREENSHOT,Buffer.from(narrowShot.data,"base64"));
+      }
     }
   } finally {
     socket?.close();chrome?.kill();server.kill();

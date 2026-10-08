@@ -1136,6 +1136,10 @@ impl MeshRunner {
             .find(|participant| participant.internal_role == role)?;
         let session = store.get(&group.canonical_session_id)?;
         let mut rendered = Vec::new();
+        // Group leader architecture: during an open diverge round, peers'
+        // answers stay hidden from non-leader members until convergence.
+        let blind = crate::runtime::group_coordination::diverge_view(group, &participant.agent_id);
+        let mut hidden_peer_answers = 0usize;
         let start_index = if participant.history_access
             == crate::runtime::company_directory::HistoryAccess::FromJoin
         {
@@ -1147,6 +1151,12 @@ impl MeshRunner {
             if matches!(message, Message::GroupContribution { message_id, group_id, .. }
                 if group_id == &group.group_id && supplied_receipts.contains(message_id)) {
                 continue;
+            }
+            if let (Some(view), Message::GroupContribution { agent_id, turn_id, .. }) = (blind.as_ref(), message) {
+                if view.hides_contribution(agent_id, turn_id) {
+                    hidden_peer_answers += 1;
+                    continue;
+                }
             }
             // The runner persists the current group prompt before preload so
             // Esc cannot lose it. The same text is also the live incoming
@@ -1173,6 +1183,11 @@ impl MeshRunner {
                 Message::ToolResult { .. } => continue,
             };
             rendered.push(line);
+        }
+        if hidden_peer_answers > 0 {
+            rendered.push(format!(
+                "[{hidden_peer_answers} teammate answer(s) from the open diverge round are hidden until the leader converges. Give your own independent take.]"
+            ));
         }
         let roster = group
             .participants

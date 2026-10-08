@@ -1088,7 +1088,7 @@
       try{const source=file.preview||await ui.invoke("image_data_url",{path:file.path});if(!button.isConnected)return;file.preview=source;image.src=source;button.classList.remove("loading");syncActivitySummary();}catch{button.classList.remove("loading");button.classList.add("failed");}
     });
   }
-  function renderUser(text, attachments = [], queued = null) {
+  function renderUser(text, attachments = [], queued = null, options = null) {
     if (isCompactionText(text) && !attachments.length) return null;
     // The next authored prompt is the only replay boundary. Receipts, asks,
     // handoffs and tool calls all remain inside the preceding turn trace.
@@ -1106,6 +1106,7 @@
     node._messageAttachments=attachments;
     hydrateUserMessageImages(node);
     if(queued?.id){node.dataset.queuedId=queued.id;node.dataset.queuedPending=String(!queued.canonical);}
+    if(options?.steered)markSteeredNode(node,true);
     if (!state.painting) renderPromptRail();
     syncActivitySummary();
     return node;
@@ -2152,7 +2153,71 @@
   // A live turn has one activity cursor. It is attached to the newest current
   // activity and moves between Thinking/Browsing/tool groups; old rows never
   // retain a second animated cube.
+  // Group live pals: the leader in a large animated circle with up to four
+  // pals around it. Seats are role-based and stable (sort_order, then
+  // agent_id), never reordered by who is speaking. As the free centre of the
+  // header narrows, the inner pair docks on the leader's lower rim (stage 2),
+  // then the outer pair docks too and the inner pair slides lower (stage 3).
+  // Thresholds carry hysteresis so a width hovering at a boundary does not
+  // flicker between layouts.
+  const PAL_SEATS=["inner-left","inner-right","outer-left","outer-right"],PAL_HYSTERESIS=16;
+  const palState={stage:1,signature:"",observer:null,needs:{1:180,2:120}};
+  function groupPalRoster(groupId){
+    const directory=ui.state.view?.directory;if(!directory)return null;
+    const rows=(directory.members||[]).filter((member)=>member.group_id===groupId&&member.present!==false)
+      .sort((a,b)=>(Number(a.sort_order)||0)-(Number(b.sort_order)||0)||String(a.agent_id).localeCompare(String(b.agent_id)));
+    const ids=[...new Set(rows.map((member)=>member.agent_id))];if(!ids.length)return null;
+    const group=(directory.groups||[]).find((row)=>row.group_id===groupId),wanted=group?.leader_agent_id;
+    const leader=wanted&&ids.includes(wanted)?wanted:ids.includes("phoenix")?"phoenix":ids[0];
+    const pals=ids.filter((id)=>id!==leader);
+    return{leader,seated:pals.slice(0,PAL_SEATS.length),extra:Math.max(0,pals.length-PAL_SEATS.length)};
+  }
+  function palFreeWidth(header){
+    const box=header.getBoundingClientRect(),centre=box.left+box.width/2;let left=box.left,right=box.right;
+    for(const node of header.children){
+      if(node.id==="groupPals"||node.classList.contains("header-spacer")||node.hidden||!node.getClientRects().length)continue;
+      const rect=node.getBoundingClientRect();if(rect.bottom<=box.top+2||rect.top>=box.top+box.height*.6)continue;
+      if(rect.right<=centre)left=Math.max(left,rect.right);else if(rect.left>=centre)right=Math.min(right,rect.left);else{left=Math.max(left,rect.right);}
+    }
+    return Math.max(0,2*Math.min(centre-left,right-centre));
+  }
+  function palStageFor(width,current){
+    const needs=palState.needs;let stage=current;
+    while(stage<3&&width<needs[stage])stage+=1;
+    while(stage>1&&width>=needs[stage-1]+PAL_HYSTERESIS)stage-=1;
+    return stage;
+  }
+  function layoutGroupPals(){
+    const host=$("groupPals"),header=$("conversationHeader");if(!host||!header)return;
+    const stage=palStageFor(palFreeWidth(header),palState.stage);
+    if(stage!==palState.stage||host.dataset.stage!==String(stage)){palState.stage=stage;host.dataset.stage=String(stage);}
+  }
+  function syncGroupPals(activity=ui.activityFor?.(state.item)){
+    const header=$("conversationHeader");if(!header)return;
+    let host=$("groupPals");
+    const roster=state.item?.kind==="group"?groupPalRoster(state.item.id):null;
+    if(!roster){if(host){host.remove();header.classList.remove("has-group-pals");palState.signature="";}return;}
+    if(!host){
+      host=document.createElement("div");host.id="groupPals";host.className="group-pals";host.setAttribute("role","group");host.dataset.stage=String(palState.stage);
+      header.append(host);header.classList.add("has-group-pals");
+      if(!palState.observer&&typeof ResizeObserver==="function"){palState.observer=new ResizeObserver(()=>layoutGroupPals());palState.observer.observe(header);}
+    }
+    const signature=JSON.stringify([state.item.id,roster]);
+    if(signature!==palState.signature){
+      palState.signature=signature;
+      const seat=(id,name)=>{const profile=agentProfile(id);return`<span class="pal-seat" data-seat="${name}" data-agent="${escape(id)}" title="${escape(agentLabel(id))}${name==="leader"?" · leader":""}" style="--agent:${escape(profile?.color||"#77736d")}"><span class="pal-face">${ui.avatarSvg(profile)}</span></span>`;};
+      host.innerHTML=seat(roster.leader,"leader")+roster.seated.map((id,index)=>seat(id,PAL_SEATS[index])).join("")+(roster.extra?`<span class="pal-more" title="${roster.extra} more">+${roster.extra}</span>`:"");
+      host.setAttribute("aria-label",`Group lead ${agentLabel(roster.leader)} with ${roster.seated.length+roster.extra} coworker${roster.seated.length+roster.extra===1?"":"s"}`);
+      host.dataset.count=String(roster.seated.length);host.dataset.more=roster.extra?"true":"false";
+      palState.needs=roster.extra?{1:244,2:150}:{1:180,2:120};
+    }
+    const live=activity&&LIVE_CONVERSATION_STATUSES.has(activity.status),speaking=new Set((live?activity.active_agent_ids||[]:[]).map(canonicalAgentId));
+    host.dataset.live=String(Boolean(live));
+    for(const node of host.querySelectorAll(".pal-seat"))node.classList.toggle("speaking",speaking.has(canonicalAgentId(node.dataset.agent)));
+    layoutGroupPals();requestAnimationFrame(layoutGroupPals);
+  }
   function syncTeamPresence(activity=ui.activityFor?.(state.item)){
+    syncGroupPals(activity);
     if(state.item?.kind==="agent"){for(const row of handoffRows())syncHandoffLiveLabel(row,activity);return;}
     if(state.item?.kind!=="group"||!activity)return;
     const feed=$("conversationFeed"),active=new Set((LIVE_CONVERSATION_STATUSES.has(activity.status)?activity.active_agent_ids||[]:[]).map(canonicalAgentId));
@@ -3541,7 +3606,7 @@
     // in one giant assistant bubble and must never enter the room transcript.
     if(state.item?.kind==="group"&&event.kind==="answer")return;
     if (isCompactionEvent(event) && !["settled", "usage", "tool_start", "steer_delivered"].includes(event.kind)) return;
-    if(event.kind==="user"&&(claimQueuedUser(event)||(!state.painting&&claimCanonicalUser(event))))return;
+    if(event.kind==="user"&&(claimQueuedUser(event)||(!state.painting&&!replay&&claimSteeredUser(event))||(!state.painting&&claimCanonicalUser(event))))return;
     // Direct threads persist only their owner's operational trace. Nested
     // coworker events arrive on the parent transport too, but retaining them
     // here leaks private tools and lets foreign lifecycle rows affect reloads.
@@ -3684,7 +3749,7 @@
     if(!historyVisibleInConversation(row))return;
     const owner=row.agent||state.item?.id||"phoenix";
     const askAnswer=askAnswerPrompt(row);if(isInternalRuntimeText(row.text)&&!askAnswer)return;
-    if (row.role === "user") {if(!renderGroupContinuationTurn(row)&&!renderAskAnswerTurn(row)&&!renderScheduledTurn(row))renderUser(row.text,Array.isArray(row.attachments)?row.attachments:[],row.queued_id?{id:row.queued_id,canonical:Boolean(row.queued_canonical)}:null);}
+    if (row.role === "user") {if(!renderGroupContinuationTurn(row)&&!renderAskAnswerTurn(row)&&!renderScheduledTurn(row)){const node=renderUser(row.text,Array.isArray(row.attachments)?row.attachments:[],row.queued_id?{id:row.queued_id,canonical:Boolean(row.queued_canonical)}:null,{steered:Boolean(row.steered)});if(node&&row.steer_id)node.dataset.steerId=row.steer_id;}}
     else if (row.role === "answer") {if(state.item?.kind==="group")return;renderAnswer(row.text, row.agent, row.meta);}
     else if (row.role === "narration" && !isReasoningSummaryText(row.text)) renderAgentUpdate(owner, row.text, true);
     else if (row.role === "commentary" && !isReasoningSummaryText(row.text)) renderAgentUpdate(owner, row.text);
@@ -3827,7 +3892,7 @@
     if (request.TodoList) return Promise.resolve({TodoList:state.tasks.length ? state.tasks : [{id:"1",text:"Connect the canonical conversation",status:"completed"},{id:"2",text:"Wire task and approval state",status:"in_progress"},{id:"3",text:"Verify the complete interaction",status:"pending"}]});
     if (request.ConversationAsks) return Promise.resolve({ConversationAsks:[]});
     if (request.GroupActivationPreview) {
-      const groupId=request.GroupActivationPreview.group_id,members=(ui.state.view?.directory.members||[]).filter((member)=>member.group_id===groupId).sort((a,b)=>a.sort_order-b.sort_order),all=request.GroupActivationPreview.user_request.trim().startsWith("@everyone"),tokens=new Set([...request.GroupActivationPreview.user_request.matchAll(/(?:^|\s)@([a-z0-9_-]+)/gi)].map((match)=>match[1].toLowerCase())),active=members.map((member)=>knownAgentProfile(member.agent_id)).filter((profile)=>activatableCoworker(profile)&&(all||tokens.has(profile.agent_id.toLowerCase())));
+      const groupId=request.GroupActivationPreview.group_id,members=(ui.state.view?.directory.members||[]).filter((member)=>member.group_id===groupId).sort((a,b)=>a.sort_order-b.sort_order),all=request.GroupActivationPreview.user_request.trim().startsWith("@everyone"),tokens=new Set([...request.GroupActivationPreview.user_request.matchAll(/(?:^|\s)@([a-z0-9_-]+)/gi)].map((match)=>match[1].toLowerCase())),leaderId=ui.state.view?.directory.groups.find((group)=>group.group_id===groupId)?.leader_agent_id,mentioned=members.map((member)=>knownAgentProfile(member.agent_id)).filter((profile)=>activatableCoworker(profile)&&(all||tokens.has(profile.agent_id.toLowerCase()))),active=mentioned.length?mentioned:[knownAgentProfile(leaderId)].filter(activatableCoworker);
       return Promise.resolve({GroupActivationPreview:{group_id:groupId,roster_fingerprint:`preview-${members.map((member)=>member.agent_id).join("-")}`,selection:all?"everyone":"explicit",active_agent_ids:active.map((profile)=>profile.agent_id),active_display_names:active.map((profile)=>profile.display_name),execution_mode:"parallel",execution_waves:active.length?[active.map((profile)=>profile.agent_id)]:[],execution_wave_display_names:active.length?[active.map((profile)=>profile.display_name)]:[]}});
     }
     if (request.Settings?.action === "models_snapshot") return Promise.resolve({Settings:{result:"models",models:{config_revision:"preview-context",lanes:[{lane:"phoenix",provider_id:"openai",model:"gpt-5.6-sol",reasoning_effort:"high",context_window:1050000,max_context_window:1050000,context_window_override:null},{lane:"specialist",provider_id:"anthropic",model:"claude-opus-4-6",reasoning_effort:"high",context_window:1000000,max_context_window:1000000,context_window_override:null}],providers:[],catalog:[{id:"gpt-5.6-sol",name:"GPT-5.6 Sol",provider:"openai",context_window:1050000,effort_levels:["minimal","low","medium","high","xhigh","max"]},{id:"gpt-4.1-mini",name:"GPT-4.1 mini",provider:"openai",context_window:1047576,effort_levels:[]},{id:"claude-opus-4-6",name:"Claude Opus 4.6",provider:"anthropic",context_window:1000000,effort_levels:["low","medium","high"]},{id:"gemini-3.1-pro",name:"Gemini 3.1 Pro",provider:"google",context_window:1000000,effort_levels:["low","medium","high"]}]}}});
@@ -3848,7 +3913,7 @@
     clearProviderRetry();
     if(state.item){persistComposerDraft(state.item);flushDisplayJournal();stashConversationView();}
     else{clearFeed();closeApproval();}
-    state.item=item;state.sessionId=sessionId;feed.dataset.conversationKey=token.key;restoreSavedContextUsage(sessionId);
+    state.item=item;state.sessionId=sessionId;syncGroupPals();feed.dataset.conversationKey=token.key;restoreSavedContextUsage(sessionId);
     setImageCommentMode(false);state.inspectionImages=[];state.activeInspectionImageId="";state.imageAnnotations.clear();renderInspectionImageTabs();
     syncWorkingElsewhere();
     syncInspectionHeader();
@@ -4578,7 +4643,10 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     let requestText=`${requestBody}${commentContext}`;
     // Plain follow-ups keep the latest initiating coworker; explicit mentions
     // and @everyone retain their existing activation rules.
-    if(state.item?.kind==='group'&&!/@[\w-]+/.test(requestBody)&&!state.groupEveryone){
+    // Group leader architecture: a led room routes unaddressed messages to
+    // its leader server-side, so the follow-up rewrite applies only to
+    // legacy payloads without leader_agent_id.
+    if(state.item?.kind==='group'&&!ui.profileFor(state.item)?.leader_agent_id&&!/@[\w-]+/.test(requestBody)&&!state.groupEveryone){
       const latest=[...state.displayRows].reverse().find(entry=>displayRole(entry)==='user');
       const owner=latest&&initiatingAgentForTurn({turn_id:displayTurnId(latest)});
       const profile=owner&&knownAgentProfile(owner);
@@ -4680,6 +4748,12 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
       if(state.item?.kind==="group"&&request.groupActivation===false)return;
     }catch(error){ui.toast(error.message||String(error),true);return;}
     if(!selectionIsCurrent(turnToken))return;
+    // A conversation that is working takes the message INTO the running work:
+    // it is shown as sent right away. One-to-one: the agent reads it at its
+    // next step. Group room: it lands in the room transcript at once, every
+    // running member hears it, the addressed members act (an idle one starts
+    // now). Nothing waits in a queue.
+    if (state.working) { steerTurn(request,turnToken); return; }
     if (state.working) {
       try{
         const queueId=await queueTurn(request.requestText,request.attachments,request.groupActivation,request.turnId);
@@ -4707,8 +4781,83 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
       setTimeout(async () => {if(!selectionIsCurrent(turnToken))return;renderAnswer("I have the context. ## Next steps 1. Confirm the exact behavior. 2. Verify it in the running app.");await settleAnswerMeta();if(!selectionIsCurrent(turnToken))return;setWorking(false);updateContext(84520,1000000);},1300); return;
     }
     const session=turnToken.sessionId,socket=new WebSocket(ui.wsUrl());state.turnSocket=socket;
-    const body={session_id:session,turn_id:request.turnId,user_request:request.requestText,permission_mode:state.permission,yolo:null,workspace:state.workspace||null,journal:true,target_agent:targetAgent(),target_group:targetGroup(),group_activation:request.groupActivation||null,delivery:"queue",sticky_notes:null,viewport:null,attachments:request.attachments.length?request.attachments:null};
+    const body=turnRequestBody(session,request,"queue");
     socket.onopen=()=>{if(state.turnSocket===socket&&selectionIsCurrent(turnToken))socket.send(JSON.stringify({Turn:body}));else try{socket.close();}catch{}};
+    bindTurnSocket(socket,request,turnToken);
+  }
+  const STEERED_LABEL='<span class="steered-label" title="Sent while the agent was working; it reads this at its next step">Delivered mid-task</span>';
+  function markSteeredNode(node,steered){
+    if(!node)return;node.classList.toggle("steered-message",steered);
+    const content=node.querySelector(".message-content");content?.querySelector(":scope > .steered-label")?.remove();
+    if(steered)content?.insertAdjacentHTML("beforeend",STEERED_LABEL);
+  }
+  // Retag a mid-task bubble as the boundary of its own new turn. Used when the
+  // running turn ended before the message could be delivered into it, so the
+  // gateway started a normal turn with it instead (never both).
+  function promoteSteeredUser(entry,node,turnId){
+    entry.turn_id=turnId;entry.value.turn_id=turnId;entry.value.steer_claimed=true;delete entry.value.steered;
+    if(node){node.dataset.turnId=turnId;markSteeredNode(node,false);}
+    state.activeTurnId=turnId;state.queuedWakeTurnId=turnId;
+    replaceDisplayRows(trimDisplayRows(state.displayRows),true);scheduleDisplayPersist(true);
+    finishTurnActivity(false);state.pinToLatest=true;state.turnStartedAt=Date.now();setWorking(true);beginTurnActivity(node||null);
+  }
+  function steeredNodeFor(entry){
+    const id=String(entry?.value?.steer_id||"");if(!id)return null;
+    return $("conversationFeed").querySelector(`.user-message[data-steer-id="${CSS.escape(id)}"]`);
+  }
+  // The race-safety wake announces the adopted message as a new turn boundary
+  // (WakeTurn). The bubble is already on screen as "delivered mid-task".
+  function claimSteeredUser(event){
+    const text=String(event?.text||"").replace(/…$/,""),turnId=String(event?.turn_id||"");
+    if(!text||!turnId)return false;
+    const head=text.slice(0,200);
+    const entry=[...state.displayRows].reverse().find((row)=>displayRole(row)==="user"&&row.value?.steered&&!row.value?.steer_claimed
+      &&(String(row.value.steer_request||"").startsWith(head)||String(row.value.text||"").startsWith(humanMentions(head))));
+    if(!entry)return false;
+    promoteSteeredUser(entry,steeredNodeFor(entry),turnId);
+    return true;
+  }
+  function steerTurn(request,turnToken){
+    const files=request.files.map(({name,path,size,type})=>({name,path,size,type}));
+    const turnId=state.activeTurnId||state.displayRows.at(-1)?.turn_id||request.turnId;
+    const entry={source:"history",turn_id:turnId,value:{role:"user",turn_id:turnId,text:request.displayText,attachments:files,steered:true,steer_id:request.turnId,steer_request:request.requestText}};
+    state.displayRows.push(entry);state.displayDirty=true;
+    const node=renderUser(request.displayText,request.files,null,{steered:true});
+    if(node)node.dataset.steerId=request.turnId;
+    clearComposerDraft();scheduleDisplayPersist(true);scrollLatest();
+    if(preview)return;
+    const socket=new WebSocket(ui.wsUrl());let settled=false,adopted=false;
+    const fail=(error)=>{
+      if(settled||adopted)return;settled=true;clearTimeout(timer);try{socket.close();}catch{}
+      if(!selectionIsCurrent(turnToken))return;
+      const at=state.displayRows.indexOf(entry);if(at>=0)state.displayRows.splice(at,1);
+      node?.remove();replaceDisplayRows(trimDisplayRows(state.displayRows),true);scheduleDisplayPersist(true);
+      if(!composerText("request").trim())setComposerDraft(request.typedText??request.displayText);
+      ui.toast(`Your message was not delivered: ${error.message||error}`,true);
+    };
+    const timer=setTimeout(()=>fail(new Error("Phoenix did not confirm it in time.")),8000);
+    socket.onopen=()=>{if(selectionIsCurrent(turnToken))socket.send(JSON.stringify({Turn:turnRequestBody(turnToken.sessionId,request,"steer")}));else fail(new Error("conversation changed"));};
+    socket.onerror=()=>fail(new Error("could not reach the local runtime"));
+    socket.onmessage=(message)=>{
+      if(adopted||settled)return;
+      let value;try{value=JSON.parse(message.data);}catch(error){fail(error);return;}
+      if(value.Error){fail(new Error(value.Error.message));return;}
+      if(value.Done?.completion==="steered"){settled=true;clearTimeout(timer);try{socket.close();}catch{}return;}
+      // Anything else means the running turn had already ended: the gateway is
+      // running this message as a normal turn on this socket. Adopt it.
+      adopted=true;clearTimeout(timer);
+      if(!selectionIsCurrent(turnToken)){try{socket.close();}catch{}return;}
+      state.turnSocket=socket;promoteSteeredUser(entry,node,request.turnId);
+      bindTurnSocket(socket,request,turnToken);socket.onmessage(message);
+    };
+  }
+  function turnRequestBody(session,request,delivery){
+    return {session_id:session,turn_id:request.turnId,user_request:request.requestText,permission_mode:state.permission,yolo:null,workspace:state.workspace||null,journal:true,target_agent:targetAgent(),target_group:targetGroup(),group_activation:request.groupActivation||null,delivery,sticky_notes:null,viewport:null,attachments:request.attachments.length?request.attachments:null};
+  }
+  // The foreground Turn socket's lifecycle. Shared by a normal send and by a
+  // mid-task message whose running turn ended before it could be delivered
+  // (the gateway then runs it as a normal turn on that same socket).
+  function bindTurnSocket(socket,request,turnToken){
     socket.onmessage=async(message)=>{if(state.turnSocket!==socket||!selectionIsCurrent(turnToken))return;try{const value=JSON.parse(message.data);if(consumeVolumeWorkerLifecycle(value))return;if(value.Story)renderStory(value.Story);if(value.Done?.completion==="queued"){finishTurn(socket,true,turnToken);return;}if(value.Done){const final=value.Done.final_markdown;if(state.item?.kind!=="group"&&final&&!isCompactionText(final)&&state.pendingAnswer?.text!==visibleAnswerText(final,targetAgent()||"phoenix")&&appendDisplay("history",{role:"answer",text:final,agent:targetAgent()||"phoenix"},true))renderAnswer(final);await settleAnswerMeta();if(!selectionIsCurrent(turnToken))return;if(state.item?.kind!=="group"&&!state.turnUsageSeen&&value.Done.context_window){const selected=selectedModelContext().effective,reported=value.Done.context_window[1],limit=selected?Math.min(selected,reported):reported;updateContext(value.Done.context_window[0],limit);}finishTurn(socket,terminalPreservesUnfinished(value.Done),turnToken);}if(value.Error){renderStory(turnFailureCard(value.Error,targetAgent()||"phoenix"));finishTurn(socket,true,turnToken);}}catch(error){if(selectionIsCurrent(turnToken))ui.toast(String(error),true);}};
     socket.onerror=()=>{if(state.turnSocket!==socket||!selectionIsCurrent(turnToken))return;renderStory({kind:"card",agent:targetAgent()||"phoenix",subject:"Connection lost",body:"Phoenix could not reach the local runtime. Your message remains visible here.",ok:false});finishTurn(socket,true,turnToken);};
     socket.onclose=()=>{
@@ -4777,11 +4926,11 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     });
   }
 
-  function syncSendMode() { const hasDraft=Boolean(composerText("request").trim()||state.attachments.length||state.mentions.length||state.groupEveryone),queueing=state.working&&hasDraft,button=$("sendButton");$("composerZone").classList.toggle("queueing-input",queueing);button.disabled=!state.working&&!hasDraft;button.setAttribute("aria-label",queueing?"Queue message":state.working?"Stop agent":"Send message");button.title=queueing?"Queue message":state.working?"Stop agent (Esc)":"Send message";syncSendOrb(); }
+  function syncSendMode() { const hasDraft=Boolean(composerText("request").trim()||state.attachments.length||state.mentions.length||state.groupEveryone),queueing=state.working&&hasDraft,button=$("sendButton");$("composerZone").classList.toggle("queueing-input",queueing);button.disabled=!state.working&&!hasDraft;const queueLabel=state.item?.kind==="group"?"Send now — everyone in the room hears it":"Send now — the agent reads it at its next step";button.setAttribute("aria-label",queueing?queueLabel:state.working?"Stop agent":"Send message");button.title=queueing?queueLabel:state.working?"Stop agent (Esc)":"Send message";syncSendOrb(); }
   // Liquid while working; gather into stop on hover or queue with a draft.
   function syncSendOrb() {
     const label=$("sendLabel");
-    if(label)label.textContent=state.working?($("composerZone").classList.contains("queueing-input")?"Queue":"Stop"):"Send";
+    if(label)label.textContent=state.working?($("composerZone").classList.contains("queueing-input")?"Send":"Stop"):"Send";
     const canvas=$("sendOrb"),button=$("sendButton");
     if(!canvas||!button)return;
     if(!window.PhoenixFluidOrb){canvas.hidden=true;button.classList.remove("orb-live");return;}
@@ -4858,7 +5007,9 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     // Prompts authored in this window already appear as normal chat bubbles.
     // Keep the queue UI only as recovery/failure UI, rather than duplicating a
     // prompt in both the conversation and a persistent “queued” drawer.
-    const rows=(state.queue||[]).filter((row)=>["queued","waiting","failed"].includes(String(row.state||"waiting"))&&(row.state==="failed"||!shownQueueIds.has(row.queue_id))),block=$("queueBlock");
+    // Group rooms never queue a message: no queue row or chip there. Only a
+    // failed item that needs review stays visible.
+    const rows=(state.queue||[]).filter((row)=>["queued","waiting","failed"].includes(String(row.state||"waiting"))&&(row.state==="failed"||!shownQueueIds.has(row.queue_id))&&(state.item?.kind!=="group"||row.state==="failed")),block=$("queueBlock");
     block.hidden=!rows.length;
     const identity=conversationIdentity();
     if(rows.length){
@@ -5062,8 +5213,33 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   }
   function syncApprovalStack(){const stack=$("approvalStack"),count=stack?.children.length||0;if(!stack)return;stack.dataset.waiting=count>1?`${count-1} more request${count===2?"":"s"} waiting`:"";syncComposerEnd();}
   function formatAskAnswers(model){const answered=model.answers.filter((answer)=>answer!=null);return `Collected ${answered.length} answer(s) from user:\n\n${model.questions.map((question,index)=>`  [${question.header}] Q: ${question.question}\n  A: ${model.answers[index]}`).join("\n\n")}`;}
-  function resolveAskDisplay(card,answer,status){const id=card.dataset.askId,model=card._askState,bookmark=conversationScrollBookmark();let entry=state.displayRows.find((row)=>row.source==="story"&&row.value?.kind==="ask_pending"&&(row.value.id||row.value.ask_id)===id);if(!entry){entry={source:"story",value:cloneDisplayValue(model.ask)};state.displayRows.push(entry);}Object.assign(entry.value,{id,status,answer,display_answers:model.answers.map((value)=>value==null?null:String(value)),resolved_at:new Date().toISOString()});replaceDisplayRows(trimDisplayRows(state.displayRows),true);card.remove();syncApprovalStack();repaintConversation(bookmark,false);scheduleDisplayPersist(true);}
-  async function submitAsk(card,answer){const token=activeSelectionToken(),session_id=state.sessionId,owner=canvasConversationOwner();card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);try{await rpc({AnswerAsk:{ask_id:card.dataset.askId,answer,session_id,owner}},8000,token?.signal);if(selectionIsCurrent(token))resolveAskDisplay(card,answer,"answered");}catch(error){if(!selectionIsCurrent(token))return;card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);ui.toast(error.message,true);}}
+  // A group-boundary decision covers every open card asking the same thing:
+  // same group, same coworker, same permission. The gateway settles those
+  // siblings too, so the client closes them with the decision.
+  function outsideCallScope(model){const approval=model?.approval||{},details=approval.details||{};return approval.action==="outside_group_call"&&details.group_id&&details.target_agent_id?`${details.group_id}\u0000${details.target_agent_id}`:"";}
+  function matchingApprovalCards(card){const scope=outsideCallScope(card._askState);if(!scope)return[];return[...$("approvalStack").querySelectorAll(".approval-card")].filter((other)=>other!==card&&outsideCallScope(other._askState)===scope);}
+  function recordAskResolution(card,answer,status){const id=card.dataset.askId,model=card._askState;let entry=state.displayRows.find((row)=>row.source==="story"&&row.value?.kind==="ask_pending"&&(row.value.id||row.value.ask_id)===id);if(!entry){entry={source:"story",value:cloneDisplayValue(model.ask)};state.displayRows.push(entry);}Object.assign(entry.value,{id,status,answer,display_answers:model.answers.map((value)=>value==null?null:String(value)),resolved_at:new Date().toISOString()});return entry;}
+  // Resolving a card updates only that card's own nodes. Repainting the whole
+  // feed here cleared every approval card and the transcript and rebuilt
+  // them, which read as the app reloading after each approval.
+  function resolveAskDisplay(card,answer,status){
+    const siblings=status==="answered"?matchingApprovalCards(card):[],primaryAnswers=card._askState.answers;
+    const entry=recordAskResolution(card,answer,status);
+    siblings.forEach((other)=>{other._askState.answers=other._askState.questions.map((_,index)=>primaryAnswers[index]??primaryAnswers.at(-1)??null);recordAskResolution(other,answer,status);});
+    replaceDisplayRows(trimDisplayRows(state.displayRows),true);
+    const feed=$("conversationFeed"),bookmark=conversationScrollBookmark(),primaryId=String(card.dataset.askId||"");
+    const anchor=[...feed.querySelectorAll(".decision-request")].find((request)=>request.dataset.decisionAskId===primaryId)||null;
+    [card,...siblings].forEach((node)=>{const id=String(node.dataset.askId||"");feed.querySelectorAll(".decision-request").forEach((request)=>{if(request!==anchor&&request.dataset.decisionAskId===id)request.remove();});node.remove();});
+    // The answer takes the question's own place in the transcript, exactly
+    // where a full repaint would put it, without rebuilding the feed.
+    const resolved=renderAskHistory(entry.value);
+    if(anchor){if(resolved&&resolved!==anchor&&resolved.classList.contains("answer-resume-message"))anchor.replaceWith(resolved);else anchor.remove();}
+    syncApprovalStack();restoreConversationScroll(bookmark);scheduleDisplayPersist(true);
+  }
+  // A card whose decision was already made elsewhere (a sibling card, another
+  // window, a turn that ended) is obsolete, not failed.
+  const OBSOLETE_ASK=/no longer pending|already (?:answered|resolved)|different saved decision|no active participant|continuation is unavailable|submission is unavailable/i;
+  async function submitAsk(card,answer){const token=activeSelectionToken(),session_id=state.sessionId,owner=canvasConversationOwner();card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);try{await rpc({AnswerAsk:{ask_id:card.dataset.askId,answer,session_id,owner}},8000,token?.signal);if(selectionIsCurrent(token))resolveAskDisplay(card,answer,"answered");}catch(error){if(!selectionIsCurrent(token))return;if(card._askState?.decision&&OBSOLETE_ASK.test(String(error?.message||error))){resolveAskDisplay(card,answer,"answered");return;}card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);ui.toast(error.message,true);}}
   async function dismissAsk(card){const token=activeSelectionToken(),session_id=state.sessionId,owner=canvasConversationOwner();card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);try{await rpc({DismissAsk:{ask_id:card.dataset.askId,session_id,owner}},8000,token?.signal);if(!selectionIsCurrent(token))return;card._askState.answers=card._askState.questions.map(()=>"Not now");resolveAskDisplay(card,"Not now","dismissed");}catch(error){if(!selectionIsCurrent(token))return;card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);ui.toast(error.message,true);}}
   function recordAskAnswer(card,answer){const model=card._askState;model.answers[model.index]=answer;if(model.index<model.questions.length-1){model.index+=1;renderApprovalQuestion(card);card.querySelector(".approval-question").focus?.();return;}submitAsk(card,formatAskAnswers(model));}
   async function unlockApprovalVault(card){const input=card.querySelector("[data-vault-password]"),password=input.value;if(password.length<12){input.reportValidity();return;}card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);try{await rpc({Vault:{action:"unlock_with_password",master_password:password}},20000);input.value="";card._askState.answers[card._askState.index]="Unlocked";await submitAsk(card,"The local credential vault is unlocked. Continue the blocked action now.");}catch(error){card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);input.focus();ui.toast(error.message,true);}}
@@ -6303,7 +6479,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     addEventListener("phoenix:select-conversation",(event)=>selectConversationWithInspection(event.detail));
     addEventListener("phoenix:directory-ready",(event)=>selectConversationWithInspection(event.detail));
     addEventListener("phoenix:directory-status",()=>{syncSelectedLiveActivity();if(state.inspectionOpen&&state.inspectionTab==="desktop")updateDesktopViewer(true);});
-    addEventListener("phoenix:directory-updated",()=>{if(state.inspectionOpen&&state.inspectionTab==="desktop")updateDesktopViewer(true);});
+    addEventListener("phoenix:directory-updated",()=>{syncGroupPals();if(state.inspectionOpen&&state.inspectionTab==="desktop")updateDesktopViewer(true);});
     addEventListener("phoenix:terminal-tabs",(event)=>{state.terminalProcesses=Array.isArray(event.detail?.tabs)?event.detail.tabs.map((tab)=>({...tab})):[];syncActivitySummary();});
     addEventListener("phoenix:settings-visibility",syncBrowserChrome);
     addEventListener("phoenix:modal-visibility",syncBrowserChrome);

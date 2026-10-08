@@ -379,6 +379,7 @@ pub(crate) mod default_goal;
 pub mod delegation;
 pub mod gateway;
 pub mod group_conversation;
+pub mod group_coordination;
 pub mod journal;
 pub mod limits;
 pub mod r#loop;
