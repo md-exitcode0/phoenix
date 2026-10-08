@@ -781,21 +781,33 @@ html:root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded)
 html:root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) #conversationStage.has-thread:not(.mc-empty) #conversationBody{margin-top:0!important}
 /* Keep a short edge in panes without a hero. The chat fade begins at
    Fluffy's center and softens a full avatar-height of scrolling messages. */
-html:root[data-skin="phoenix"] #conversationBody{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 18px)!important;mask-image:linear-gradient(to bottom,transparent 0,#000 18px)!important}
+html:root[data-skin="phoenix"] #conversationBody{--transcript-edge-fade:18px;-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 18px)!important;mask-image:linear-gradient(to bottom,transparent 0,#000 18px)!important}
 html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage.has-fluffy:not(.mc-empty){--chat-hero-diameter:160px;--chat-hero-fade:160px}
 html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage.has-fluffy:not(.mc-empty) #fluffyHero{--mc-hero-diameter:var(--chat-hero-diameter);height:var(--chat-hero-diameter);flex-basis:var(--chat-hero-diameter)}
 html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage.has-fluffy:not(.mc-empty) #conversationBody{
+ --transcript-edge-fade:var(--chat-hero-fade);
  margin-top:calc(var(--chat-hero-diameter) / -2 - 8px)!important;
  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 var(--chat-hero-fade))!important;
  mask-image:linear-gradient(to bottom,transparent 0,#000 var(--chat-hero-fade))!important;
 }
 html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage.has-fluffy:not(.mc-empty) #conversationFeed{padding-top:calc(var(--chat-hero-fade) + 20px)!important}
 html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty):has(#groupPals) #conversationBody{
+ --transcript-edge-fade:var(--room-transcript-fade,160px);
  margin-top:var(--room-transcript-offset,0px)!important;
  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 var(--room-transcript-fade,160px))!important;
  mask-image:linear-gradient(to bottom,transparent 0,#000 var(--room-transcript-fade,160px))!important;
 }
 html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty):has(#groupPals) #conversationFeed{padding-top:calc(var(--room-transcript-fade,160px) + 20px)!important}
+/* Blur the scrolling text beneath the hero, easing back to sharp text at
+   the end of the existing opacity fade. The overlay never intercepts input. */
+html:root[data-skin="phoenix"] #conversationStage:not(.mc-empty) #conversationBody::before{
+ content:""!important;display:block!important;position:absolute;inset:0 0 auto;
+ height:var(--transcript-edge-fade);z-index:6;pointer-events:none;
+ background:transparent!important;border:0;box-shadow:none!important;
+ -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+ -webkit-mask-image:linear-gradient(to bottom,#000 0,#000 35%,transparent 100%)!important;
+ mask-image:linear-gradient(to bottom,#000 0,#000 35%,transparent 100%)!important;
+}
 html:root[data-skin="phoenix"] #inspectionSidebar .browser-owner-chip>:is(.fluffy-token,.avatar-custom){width:22px;height:22px;flex:0 0 22px}
 html:root[data-skin="phoenix"] #inspectionSidebar .browser-owner-chip .fluffy-token>:is(img,canvas){width:22px;height:22px}
 
