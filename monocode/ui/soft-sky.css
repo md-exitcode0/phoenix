@@ -847,6 +847,13 @@ html:root[data-skin="phoenix"] .codex-speed-controls button:focus-visible{outlin
 html:root[data-skin="phoenix"] .codex-speed-controls button:disabled{opacity:.4;cursor:default}
 
 /* Prompt previews use authored text and stay bounded for long words/URLs. */
+/* Completed replies replace the visible interim updates from the same speaker. */
+html:root[data-skin="phoenix"] #conversationFeed > .agent-message.superseded-update{display:none!important}
+.answer-earlier-updates{margin-top:12px;color:var(--muted);font-size:13px}
+.answer-earlier-updates > summary{cursor:pointer;width:fit-content;padding:4px 0}
+.answer-earlier-updates > summary:focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:4px}
+.answer-earlier-updates-body{padding-top:8px}
+.answer-earlier-updates-body > .markdown + .markdown{margin-top:12px}
 /* One glass surface: nested beUI borders produced a second, mismatched rim. */
 html:root[data-skin="phoenix"] #promptRailCard{border:0!important;box-shadow:0 8px 24px rgb(8 10 24 / 16%)!important}
 html:root[data-skin="phoenix"][data-theme="light"] #promptRailCard{box-shadow:0 8px 24px rgb(24 44 90 / 12%)!important}

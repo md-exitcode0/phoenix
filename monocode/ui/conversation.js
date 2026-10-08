@@ -569,7 +569,7 @@
     let previous = null;
     for (const node of $("conversationFeed").children) {
       node.classList.remove("message-continuation", "message-group-start");
-      if (node.hidden || node.classList.contains("superseded-answer")) {
+      if (node.hidden || node.matches(".superseded-answer,.superseded-update")) {
         if (node.classList.contains("decision-request")) previous = null;
         continue;
       }
@@ -1344,6 +1344,7 @@
     const profile=agentProfile(from),text=visibleAnswerText(body,from);
     const node=feedNode("message-row group-message member-message",`${avatar(profile)}<div class="message-content" data-slot="message-content"><header><strong>${escape(agentLabel(from))}</strong></header><div class="markdown">${relayedImagesMarkup(text)}${markdown(text)}</div></div>`,{agentId:from,returnReceipt:id,slot:"message",from:"assistant"});
     if(event.turn_id)node.dataset.turnId=String(event.turn_id);
+    PhoenixConversationUpdates.finalize(node);
     node.style.setProperty("--speaker",profile?.color||"var(--ember)");
     // A room is chronological: the leader's plan (and its assignments) comes
     // before the pitches it asked for, so a teammate is never moved above an
@@ -2110,7 +2111,7 @@
     const turn=state.renderingTurnId||state.activeTurnId||"";
     const waiting=suppliedMeta?.awaiting_input||state.displayRows.some((entry)=>displayRole(entry)==="answer"&&displayTurnId(entry)===turn&&entry.value?.awaiting_input&&answerKey(entry.value.markdown||entry.value.text||"")===key);
     // A final reply remains public even when the agent also asks a question.
-    if(waiting){const update=renderAgentUpdate(agent||state.item?.id||"phoenix",visibleText,false,true);if(update)update.classList.add("awaiting-input-update");return update;}
+    if(waiting){const update=renderAgentUpdate(agent||state.item?.id||"phoenix",visibleText,false,true,true);if(update){update.classList.add("awaiting-input-update");PhoenixConversationUpdates.finalize(update);if(!state.painting)syncMessageGroups();}return update;}
     // Recover histories written by the old late-helper integration pass. A
     // status explicitly reporting no change cannot replace this turn's answer.
     if(/^Nothing new(?:[.:]|$)/i.test(visibleText)){
@@ -2123,6 +2124,7 @@
     if(workCluster){settleWorkCluster(workCluster,false,meta);}
     const node=feedNode("message-row agent-message", `${avatar(profile)}<div class="message-content" data-slot="message-content"><header><strong>${escape(profile?.display_name || currentName())}</strong></header><div class="markdown">${relayedImagesMarkup(visibleText)}${markdown(visibleText)}</div>${turnEditSummaryMarkup(workCluster)}<footer class="answer-footer"><button type="button" data-copy-answer aria-label="Copy answer" title="Copy answer">${copyIcon()}</button><button type="button" class="turn-delete-button" data-delete-agent-turn aria-label="Permanently delete this complete agent turn" title="Delete agent turn">${deleteIcon()}</button>${completionMetaMarkup(meta)}</footer></div>`,{slot:"message",from:"assistant",speaker:canonicalAgentId(agent||state.item?.id||"phoenix")});
     node.dataset.answerKey=key;
+    PhoenixConversationUpdates.finalize(node);
     attachWorkToggle(node,workCluster);
     // One task, one answer: when a coworker's later pass (after a coworker
     // reported back) answers again in the same task, the newest answer stands
@@ -2578,7 +2580,7 @@
   }
   // Only user_update intentionally publishes an intermediate message.
   // Ordinary model prose and reasoning never become chat bubbles.
-  function renderAgentUpdate(agent,text,muted=false,explicit=false){
+  function renderAgentUpdate(agent,text,muted=false,explicit=false,publicReply=false){
     if(runtimeFailureSummary(text))return renderRuntimeFailure(text,agent);
     if(isCompactionText(text))return null;
     clearProviderRetry();
@@ -2589,13 +2591,16 @@
     const fingerprint=progressFingerprint(cleaned),speaker=canonicalAgentId(agent||state.item?.id||"phoenix"),turnId=state.renderingTurnId||state.activeTurnId||state.displayRows.at(-1)?.turn_id||"";
     // A live receipt and its canonical history row can describe the same
     // update. Deduplicate within its turn even if a tool row intervened.
-    if([...$("conversationFeed").querySelectorAll(":scope > .commentary-message")].some(node=>node.dataset.progressFingerprint===fingerprint&&node.dataset.speaker===speaker&&node.dataset.turnId===turnId))return null;
+    const existing=[...$("conversationFeed").querySelectorAll(":scope > .commentary-message")].find(node=>node.dataset.progressFingerprint===fingerprint&&node.dataset.speaker===speaker&&node.dataset.turnId===turnId&&(node.dataset.publicReply==="true")===publicReply);
+    if(existing)return publicReply?existing:null;
     markHandoffsWorking(agent);
     const cluster=ensureWorkCluster(agent||state.item?.id||"phoenix");
     delete cluster.dataset.latestProgress;syncWorkProgress(cluster);
     const profile=agentProfile(agent||state.item?.id||"phoenix");
     const html=avatar(profile)+'<div class="message-content" data-slot="message-content"><header><strong>'+escape(profile?.display_name||currentName())+'</strong></header><div class="markdown">'+markdown(cleaned)+'</div></div>';
     const node=feedNode("message-row agent-message commentary-message"+(muted?" muted":""),html,{agent:agent||"",slot:"message",from:"assistant",speaker:canonicalAgentId(agent||state.item?.id||"phoenix"),progressFingerprint:fingerprint});
+    if(publicReply)node.dataset.publicReply="true";
+    else PhoenixConversationUpdates.acceptUpdate(node);
     cluster.classList.add("has-progress");syncTeamWorkSummary(cluster);
     if(!state.painting)syncMessageGroups();
     scrollLatest();
@@ -3545,7 +3550,8 @@
     const snapshot=event.agent_snapshot&&typeof event.agent_snapshot==="object"?event.agent_snapshot:null;
     const live=agentProfile(event.agent_id),p=snapshot?{...live,...snapshot,agent_id:event.agent_id||snapshot.agent_id,metadata_json:JSON.stringify({avatar:snapshot.avatar||{}})}:live;
     const color=p?.color||"var(--ember)";
-    const text=visibleAnswerText(event.markdown,event.agent_id),node=feedNode("message-row group-message", `${avatar(p)}<div class="message-content" data-slot="message-content"><header><strong>${escape(event.agent_name || p?.display_name)}</strong></header><div class="markdown">${relayedImagesMarkup(text)}${markdown(text)}</div></div>`,{agentId:event.agent_id||"",messageId:event.message_id||"",slot:"message",from:"assistant"});
+    const text=visibleAnswerText(event.markdown,event.agent_id),node=feedNode("message-row group-message", `${avatar(p)}<div class="message-content" data-slot="message-content"><header><strong>${escape(event.agent_name || p?.display_name)}</strong></header><div class="markdown">${relayedImagesMarkup(text)}${markdown(text)}</div></div>`,{agentId:event.agent_id||"",speaker,messageId:event.message_id||"",slot:"message",from:"assistant"});
+    PhoenixConversationUpdates.finalize(node);
     node.style.setProperty("--speaker",color);syncOwnerHandoffUpdate(node.dataset.turnId);hydrateRelayedImages(node);
   }
   function renderGroupMemberStatus(event) {

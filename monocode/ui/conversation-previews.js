@@ -130,11 +130,26 @@ export function installConversationPreviews({
       renderHistory({role:"narration",agent:"phoenix",text:"EARLY DRAFT replay"});
       checks.explicitUpdateShownOnce=feed.querySelectorAll(".commentary-message").length===1&&feed.textContent.includes("teacher’s specific feedback");
       checks.historyDraftsHidden=!feed.textContent.includes("EARLY DRAFT");
-      renderAnswer("Choose the stubborn problem you finally solved.","phoenix");
+      const final=renderAnswer("Choose the stubborn problem you finally solved.","phoenix");
       checks.oneFinalAnswer=feed.querySelectorAll(".agent-message:not(.commentary-message)").length===1;
+      const earlier=feed.querySelector('.commentary-message'),disclosure=final.querySelector('.answer-earlier-updates');
+      checks.updatesFoldAfterFinal=getComputedStyle(earlier).display==='none'&&Boolean(disclosure)&&!disclosure.open;
+      disclosure.open=true;checks.originalUpdatePreserved=disclosure.querySelector('.markdown').textContent.includes('teacher’s specific feedback')&&getComputedStyle(disclosure.querySelector('.markdown')).display!=='none';disclosure.open=false;
+      renderStory({kind:"tool",agent:"phoenix",tool:"user_update",ok:true,detail:"A delayed update receipt."});
+      checks.delayedUpdateFolds=final.querySelectorAll('.answer-earlier-updates .markdown').length===2&&[...feed.querySelectorAll('.commentary-message')].every(node=>getComputedStyle(node).display==='none');
+      const otherTurn=earlier.cloneNode(true);otherTurn.classList.remove('superseded-update');otherTurn.dataset.turnId='another-proof-turn';feed.insertBefore(otherTurn,tail);
+      // Direct-thread routing correctly rejects foreign tool events. Seed a
+      // second speaker to exercise the presentation scope used in group feeds.
+      const otherSpeaker=earlier.cloneNode(true);otherSpeaker.classList.remove('superseded-update');otherSpeaker.dataset.speaker='school_coach';feed.insertBefore(otherSpeaker,tail);
+      PhoenixConversationUpdates.finalize(final);
+      checks.independentUpdatesStayVisible=[...feed.querySelectorAll('.commentary-message')].filter(node=>getComputedStyle(node).display!=='none').length===2;
       const beforeQuestion=feed.querySelectorAll('.awaiting-input-update').length;
       renderAnswer("You have enough detail now. Choose the change you want to describe.","phoenix",{awaiting_input:true});
       checks.finalReplyWithQuestionVisible=feed.querySelectorAll('.awaiting-input-update').length===beforeQuestion+1&&feed.textContent.includes("enough detail now");
+      checks.publicReplyNotFolded=getComputedStyle(feed.querySelector('.awaiting-input-update')).display!=='none';
+      const publicCount=feed.querySelectorAll('[data-public-reply="true"]').length;
+      renderAnswer("You have enough detail now. Choose the change you want to describe.","phoenix",{awaiting_input:true});
+      checks.publicReplyReplayShownOnce=feed.querySelectorAll('[data-public-reply="true"]').length===publicCount;
       const selectedBefore=state.item,openedBefore=state.inspectionOpen;
       let foreignBrowserRejected=false;try{await window.PhoenixConversation.openBrowser("school_coach","browse");}catch{foreignBrowserRejected=true;}
       checks.foreignBrowserCannotOpen=foreignBrowserRejected&&state.item===selectedBefore&&state.inspectionOpen===openedBefore;
@@ -790,6 +805,9 @@ export function installConversationPreviews({
       started=performance.now();await selectConversationWithInspection({item:averyItem,sessionId:averySession});const coldAveryMs=performance.now()-started;
       const averyColdText=$("conversationFeed").textContent,averyColdIsolated=averyColdText.includes(`${avery.display_name} private answer`)&&!averyColdText.includes("Phoenix private answer");
       started=performance.now();await selectConversationWithInspection({item:phoenixItem,sessionId:phoenixSession});const cachedPhoenixMs=performance.now()-started;
+      // Let the deferred fluffy header and fonts settle before recording a
+      // bookmark; its reserved height is part of the stable conversation.
+      await document.fonts.ready;await pause(80);
       const feed=$("conversationFeed"),maximum=Math.max(0,feed.scrollHeight-feed.clientHeight);feed.scrollTop=Math.round(maximum*.43);state.pinToLatest=false;const scrollBefore=feed.scrollTop;
       await selectConversationWithInspection({item:averyItem,sessionId:averySession});
       started=performance.now();await selectConversationWithInspection({item:phoenixItem,sessionId:phoenixSession});const cachedRestoreMs=performance.now()-started;await pause(80);const scrollAfter=feed.scrollTop,scrollRestored=maximum===0||Math.abs(scrollAfter-scrollBefore)<=6;

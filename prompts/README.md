@@ -23,6 +23,8 @@ Readable source of truth for Phoenix system prompts. Rust loads the active sourc
 
 Every built-in and future custom coworker also receives the shared `# Persistent completion discipline` from `src/runtime/shared_contract.rs`. Substantial work starts or resumes a durable Phoenix workflow goal, records observable acceptance outcomes, runs four craft passes, independently re-verifies returned work, and reconciles the latest request before completion. This uses Phoenix's native `work`/`todo_write`/evidence runtime, without a second repository gate file or external completion hook. Source provenance and required notices remain in `THIRD_PARTY_NOTICES.md`.
 
+Visible replies follow the shared conversation contract: routine narration stays private; `user_update` publishes a rare, necessary interim update. The final reply adds results and new information rather than repeating updates the user already read. The UI folds those earlier updates under the completed reply, scoped to the same speaker and turn, while preserving their original text behind a closed disclosure. A final reply accompanying a question remains visible.
+
 The frontend coworker's integrated design process and local palette, typography, blueprint and copy
 tools are documented in `docs/iris-design.md`. The primary runtime contract is
 bounded, with at most one task-specific supplement. Product meaning and a fresh
