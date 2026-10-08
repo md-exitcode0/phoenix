@@ -411,7 +411,8 @@
     form.querySelector("[data-remove]").onclick = () => run("Removing account…", async () => {
       await invoke("auth_remove", { profileId: account.id });
       if (current()) ui.closeModal();
-      ui.toast(`${label} removed.`); await options.onConnected?.();
+      dispatchEvent(new CustomEvent("phoenix:provider-accounts-changed",{detail:{removedProfileId:account.id}}));
+      await options.onConnected?.();ui.toast(`${label} removed.`);
     });
   }
 

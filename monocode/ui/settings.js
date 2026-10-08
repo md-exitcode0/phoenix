@@ -2,7 +2,7 @@
 
 (() => {
   const ui=window.PhoenixUI;if(!ui)return;const $=(id)=>document.getElementById(id),preview=!ui.TAURI||ui.SIDEBAR_PREVIEW;
-  const state={open:false,snapshot:null,snapshotRequest:0,scope:{kind:"global"},section:"General",query:"",searchScope:"all",route:null,models:null,modelView:"coworkers",modelFallbackLane:null,modelSaving:false,providerQuery:"",searchTimer:null,liveGeneration:0,paintTarget:null,bundlingWork:false,appearanceSaveChain:Promise.resolve()};
+  const state={open:false,snapshot:null,snapshotRequest:0,scope:{kind:"global"},section:"General",query:"",searchScope:"all",route:null,models:null,modelRequest:0,modelView:"coworkers",modelFallbackLane:null,modelSaving:false,providerQuery:"",searchTimer:null,liveGeneration:0,paintTarget:null,bundlingWork:false,appearanceSaveChain:Promise.resolve()};
   const icon='<svg viewBox="0 0 20 20"><path d="M5 4h10M5 10h10M5 16h10"/></svg>',arrow='<svg viewBox="0 0 20 20"><path d="m8 5 5 5-5 5"/></svg>',back='<svg viewBox="0 0 20 20"><path d="m12 5-5 5 5 5"/></svg>',reset='<svg viewBox="0 0 20 20"><path d="M15 7a6 6 0 1 0 .4 5M15 3v4h-4"/></svg>';
   const escape=(value)=>ui.escapeHtml(value),scopeKey=()=>state.scope.kind==="global"?"global":`${state.scope.kind}:${state.scope.id}`;
   const menuChevron='<svg viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg>';
@@ -507,22 +507,23 @@
 
   async function renderDestination(route){state.route=null;const destination=state.snapshot.destinations.find((d)=>d.id===route);if(destination)state.section=destination.section;render();}
   async function renderModels(route,host=settingsHost()){
+    const request=++state.modelRequest,current=()=>request===state.modelRequest&&host.isConnected;
     if(route==="models")state.modelView="coworkers";
     if(route==="providers")state.modelView="providers";
     const value=await rpc({Settings:{action:"models_snapshot"}}),models=value.Settings.snapshot;
-    if(!host.isConnected)return;
+    if(!current())return;
     const runtimeOrder=["phoenix","specialist","volume_worker","librarian","vision","image","memory","stt","tts","realtime"],specialist=models.lanes.find((lane)=>lane.lane==="specialist")||models.lanes.find((lane)=>["phoenix","orchestrator"].includes(lane.lane));
     if(specialist&&!models.lanes.some((lane)=>lane.lane==="volume_worker"))models.lanes.push({...specialist,lane:"volume_worker",auth_profile_id:null,inherited:true});
     for(const agent of liveAgents()){if(agent.agent_id==="phoenix"||models.lanes.some((lane)=>lane.lane===agent.agent_id)||!specialist)continue;models.lanes.push({...specialist,lane:agent.agent_id,auth_profile_id:null,inherited:true});}
     models.lanes.sort((a,b)=>{const ai=runtimeOrder.indexOf(a.lane),bi=runtimeOrder.indexOf(b.lane);if(ai>=0||bi>=0)return(ai<0?999:ai)-(bi<0?999:bi);return agentName(a.lane).localeCompare(agentName(b.lane));});
-    state.models=models;
     let detailed={providers:models.providers.map((p)=>({...p,profiles:models.accounts.filter((a)=>a.provider_id===p.id).map((a)=>({id:a.profile_id,method:a.auth_kind,display:a.display_name}))}))};
     if(!preview){try{detailed=await ui.invoke("providers_catalog");}catch{}}
     await Promise.all((detailed.providers||[]).filter(p=>p.profiles?.length).map(async p=>{
       const ids=await nativeOr("auth_provider_order",{provider:p.id,profileIds:null},p.profiles.map(a=>a.id||a.profile_id));
       p.profiles.sort((a,b)=>ids.indexOf(a.id||a.profile_id)-ids.indexOf(b.id||b.profile_id));
     }));
-    state.providerCatalog=detailed;
+    if(!current())return;
+    state.models=models;state.providerCatalog=detailed;
     const views=[["coworkers","Coworkers"],["system","System jobs"],["providers","Providers"]];
     host.innerHTML=`${$("settingsWork")?"":workHead("Models & Providers","Models & Providers","Choose models and manage your accounts.")}<nav class="model-hub-tabs" aria-label="Model settings views">${views.map(([id,label])=>`<button type="button" data-model-view="${id}" class="${state.modelView===id?"active":""}" aria-pressed="${state.modelView===id}">${label}</button>`).join("")}</nav><div class="model-hub-body">${state.modelView==="providers"?providerView(detailed):routingView(models,state.modelView)}</div>`;
     bindModelHub(host);

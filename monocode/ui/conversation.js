@@ -1006,6 +1006,8 @@
     if (/Command FAILED with exit code/i.test(raw)) return "The command didn’t finish successfully. Open activity for the details.";
     if (toolName === "response_validation") return "Phoenix adjusted the approach before continuing.";
     if (/credential vault is locked|Passes is locked/i.test(raw)) return "Passes is locked.";
+    if(/Browser input target changed during preparation/i.test(raw))return "The browser page changed before the click could be sent. Phoenix needs to check the page again.";
+    if(/Browser screenshot timed out/i.test(raw))return "Phoenix could not prepare the browser view in time. The action was not sent.";
     const httpStatus=raw.match(/HTTP\s+(\d{3})\b/i);
     if(httpStatus){
       const webOwned=/browser|web_|crawl|scrape/.test(toolName);
@@ -1499,6 +1501,12 @@
     if(leftIncoming||rightIncoming)return Boolean(leftIncoming&&rightIncoming&&leftIncoming===rightIncoming);
     const handoffRoles=new Set(["talk","handoff"]);
     if(handoffRoles.has(leftRole)&&handoffRoles.has(rightRole))return displaySemantic(left)===displaySemantic(right);
+    // Canonical history calls live authored commentary "narration".
+    // These are two transports for the same update, not two messages.
+    if(left.source!==right.source&&["narration","commentary"].includes(leftRole)&&["narration","commentary"].includes(rightRole)){
+      const a=displayTurnId(left),b=displayTurnId(right);
+      return (!a||!b||a===b)&&(state.item?.kind!=="group"||displayAgentId(left)===displayAgentId(right))&&displaySemantic(left)===displaySemantic(right);
+    }
     if(leftRole!==rightRole)return false;
     if(leftRole==="user"&&imageCommentUserMirrors(left,right))return true;
     const leftTurn=displayTurnId(left),rightTurn=displayTurnId(right);
@@ -1647,6 +1655,14 @@
     return rows;
   }
   function replaceDisplayRows(rows,dirty=state.displayDirty) {
+    const liveProgress=rows.filter(row=>row.source==="story"&&["commentary","narration"].includes(displayRole(row))).map(entry=>({entry,used:false}));
+    const repaired=rows.filter(row=>{
+      if(row.source!=="history"||!["commentary","narration"].includes(displayRole(row)))return true;
+      const match=liveProgress.find(candidate=>!candidate.used&&equivalentDisplayRows(candidate.entry,row));
+      if(!match)return true;match.used=true;return false;
+    });
+    dirty ||= repaired.length!==rows.length;rows=repaired;
+
     state.displayRows=markQuestionContinuations(rows);
     state.displayBytes=displayRowsBytes(rows);
     state.displayDirty=Boolean(dirty);
@@ -1669,6 +1685,7 @@
         return "before_answer";
       }
     }
+    if(["commentary","narration"].includes(role)&&state.displayRows.some(candidate=>candidate.source!==source&&equivalentDisplayRows(candidate,entry)))return false;
     const lastEvent=ownedStoryEventKey(last?.value),entryEvent=ownedStoryEventKey(entry.value);
     const receiptRole=role==="tool"||role==="tool_start";
     if(last&&(!receiptRole||(lastEvent&&entryEvent&&lastEvent===entryEvent))&&(!lastEvent||!entryEvent||lastEvent===entryEvent)&&displaySemantic(last)===displaySemantic(entry))return false;
@@ -1866,7 +1883,7 @@
     if(state.sessionId===sessionId)state.displayDirty=false;
     state.displayPersistChain=Promise.resolve();
   }
-  function reconcileHistory(rows) {
+  function reconcileHistory(rows,{appendOnly=false}={}) {
     const available=state.displayRows.map((entry)=>({entry,used:false}));
     const added=[];let reordered=false,canonicalTurn="";
     const canonicalRows=(rows||[]).filter((row)=>!(state.item?.kind==="group"&&row.role==="answer")&&historyVisibleInConversation(row));
@@ -1888,6 +1905,18 @@
       if(agentThread&&row.role==="user")canonicalTurn=displayTurnId(match?.entry||entry);
       return{entry,match};
     });
+    if(appendOnly){
+      // Quiet polling never rearranges live messages or imports unanchored
+      // archive receipts into the newest turn.
+      const lastBoundary=recovered.findLastIndex(({entry,match})=>match&&displayRole(entry)==="user");
+      if(lastBoundary<0)return{added:[],reordered:false};
+      recovered.slice(lastBoundary+1).forEach(({entry,match})=>{
+        if(match||isCompactionEvent(entry.value))return;
+        state.displayRows.push(entry);added.push(entry);
+      });
+      if(added.length)replaceDisplayRows(ensureDisplayTurnIds(trimDisplayRows(state.displayRows)),true);
+      return{added,reordered:false};
+    }
     recovered.forEach(({entry,match},position)=>{
       if(match){
         if(match.entry.source==="history"&&match.entry.value?.historical===true&&entry.value?.historical===true
@@ -1914,7 +1943,7 @@
     // matched an older run.
     recovered.forEach(({entry,match})=>{
       const own=match?.entry||entry,turn=String(entry.value?.turn_id||"");
-      if(displayRole(own)!=="user"||!turn)return;
+      if(displayRole(own)!=="user"||!turn||own.value?.steered||entry.value?.steered)return;
       const first=state.displayRows.findIndex((row)=>row!==own&&displayTurnId(row)===turn);
       const at=state.displayRows.indexOf(own);
       if(first<0||at<0||at===first-1)return;
@@ -4583,11 +4612,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
       // The background catch-up only appends. While a coworker's context is
       // being compacted its saved history is rewritten; reconciling against it
       // redrew the whole conversation every few seconds.
-      const before=quiet?state.displayRows.slice():null;
-      const {added,reordered}=reconcileHistory(rows);
-      // Skip only the noise: a pure reorder, or rows that are all compaction
-      // output. Real missing rows (a reply, your answer) still land.
-      if(quiet&&(reordered||added.length)&&added.every((entry)=>isCompactionEvent(entry.value))){state.displayRows=before;return;}
+      const {added,reordered}=reconcileHistory(rows,{appendOnly:quiet});
       if(!added.length&&!reordered){flushOwnedStories();return;}
       $("conversationFeed").querySelector(".conversation-empty")?.remove();
       if(reordered)repaintConversation(conversationScrollBookmark(),false);
@@ -6549,6 +6574,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   }
   function bind(){
     startQuietWorkCatchUp();
+    addEventListener("phoenix:provider-accounts-changed",()=>{if(state.item)refreshModels(activeSelectionToken()).catch(()=>{});});
     initializeComposerInput();
     if ($("historyButton")) $("historyButton").onclick = () => togglePromptHistory($("historyButton").getAttribute("aria-expanded") !== "true");
     document.addEventListener("pointerdown", (event) => {

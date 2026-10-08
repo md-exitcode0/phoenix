@@ -479,8 +479,11 @@ function detachSurfaceTab(tab) {
   tab.host = null;
 }
 
-function attachSurfaceTab(tab, host, rect) {
-  tab.inputRevision++;
+function attachSurfaceTab(tab, host, rect, invalidateInput = true) {
+  const previous=tab.view.getBounds();
+  // Identical status-tick bounds do not change the input target. A capture
+  // lease also restores its own temporary layout without invalidating input.
+  if (invalidateInput && (tab.host !== host || tab.leased || ["x","y","width","height"].some(key=>previous[key]!==rect[key]))) tab.inputRevision++;
   tab.leased = false;
   if (tab.host !== host) {
     detachSurfaceTab(tab);
@@ -491,11 +494,11 @@ function attachSurfaceTab(tab, host, rect) {
   tab.view.setBounds(rect);
 }
 
-function parkSurfaceTab(tab, rect) {
+function parkSurfaceTab(tab, rect, invalidateInput = true) {
   // Hidden or unparented native views cannot provide compositor frames even
   // with background throttling disabled. Keep a drawable view in a window
   // that is never shown or focused; captures pump frames only while needed.
-  attachSurfaceTab(tab, renderHost(rect), { x: 0, y: 0, width: rect.width, height: rect.height });
+  attachSurfaceTab(tab, renderHost(rect), { x: 0, y: 0, width: rect.width, height: rect.height }, invalidateInput);
 }
 
 // A parked tab's hidden host window never draws on Wayland, so captures of it
@@ -515,7 +518,7 @@ function drawableLease(entry, tab) {
       return () => {
         // Mounting the tab during the capture ends the lease; leave it shown.
         if (!tab.leased || tab.view.webContents.isDestroyed()) return;
-        parkSurfaceTab(tab, entry.rect);
+        parkSurfaceTab(tab, entry.rect, false);
       };
     },
   };

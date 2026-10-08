@@ -231,6 +231,38 @@ async function main() {
     })()`);
     console.log(JSON.stringify({sendFix},null,2));
     assert.ok(Object.values(sendFix).every(Boolean),'Sending, draft recovery and live-only browser cursors work: '+JSON.stringify(sendFix));
+    const transcriptFix=await evaluate(`(async()=>{
+      const t=window.MonocodeRoomTest,turn='poll-fixture';t.setWorking(false);t.clearFeed();t.state.activeTurnId=turn;
+      const user={source:'history',turn_id:turn,value:{role:'user',text:'Current request',turn_id:turn}};
+      const update={source:'story',turn_id:turn,value:{kind:'commentary',agent:'phoenix',text:'I will check the page.'}};
+      const recovered={source:'history',turn_id:turn,value:{role:'narration',agent:'phoenix',text:'I will check the page.'}};
+      t.replaceDisplayRows([user,update,recovered]);t.repaintConversation(null,true,true);
+      const repairedDuplicate=t.state.displayRows.length===2&&document.querySelectorAll('#conversationFeed .commentary-message').length===1;
+      const firstNode=document.querySelector('#conversationFeed .user-message');
+      const history=[{role:'tool',tool:'read',target:'ancient.md',detail:'old unrelated failure',ok:false},{role:'user',text:'Current request',turn_id:turn},{role:'narration',agent:'phoenix',text:'I will check the page.'},{role:'tool',agent:'phoenix',tool:'browser_state',target:'{}',ok:true}];
+      const first=t.reconcileHistory(history,{appendOnly:true});first.added.forEach(t.renderDisplayEntry);
+      const oneRealAddition=first.added.length===1&&!first.reordered;
+      let stable=true;for(let i=0;i<3;i++){const next=t.reconcileHistory(history,{appendOnly:true});stable&&=!next.added.length&&!next.reordered&&document.querySelector('#conversationFeed .user-message')===firstNode;}
+      const noArchiveLeak=!JSON.stringify(t.state.displayRows).includes('ancient.md');
+      const noBoundaryNoImport=t.reconcileHistory([{role:'tool',tool:'read',target:'another-old.md',ok:false}],{appendOnly:true}).added.length===0;
+      t.replaceDisplayRows([...t.state.displayRows,{source:'history',turn_id:'later-turn',value:{role:'user',text:'Another request'}},{...recovered,turn_id:'later-turn'}]);
+      const laterRepeatPreserved=t.state.displayRows.filter(row=>row.value.text==='I will check the page.').length===2;
+      const truthfulBrowserFailure=t.humanFailureDetail('Phoenix browser input preparation rejected (HTTP 400: Browser input target changed during preparation; observe it again); no input sent','browser_click').includes('page changed');
+      return{repairedDuplicate,oneRealAddition,stable,noArchiveLeak,noBoundaryNoImport,laterRepeatPreserved,truthfulBrowserFailure};
+    })()`);
+    console.log(JSON.stringify({transcriptFix},null,2));
+    assert.ok(Object.values(transcriptFix).every(Boolean),'Quiet polling preserves the live transcript and updates are not duplicated: '+JSON.stringify(transcriptFix));
+    const accountRefresh=await evaluate(`(async()=>{
+      const t=window.MonocodeSettingsTest,host=document.createElement('div');document.body.append(host);let resolveOld;
+      const base={providers:[{id:'openai-codex',name:'OpenAI Codex',models:[]}],lanes:[],accounts:[],fallback_chains:{},config_revision:'fixture'};
+      let calls=0;t.setRpc(()=>++calls===1?new Promise(resolve=>resolveOld=resolve):Promise.resolve({Settings:{snapshot:structuredClone(base)}}));
+      const older=t.renderModels('providers',host);await Promise.resolve();await t.renderModels('providers',host);
+      const old=structuredClone(base);old.accounts=[{profile_id:'openai-codex:removed',provider_id:'openai-codex',auth_kind:'oauth',display_name:'Removed account'}];
+      resolveOld({Settings:{snapshot:old}});await older;
+      const staleListCannotReturn=!host.textContent.includes('Removed account')&&!t.state.models.accounts.length;
+      host.remove();return{staleListCannotReturn};
+    })()`);
+    console.log(JSON.stringify({accountRefresh},null,2));assert.ok(accountRefresh.staleListCannotReturn,'A pre-removal snapshot cannot restore a removed account');
     const speedControls=await evaluate(`(async()=>{
       const t=window.MonocodeRoomTest;
       t.ui.closeLayers();t.state.selectedModel={id:'gpt-6.1-sol',name:'GPT-6.1 Sol',provider:'openai-codex',provider_id:'openai-codex',effort_levels:['low','medium','high','xhigh','max']};
