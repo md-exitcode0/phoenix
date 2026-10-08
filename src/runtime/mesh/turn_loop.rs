@@ -2713,6 +2713,12 @@ impl MeshRunner {
             }
             crate::runtime::wire_history::commit_round(&mut request, &mut native_tool_messages, observations);
             request.temperature = Some(AGENT_TEMPERATURE);
+            if turn_provider.name() == "openai-codex" {
+                if let Some(tier) = self.service_tier_for_addr(addr)
+                    .and_then(|tier| crate::providers::openai_codex::codex_service_tier(&request.model, tier)) {
+                    request.extra_body.insert("service_tier".into(), serde_json::json!(tier));
+                }
+            }
             // Per-lane reasoning effort: this agent's own lane in
             // [profile.llm.efforts], falling back to the global setting.
             if let Some(effort) = super::iris_design::phase_effort(

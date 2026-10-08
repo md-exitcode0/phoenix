@@ -332,6 +332,13 @@ impl ConfigLoader {
             profile.timeout_seconds = u64::try_from(timeout)
                 .context("profile.llm.timeout_seconds must be non-negative")?;
         }
+        if let Some(tiers) = tbl.get("service_tiers").and_then(|v| v.as_table()) {
+            for (lane, value) in tiers {
+                let tier = value.as_str().context("service tier must be a string")?;
+                anyhow::ensure!(matches!(tier, "standard" | "fast" | "ultrafast"), "unknown service tier `{tier}`");
+                profile.service_tiers.insert(lane.clone(), tier.to_string());
+            }
+        }
         // [profile.llm.efforts] — per-lane reasoning effort (role or agent
         // name → low/medium/high/xhigh). Missing lanes ride reasoning_effort.
         if let Some(efforts) = tbl.get("efforts").and_then(|v| v.as_table()) {

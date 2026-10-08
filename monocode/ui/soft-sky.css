@@ -63,8 +63,8 @@ html:root[data-skin="monocode"][data-theme="light"]{
   --glass-line-strong:rgb(40 46 90 / 16%);
   --glass-shadow:0 12px 40px rgb(24 44 90 / 18%);
   --soft-ink:rgb(28 30 48 / 94%);
-  --soft-ink-2:rgb(52 56 84 / 76%);
-  --soft-ink-3:rgb(60 64 96 / 62%);
+  --soft-ink-2:rgb(40 44 72 / 84%);
+  --soft-ink-3:rgb(46 50 82 / 74%);
   --soft-accent:#4b45a8;
   --mc-raised:rgb(255 255 255 / 80%);--surface-raised:rgb(255 255 255 / 80%);
   --ember:#4d4a9c;--accent-ink:#3e3a8a;--accent-contrast:#fff;
@@ -671,22 +671,31 @@ html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar .p
 html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger:not(:disabled):hover{background:var(--glass-hover)!important;border-color:var(--glass-line-strong)!important}
 html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-status{font:500 11.5px var(--soft-font);color:var(--soft-ink-3)}
 /* Browser toolbar: glass pills, spaced, aligned on one row. */
-html:root[data-skin="monocode"] #inspectionSidebar .browser-side-toolbar{display:flex;align-items:center;gap:4px;width:100%}
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-toolbar:has(.browser-side-toolbar:not([hidden])){height:auto!important;min-height:0!important;padding:8px 10px!important}
-html:root[data-skin="monocode"] #inspectionSidebar .browser-side-toolbar :is(.browser-nav-button,.browser-settings-button){width:32px!important;height:32px!important;min-height:32px;padding:0;display:grid;place-items:center;border-radius:999px!important;background:transparent!important;border:0!important;color:var(--soft-ink-2)}
+/* Browser toolbar: one 32px row (buttons and address pill alike), centred
+   with 10px above and below, so the page view starts 10px under the pill. */
+html:root[data-skin="monocode"] #inspectionSidebar .browser-side-toolbar{display:flex;align-items:center;gap:4px;width:100%;height:auto!important;min-height:32px!important}
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-toolbar:has(.browser-side-toolbar:not([hidden])){height:auto!important;min-height:0!important;padding:10px!important}
+html:root[data-skin="monocode"] #inspectionSidebar .browser-side-toolbar :is(.browser-nav-button,.browser-settings-button){flex:0 0 32px!important;width:32px!important;min-width:32px!important;height:32px!important;min-height:32px!important;margin:0!important;padding:0;display:grid;place-items:center;border-radius:999px!important;background:transparent!important;border:0!important;color:var(--soft-ink-2)}
 html:root[data-skin="monocode"] #inspectionSidebar .browser-side-toolbar :is(.browser-nav-button,.browser-settings-button):hover{background:var(--glass-hover)!important;color:var(--soft-ink)}
 html:root[data-skin="monocode"] #inspectionSidebar .browser-side-toolbar :is(.browser-nav-button,.browser-settings-button) svg{width:17px;height:17px}
-html:root[data-skin="monocode"] #inspectionSidebar .browser-address-shell{flex:1 1 auto;min-width:0;height:34px!important;min-height:34px;margin:0 4px;padding:0 12px;border-radius:999px!important;background:var(--glass-3)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important}
+html:root[data-skin="monocode"] #inspectionSidebar .browser-address-shell{box-sizing:border-box;flex:1 1 0!important;min-width:0;height:32px!important;min-height:32px!important;margin:0 4px!important;padding:0 12px;border-radius:999px!important;background:var(--glass-3)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important}
 html:root[data-skin="monocode"] #inspectionSidebar .browser-address-shell input{font:450 12.5px var(--soft-font);color:var(--soft-ink);background:transparent}
 
-/* The native browser view sits inside the pane's rounded glass. */
+/* The page view (placeholder and the native view, whose bounds are read off
+   #browserViewport) is inset 10px left, right and bottom inside the glass,
+   matching the toolbar padding, with a 12px radius on every corner. */
 html:root[data-skin="monocode"] body.inspection-open:not(.inspection-stacked):not(.inspection-expanded) .browser-overlay:not([hidden]){
   right:calc(var(--pane-inset) + 1px)!important;bottom:calc(var(--pane-inset) + 1px)!important;
   width:calc(var(--inspection-width) - var(--pane-inset) * 2 - 2px)!important;
-  background:transparent!important;border-radius:0 0 19px 19px;overflow:hidden;padding:0 6px 6px!important;box-sizing:border-box}
-html:root[data-skin="monocode"] body.inspection-expanded .browser-overlay:not([hidden]){left:calc(var(--workspace-left) + var(--pane-inset) + 1px)!important;right:calc(var(--pane-inset) + 1px)!important;bottom:calc(var(--pane-inset) + 1px)!important;background:transparent!important;padding:0 6px 6px!important;box-sizing:border-box}
-html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) .browser-overlay:not([hidden]){left:calc(var(--workspace-left) + var(--pane-inset) + 1px)!important;right:calc(var(--pane-inset) + 1px)!important;height:calc(var(--inspection-stack-height) + 27px - var(--mc-browser-top,94px))!important;background:transparent!important;padding:0 6px 6px!important;box-sizing:border-box}
-html:root[data-skin="monocode"] .browser-overlay .embedded-browser{border-radius:14px;overflow:hidden;background:transparent!important}
+  background:transparent!important;border-radius:0 0 19px 19px;overflow:hidden;padding:0 10px 10px!important;box-sizing:border-box}
+html:root[data-skin="monocode"] body.inspection-expanded .browser-overlay:not([hidden]){left:calc(var(--workspace-left) + var(--pane-inset) + 1px)!important;right:calc(var(--pane-inset) + 1px)!important;bottom:calc(var(--pane-inset) + 1px)!important;background:transparent!important;padding:0 10px 10px!important;box-sizing:border-box}
+html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) .browser-overlay:not([hidden]){left:calc(var(--workspace-left) + var(--pane-inset) + 1px)!important;right:calc(var(--pane-inset) + 1px)!important;height:calc(var(--inspection-stack-height) + 27px - var(--mc-browser-top,94px))!important;background:transparent!important;padding:0 10px 10px!important;box-sizing:border-box}
+html:root[data-skin="monocode"] .browser-overlay .embedded-browser{border-radius:12px!important;overflow:hidden;background:transparent!important}
+html:root[data-skin="monocode"] .browser-overlay #browserViewport{border-radius:12px;overflow:hidden}
+html:root[data-skin="monocode"] body.inspection-open .browser-overlay:not([hidden]){border:0!important}
+/* The overlay's 10px inset is see-through: keep the pane's own empty copy
+   from peeking out under the page view. */
+html:root[data-skin="monocode"] body.inspection-browser-active:has(#browserOverlay:not([hidden])) #inspectionBrowserPanel .inspection-empty{visibility:hidden}
 
 /* Desktop empty state: centred in the pane, quiet icon above. */
 html:root[data-skin="monocode"] #inspectionSidebar .inspection-desktop-panel:not([hidden]){position:relative;display:flex!important;flex-direction:column;min-height:0}
@@ -721,7 +730,10 @@ html:root[data-skin="monocode"][data-theme="light"][data-sky-ink-top="light"] bo
 html:root[data-skin="monocode"][data-theme="light"][data-sky-ink-mid="light"] .mc-empty-heading{color:#fff!important;text-shadow:0 2px 18px rgb(10 20 50 / 30%)}
 html:root[data-skin="monocode"][data-theme="light"][data-sky-ink-mid="dark"] .mc-empty-heading{text-shadow:0 0 22px rgb(255 255 255 / 55%)}
 html:root[data-skin="monocode"][data-theme="light"] #conversationFeed :is(.agent-message,.group-message) .message-content>header :is(strong,small){text-shadow:0 0 6px rgb(255 255 255 / 85%),0 0 2px rgb(255 255 255 / 90%)}
-html:root[data-skin="monocode"][data-theme="light"] #composer .mc-composer-head{color:rgb(255 255 255 / 92%)!important;text-shadow:0 1px 6px rgb(10 20 50 / 40%)!important}
+/* Small status text on the light sky (context used, "Responded in …"):
+   dark ink with a soft white halo so it reads on pale clouds and blue sky. */
+html:root[data-skin="monocode"][data-theme="light"] #composer .mc-composer-head{color:rgb(30 38 70 / 82%)!important;text-shadow:0 0 6px rgb(255 255 255 / 75%),0 0 2px rgb(255 255 255 / 60%)!important}
+html:root[data-skin="monocode"][data-theme="light"] #conversationFeed .completion-meta{color:rgb(30 38 70 / 78%);text-shadow:0 0 6px rgb(255 255 255 / 70%)}
 html:root[data-skin="monocode"] #conversationStage:not(.mc-empty) #composerZone:has(.mc-composer-head .mc-context:empty){margin-bottom:20px!important}
 html:root[data-skin="monocode"][data-theme="light"] #conversationFeed .member-message .message-content>header strong{color:color-mix(in srgb,var(--speaker,var(--soft-ink)) 40%,var(--soft-ink))!important}
 html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar #desktopObservationEmpty:not([hidden]){padding:0!important;gap:8px;font-size:12.5px!important}
@@ -791,3 +803,16 @@ html:root[data-skin="monocode"] #inspectionSidebar .inspection-tabbar :is(.inspe
 html:root[data-skin="monocode"] #inspectionSidebar .inspection-tabbar :is(button,a,input,select,textarea,label,[role="button"],[role="tab"],[contenteditable],[tabindex]:not([tabindex="-1"]),.inspection-panel-controls,.view-menu){-webkit-app-region:no-drag}
 html:root[data-skin="monocode"] :is(.mc-window-controls,.chrome-controls){-webkit-app-region:no-drag}
 html:root[data-skin="monocode"] :is(#sidebarResize,#inspectionResize,.sidebar-resize,.inspection-resize){-webkit-app-region:no-drag}
+
+/* Codex speed is independent of effort; only one bolt toggle can be active. */
+html:root[data-skin="monocode"] .goo-head:has(.codex-speed-controls){display:grid;grid-template-columns:1fr auto;gap:2px 12px}
+html:root[data-skin="monocode"] .goo-head:has(.codex-speed-controls) :is(strong,small){grid-column:1}
+html:root[data-skin="monocode"] .goo-head .codex-speed-controls{display:flex;gap:4px;grid-column:2;grid-row:1/3;align-self:center}
+html:root[data-skin="monocode"] .codex-speed-controls button{display:flex;align-items:center;justify-content:center;gap:0;width:34px;height:30px;padding:6px;border:1px solid var(--glass-line);border-radius:10px;background:var(--glass-1);color:var(--soft-ink-2);cursor:pointer}
+html:root[data-skin="monocode"] .codex-speed-controls button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linejoin:round}
+html:root[data-skin="monocode"] .codex-speed-controls button[data-codex-speed="ultrafast"]{width:42px}
+html:root[data-skin="monocode"] .codex-speed-controls button[data-codex-speed="ultrafast"] svg+svg{margin-left:-4px}
+html:root[data-skin="monocode"] .codex-speed-controls button[aria-pressed="true"]{background:var(--glass-3);border-color:var(--soft-accent);color:var(--soft-accent)}
+html:root[data-skin="monocode"] .codex-speed-controls button:hover:not(:disabled){background:var(--glass-hover)}
+html:root[data-skin="monocode"] .codex-speed-controls button:focus-visible{outline:2px solid var(--soft-accent);outline-offset:2px}
+html:root[data-skin="monocode"] .codex-speed-controls button:disabled{opacity:.4;cursor:default}

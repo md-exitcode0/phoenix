@@ -239,6 +239,8 @@ pub struct LLMProfile {
     /// (`orchestrator`, `specialist`, `librarian`) or an
     /// individual agent name (`coder`). Missing key = `reasoning_effort`.
     pub efforts: std::collections::BTreeMap<String, String>,
+    /// Explicit Codex OAuth speed per lane; absent means Standard.
+    pub service_tiers: std::collections::BTreeMap<String, String>,
     /// `[profile.llm.agent_models]` — primary model per individual specialist
     /// (`coder = "glm-5.2"`). Unset agents ride `specialist_model` → `model`.
     pub agent_models: std::collections::BTreeMap<String, String>,
@@ -571,6 +573,7 @@ impl Default for LLMProfile {
             timeout_seconds: 0,
             reasoning_effort: None,
             efforts: Default::default(),
+            service_tiers: Default::default(),
             agent_models: Default::default(),
             auth_by_lane: Default::default(),
             compaction_modes: Default::default(),
@@ -612,6 +615,7 @@ impl LLMProfile {
             timeout_seconds: 0,
             reasoning_effort: None,
             efforts: Default::default(),
+            service_tiers: Default::default(),
             agent_models: Default::default(),
             auth_by_lane: Default::default(),
             compaction_modes: Default::default(),

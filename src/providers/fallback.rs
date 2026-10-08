@@ -298,6 +298,12 @@ impl FallbackProvider {
                 serde_json::json!({ "effort": effort }),
             );
         }
+        // A Codex subscription speed preference must not leak to another
+        // provider or an unsupported model when an account fallback rotates.
+        let speed_supported = self.links[index].provider.name() == "openai-codex"
+            && request.extra_body.get("service_tier").and_then(|v| v.as_str())
+                .and_then(|tier| crate::providers::openai_codex::codex_service_tier(&request.model, tier)).is_some();
+        if !speed_supported { request.extra_body.remove("service_tier"); }
         // Replay is bound to the candidate AFTER its model override is
         // applied. Every attempt starts from the original portable request, so
         // a mismatching candidate loses only its native accelerator; it can
@@ -713,6 +719,21 @@ mod tests {
             effort_override: None,
         };
         (link, calls, seen_model)
+    }
+
+    #[test]
+    fn codex_speed_does_not_leak_across_provider_or_model_fallbacks() {
+        let codex: Arc<dyn LLMProvider> = Arc::new(crate::providers::openai_codex::OpenAICodexProvider::with_url_and_timeout(
+            "http://127.0.0.1:9".into(), "fixture-only".into(), std::time::Duration::from_secs(1)));
+        let primary = FallbackLink { label: "codex".into(), provider: codex.clone(), model_override: None, effort_override: None };
+        let (other, _, _) = link("other", None, Some("other-model"));
+        let unsupported = FallbackLink { label: "luna".into(), provider: codex, model_override: Some("gpt-6-luna".into()), effort_override: None };
+        let lane = FallbackProvider::new("fixture", vec![primary, other, unsupported]);
+        let mut request = CompletionRequest::new("gpt-6.1-sol", vec![]);
+        request.extra_body.insert("service_tier".into(), serde_json::json!("ultrafast"));
+        assert_eq!(lane.request_for(0, &request).extra_body["service_tier"], "ultrafast");
+        assert!(!lane.request_for(1, &request).extra_body.contains_key("service_tier"));
+        assert!(!lane.request_for(2, &request).extra_body.contains_key("service_tier"));
     }
 
     fn image_link(label: &str, native_images: bool) -> FallbackLink {

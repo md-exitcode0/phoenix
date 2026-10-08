@@ -93,6 +93,7 @@ pub struct MeshRunner {
     /// Reasoning effort per lane (`[profile.llm.efforts]`): agent label →
     /// "specialist" → the global `reasoning_effort`.
     role_efforts: HashMap<String, String>,
+    role_service_tiers: HashMap<String, String>,
     /// Explicit usable context ceilings per lane. Missing specialist lanes use
     /// their provider/model catalog maximum; the orchestrator falls back to
     /// the legacy/global ceiling for backward compatibility.
@@ -180,6 +181,7 @@ impl MeshRunner {
             reasoning_effort: None,
             agent_models: HashMap::new(),
             role_efforts: HashMap::new(),
+            role_service_tiers: HashMap::new(),
             role_context_windows: HashMap::new(),
             permission_mode: PermissionMode::Workspace,
             interaction_mode: crate::runtime::InteractionMode::Execute,
@@ -330,6 +332,11 @@ impl MeshRunner {
         self
     }
 
+    pub fn with_role_service_tiers(mut self, tiers: HashMap<String, String>) -> Self {
+        self.role_service_tiers = tiers;
+        self
+    }
+
     pub fn with_role_context_windows(mut self, windows: HashMap<String, u64>) -> Self {
         self.role_context_windows = windows;
         self
@@ -365,6 +372,14 @@ impl MeshRunner {
             _ => self.role_efforts.get("orchestrator"),
         };
         lane.cloned().or_else(|| self.reasoning_effort.clone())
+    }
+
+    fn service_tier_for_addr(&self, addr: &AgentAddress) -> Option<&str> {
+        match addr {
+            AgentAddress::Specialist(_) => self.role_service_tiers.get(&addr.label())
+                .or_else(|| self.role_service_tiers.get("specialist")),
+            _ => self.role_service_tiers.get("orchestrator"),
+        }.map(String::as_str)
     }
 
     pub fn with_permission_mode(mut self, mode: PermissionMode) -> Self {

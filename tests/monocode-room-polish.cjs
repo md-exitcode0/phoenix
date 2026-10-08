@@ -37,7 +37,8 @@ async function main() {
       const id = ++sequence; waiting.set(id,{resolve,reject}); socket.send(JSON.stringify({id,method,params}));
     });
     const evaluate = async expression => {
-      const reply = await command("Runtime.evaluate", {expression,returnByValue:true,awaitPromise:true});
+      // Keep asynchronous test evaluations rooted while Chrome collects garbage.
+      const reply = await command("Runtime.evaluate", {expression:`window.__phoenixTestEvaluation=(${expression})`,returnByValue:true,awaitPromise:true});
       if (reply.exceptionDetails) throw new Error(JSON.stringify(reply.exceptionDetails));
       return reply.result.value;
     };
@@ -202,6 +203,62 @@ async function main() {
     })()`);
     console.log(JSON.stringify({uiFix},null,2));
     assert.ok(Object.values(uiFix).every(Boolean),'UI fixes keep drag controls clickable, dropdowns current, sky ink readable, and inspection tabs isolated: '+JSON.stringify(uiFix));
+    const sendFix=await evaluate(`(async()=>{
+      const t=window.MonocodeRoomTest,agent=t.ui.state.view.directory.agents[0];
+      await t.ui.selectItem({kind:'agent',id:agent.agent_id});t.setWorking(false);t.clearFeed();
+      const text='One draft sent once.\\n'.repeat(6).trim();
+      t.state.attachments=[{name:'fixture.png',path:'/tmp/phoenix-send-fixture.png',type:'image/png',size:10}];t.renderAttachments();t.renderComposerText(text);
+      const draft=t.draftSnapshot(),token=t.activeSelectionToken(),input=document.getElementById('composerInput'),height=input.getBoundingClientRect().height;
+      for(let i=0;i<2;i++)input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+      document.getElementById('sendButton').click();await new Promise(resolve=>setTimeout(resolve,100));document.getElementById('sendButton').click();
+      const oneSend=document.querySelectorAll('#conversationFeed .user-message').length===1;
+      const cleared=!input.value&&!t.state.attachments.length&&!document.getElementById('attachmentTray').children.length;
+      const heightReset=input.getBoundingClientRect().height<=height;
+      const accidentalStopBlocked=t.state.working;
+      const textDraft={...draft,attachments:[]};t.state.unackedSend={turnId:'test-ack',draft:textDraft,item:t.state.item};t.renderComposerText(text);t.acknowledgeSubmission({turnId:'test-ack'},textDraft,token);
+      const identicalNewDraftSurvives=input.value===text;
+      t.renderComposerText('');t.state.unackedSend={turnId:'test-recover',draft,item:t.state.item};t.restoreUnackedDraft({turnId:'test-recover'},token);
+      const failedDraftRestored=input.value===text&&t.state.attachments.length===1;
+      t.renderComposerText('Keep my newer draft');t.state.attachments=[];t.state.unackedSend={turnId:'test-newer',draft,item:t.state.item};t.restoreUnackedDraft({turnId:'test-newer'},token);
+      const newerDraftSurvives=input.value==='Keep my newer draft';
+      const internalNoticeHidden=t.visibleNotice('Memory lookup is taking longer than expected.')===null&&t.visibleNotice('Librarian preloading memories')===null;
+      const usefulNoticeVisible=t.visibleNotice('Please reconnect your account.')==='Please reconnect your account.';
+      const cursor=document.getElementById('browserGhostCursor');cursor.style.setProperty('--cursor-x','1%');
+      const event={kind:'tool',agent:agent.agent_id,tool:'browser_click',target:'{"x":20,"y":30}',ok:true};
+      t.renderTool(event,true);const replayCursorStill=cursor.style.getPropertyValue('--cursor-x')==='1%';
+      t.renderTool(event,false);const liveCursorMoves=cursor.style.getPropertyValue('--cursor-x')!=='1%';
+      return {oneSend,cleared,heightReset,accidentalStopBlocked,identicalNewDraftSurvives,failedDraftRestored,newerDraftSurvives,internalNoticeHidden,usefulNoticeVisible,replayCursorStill,liveCursorMoves};
+    })()`);
+    console.log(JSON.stringify({sendFix},null,2));
+    assert.ok(Object.values(sendFix).every(Boolean),'Sending, draft recovery and live-only browser cursors work: '+JSON.stringify(sendFix));
+    const speedControls=await evaluate(`(async()=>{
+      const t=window.MonocodeRoomTest;
+      t.ui.closeLayers();t.state.selectedModel={id:'gpt-6.1-sol',name:'GPT-6.1 Sol',provider:'openai-codex',provider_id:'openai-codex',effort_levels:['low','medium','high','xhigh','max']};
+      t.state.selectedLane={lane:t.state.item.id,provider_id:'openai-codex',model:'gpt-6.1-sol',service_tier:'standard'};
+      document.getElementById('reasoningControl').click();await new Promise(resolve=>setTimeout(resolve,200));
+      const fast=document.querySelector('[data-codex-speed="fast"]'),ultra=document.querySelector('[data-codex-speed="ultrafast"]');
+      const bothOff=fast.getAttribute('aria-pressed')==='false'&&ultra.getAttribute('aria-pressed')==='false';
+      const accurateHover=fast.title.includes('2.5×')&&fast.title.includes('2×')&&ultra.title.includes('8×')&&ultra.title.includes('6×')&&ultra.title.includes('$500 Pro');
+      const reasoning=t.state.reasoning;
+      fast.click();const fastOnly=fast.getAttribute('aria-pressed')==='true'&&ultra.getAttribute('aria-pressed')==='false';
+      ultra.click();const ultraOnly=fast.getAttribute('aria-pressed')==='false'&&ultra.getAttribute('aria-pressed')==='true';
+      ultra.click();const backToStandard=t.state.selectedLane.service_tier==='standard'&&ultra.getAttribute('aria-pressed')==='false';
+      const effortUnchanged=t.state.reasoning===reasoning;
+      document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await new Promise(resolve=>setTimeout(resolve,750));t.state.selectedModel={...t.state.selectedModel,id:'gpt-6-luna'};document.getElementById('reasoningControl').click();await new Promise(resolve=>setTimeout(resolve,150));
+      const lunaNoUltrafast=document.querySelector('[data-codex-speed="ultrafast"]').disabled;
+      document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await new Promise(resolve=>setTimeout(resolve,750));t.state.selectedModel={...t.state.selectedModel,provider:'openai',provider_id:'openai'};document.getElementById('reasoningControl').click();await new Promise(resolve=>setTimeout(resolve,150));
+      const oauthOnly=!document.querySelector('[data-codex-speed]');document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+      return {bothOff,accurateHover,fastOnly,ultraOnly,backToStandard,effortUnchanged,lunaNoUltrafast,oauthOnly};
+    })()`);
+    console.log(JSON.stringify({speedControls},null,2));
+    assert.ok(Object.values(speedControls).every(Boolean),'Codex speed controls are exclusive, independent of effort and model-aware: '+JSON.stringify(speedControls));
+    if(process.env.PHOENIX_TEST_SPEED_SCREENSHOT){
+      await evaluate(`(async()=>{await new Promise(resolve=>setTimeout(resolve,750));const t=window.MonocodeRoomTest;t.state.selectedModel={...t.state.selectedModel,id:'gpt-6.1-sol',name:'GPT-6.1 Sol',provider:'openai-codex',provider_id:'openai-codex'};document.getElementById('reasoningControl').click();})()`);
+      await sleep(450);
+      const speed=await command("Page.captureScreenshot",{format:"png"});
+      fs.writeFileSync(process.env.PHOENIX_TEST_SPEED_SCREENSHOT,Buffer.from(speed.data,"base64"));
+      await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))`);
+    }
     if(process.env.PHOENIX_TEST_PANE_SCREENSHOT){
       await evaluate(`(()=>{document.documentElement.dataset.theme='light';PhoenixSky.set('12:00');PhoenixConversation.showInspectionSidebar('desktop');})()`);
       await sleep(400);

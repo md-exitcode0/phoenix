@@ -1416,10 +1416,11 @@ impl AgentRunner {
                     (Some(bundle), Some(loaded))
                 }
                 Err(_) => {
-                    self.emit(CliEvent::GatewayNotice(
-                        "Memory lookup is taking longer than expected. Continuing with the saved conversation; additional memories may not be included in this reply."
-                            .to_string(),
-                    ));
+                    // Diagnostics only: a slow preload is not conversation, so
+                    // it is logged rather than journaled as a transcript notice.
+                    tracing::info!(
+                        "memory: preload exceeded 850ms; continuing without additional memories this turn"
+                    );
                     (None, None)
                 }
             }
@@ -1438,6 +1439,7 @@ impl AgentRunner {
         .with_reasoning_effort(self.reasoning_effort.clone())
         .with_agent_models(self.agent_models.clone())
         .with_role_efforts(self.role_efforts.clone())
+        .with_role_service_tiers(self.role_service_tiers.clone())
         .with_role_context_windows(self.role_context_windows.clone())
         .with_vision(self.vision.clone())
         .with_native_vision(self.native_vision)

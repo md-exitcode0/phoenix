@@ -197,6 +197,8 @@ pub struct ModelLaneSetting {
     #[serde(default = "settings_default_true")]
     pub configured: bool,
     pub reasoning_effort: Option<String>,
+    #[serde(default)]
+    pub service_tier: Option<String>,
     pub auth_profile_id: Option<String>,
     /// Effective usable ceiling for this lane after applying a user override.
     pub context_window: Option<u64>,
@@ -269,6 +271,12 @@ pub enum SettingsCommand {
         reasoning_effort: Option<String>,
         #[serde(default)]
         auth_profile_id: Option<String>,
+        #[serde(default)]
+        expected_config_revision: Option<String>,
+    },
+    SetModelServiceTier {
+        lane: String,
+        service_tier: String,
         #[serde(default)]
         expected_config_revision: Option<String>,
     },
@@ -2086,7 +2094,7 @@ fn models_snapshot() -> Result<ModelSettingsSnapshot> {
         lane_names.extend(llm.fallback.agents.keys().cloned());
         // An agent with only a custom context window or reasoning effort still
         // needs its lane, or the composer falls back to the model maximum.
-        lane_names.extend(llm.context_windows.keys().chain(llm.efforts.keys()).filter(|lane| lane.as_str() != "orchestrator").cloned());
+        lane_names.extend(llm.context_windows.keys().chain(llm.efforts.keys()).chain(llm.service_tiers.keys()).filter(|lane| lane.as_str() != "orchestrator").cloned());
         lane_names.extend(
             llm.auth_by_lane
                 .keys()
@@ -2195,6 +2203,10 @@ fn models_snapshot() -> Result<ModelSettingsSnapshot> {
                     context_window,
                     max_context_window,
                     context_window_override,
+                    service_tier: llm.service_tiers.get(context_lane)
+                        .or_else(|| inherited.then(|| llm.service_tiers.get("specialist")).flatten())
+                        .filter(|tier| provider_id == "openai-codex"
+                            && crate::providers::openai_codex::codex_service_tier(&model, tier).is_some()).cloned(),
                     lane,
                     provider_id,
                     model,
@@ -2419,6 +2431,23 @@ fn set_model_lane(
 
 const MIN_MODEL_CONTEXT_WINDOW_TOKENS: u64 = 8_192;
 
+fn set_model_service_tier(lane: &str, tier: &str, expected_revision: Option<&str>) -> Result<()> {
+    validate_identifier(lane, "model lane", 96)?;
+    let config = crate::config::PhoenixConfig::load_from_path(config_path())?;
+    let accounts = crate::config::auth_profile::load_auth_profile_store()?;
+    let (provider, model) = lane_provider_and_model(&config.profile.llm, &accounts, lane);
+    anyhow::ensure!(tier == "standard" || (provider == "openai-codex"
+        && crate::providers::openai_codex::codex_service_tier(&model, tier).is_some()),
+        "speed `{tier}` is not supported by `{provider}/{model}`");
+    let lane = if matches!(lane, "phoenix" | "orchestrator") { "orchestrator" } else { lane };
+    update_config(expected_revision, |document| {
+        let tiers = nested_table_mut(llm_table_mut(document)?, "service_tiers")?;
+        // Explicit Standard overrides an inherited specialist speed.
+        tiers[lane] = toml_edit::value(tier);
+        Ok(())
+    })
+}
+
 fn set_model_context_window(
     lane: &str,
     requested: Option<u64>,
@@ -2526,6 +2555,7 @@ fn reset_model_lane(lane: &str, expected_revision: Option<&str>) -> Result<()> {
         nested_table_mut(llm, "agent_models")?.remove(lane);
         nested_table_mut(llm, "auth_by_lane")?.remove(lane);
         nested_table_mut(llm, "efforts")?.remove(lane);
+        nested_table_mut(llm, "service_tiers")?.remove(lane);
         Ok(())
     })
 }
@@ -2652,6 +2682,10 @@ pub fn execute(command: SettingsCommand) -> Result<SettingsReply> {
             Ok(SettingsReply::Models {
                 snapshot: models_snapshot()?,
             })
+        }
+        SettingsCommand::SetModelServiceTier { lane, service_tier, expected_config_revision } => {
+            set_model_service_tier(&lane, &service_tier, expected_config_revision.as_deref())?;
+            Ok(SettingsReply::Models { snapshot: models_snapshot()? })
         }
         SettingsCommand::SetModelContextWindow {
             lane,
@@ -3162,6 +3196,31 @@ mod tests {
             .find(|entry| entry.definition.key == "composer.show_reasoning")
             .unwrap();
         assert!(reasoning.enabled);
+    }
+
+    #[test]
+    fn codex_speed_settings_persist_and_validate_the_selected_lane() {
+        let (dir, _guard) = private_temp_home();
+        crate::config::private_io::atomic_write_private(&dir.path().join("config.toml"),
+            b"[profile]\nname = \"test\"\n[profile.llm]\nprovider = \"openai-codex\"\nmodel = \"gpt-6.1-sol\"\n").unwrap();
+        let mut revision = models_snapshot().unwrap().config_revision;
+        for tier in ["fast", "ultrafast", "standard"] {
+            set_model_service_tier("phoenix", tier, Some(&revision)).unwrap();
+            let loaded = crate::config::PhoenixConfig::load_from_path(config_path()).unwrap();
+            assert_eq!(loaded.profile.llm.service_tiers.get("orchestrator").map(String::as_str), Some(tier));
+            let snapshot = models_snapshot().unwrap();
+            let lane = snapshot.lanes.iter().find(|lane| lane.lane == "phoenix").unwrap();
+            assert_eq!(lane.service_tier.as_deref(), if tier == "standard" { None } else { Some(tier) });
+            assert_eq!(lane.reasoning_effort, None);
+            assert!(set_model_service_tier("phoenix", "fast", Some(&revision)).is_err());
+            revision = snapshot.config_revision;
+        }
+        assert!(set_model_service_tier("phoenix", "turbo", Some(&revision)).is_err());
+        set_model_lane("phoenix", "openai-codex", "gpt-6-luna", None, None, Some(&revision)).unwrap();
+        assert!(set_model_service_tier("phoenix", "ultrafast", None).is_err());
+        set_model_service_tier("phoenix", "fast", None).unwrap();
+        set_model_lane("phoenix", "openai", "gpt-6.1-sol", None, None, None).unwrap();
+        assert!(set_model_service_tier("phoenix", "fast", None).is_err());
     }
 
     #[test]

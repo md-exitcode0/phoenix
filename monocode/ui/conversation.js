@@ -32,6 +32,11 @@
     mentions: [],
     groupEveryone: false,
     drafts: new Map(),
+    // One send at a time; the sent draft is kept aside (not in the composer)
+    // until the runtime acknowledges it, and put back only if the send fails.
+    sendInFlight: false,
+    unackedSend: null,
+    lastSendAt: 0,
     previewQueues: new Map(),
     tasks: [],
     tasksBySession: new Map(),
@@ -967,10 +972,14 @@
     if(/(?:execution-economy|replay slice|RECOVERY ROUTE|\"node_id\"|\"attempt_id\"|failed work:|ok work:)/i.test(value))return"This coworker stopped before finishing. Its internal retries were kept out of the conversation.";
     return humanFailureDetail(value).slice(0,180)||"This coworker could not finish that part.";
   }
+  const INTERNAL_NOTICE=/^(?:memory lookup is taking longer|memory preload|librarian )/;
   function visibleNotice(value) {
     const text=String(value||"").trim(),lower=text.toLowerCase();if(!text)return null;
     if(lower.startsWith("queued prompt")||lower.startsWith("queued group turn"))return /failed|could not|stopped/.test(lower)?"A queued message needs review. Open the queue above the composer to inspect the saved reason before removing it or sending a new request.":null;
     if(lower.startsWith("queued message ready")||lower.startsWith("late popup answer queued")||lower.startsWith("popup answer queued")||lower.startsWith("provider-native context")||lower.startsWith("context auto-compacted")||lower.startsWith("context overflow recovered")||lower.startsWith("context overflow could not commit")||lower.startsWith("checkpoint ")||lower.startsWith("talk →")||lower==="after barrier"||lower.includes(" · trace "))return null;
+    // Internal runtime status (a slow memory preload, warm-ups) is diagnostics,
+    // not conversation: log it, never show it as a transcript row.
+    if(INTERNAL_NOTICE.test(lower)){console.info("[phoenix] runtime notice:",text);return null;}
     return text.replace(/\bqueued_[a-f0-9]{12,}\b/gi,"").replace(/\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/gi,"").replace(/\s{2,}/g," ").trim()||null;
   }
   function providerRetryParts(value){
@@ -3077,7 +3086,7 @@
     scrollLatest();
     return true;
   }
-  function renderTool(event) {
+  function renderTool(event, replay = false) {
     clearProviderRetry();
     const toolName=String(event.tool||"").toLowerCase();
     // response_validation is an internal retry guard, not an action the user
@@ -3085,7 +3094,10 @@
     // scary “Adjusted the approach” error after otherwise successful work.
     if(toolName==="response_validation")return;
     if(toolName==="react")return void renderReaction(event);
-    if(traceCategory(toolName)==="browser"||/^computer_(?:click|act|app_|window_)/.test(toolName))animateBrowserCursor(event);
+    // Only a live action moves the agent cursor. A repaint or a journal replay
+    // re-renders old browser steps; animating those moved the cursor (and the
+    // native page's cursor overlay) while the agent was idle.
+    if(!replay&&!state.painting&&(traceCategory(toolName)==="browser"||/^computer_(?:click|act|app_|window_)/.test(toolName)))animateBrowserCursor(event);
     const agent = canonicalAgentId(event.agent || state.item?.id || "phoenix");
     markHandoffsWorking(agent);
     const cluster = ensureWorkCluster(agent);
@@ -3726,7 +3738,7 @@
       } break;
       case "thinking": case "reasoning": renderThinking(event.agent, event.text); break;
       case "tool_start": case "tool":
-        renderTool(event);
+        renderTool(event,replay);
         // Some background/group transports expose only the completed receipt.
         // Either edge is sufficient proof that this coworker's managed browser
         // exists and belongs in the selected conversation's right sidebar.
@@ -4736,9 +4748,32 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   function acknowledgeSubmission(request,draft,token){
     const saved=pendingSubmission(token);
     if(saved?.turnId===request.turnId)localStorage.removeItem(pendingSubmissionKey(token));
-    clearSubmittedDraft(draft,token);
+    if(state.unackedSend?.turnId===request.turnId)state.unackedSend=null;
+    // The sent composer was already cleared; acknowledgement never edits a new draft.
   }
+  // Idempotent send: a repeat Enter/click while a send is being accepted is
+  // ignored, and the composer is cleared as soon as the send is accepted, so
+  // a second press can never resubmit the same draft (it used to stay in the
+  // composer until the first Story arrived; a second Enter then went out as a
+  // mid-task steer with a fresh turn id, which the runtime cannot dedupe).
   async function submitTurn(text = null) {
+    if(state.sendInFlight)return;
+    state.sendInFlight=true;state.lastSendAt=Date.now();
+    try{return await submitTurnOnce(text);}finally{state.sendInFlight=false;}
+  }
+  function restoreUnackedDraft(request,token){
+    const pending=state.unackedSend;if(!pending||pending.turnId!==request?.turnId)return;
+    state.unackedSend=null;const draft=pending.draft;
+    if(selectionIsCurrent(token)&&conversationKey(pending.item)===conversationKey()){
+      if(composerText("request").trim()||state.attachments.length)return;
+      $("composerInput").value=draft.tokens||draft.text;state.attachments=[...draft.attachments];state.mentions=[...(draft.mentions||[])];state.groupEveryone=Boolean(draft.everyone&&state.item?.kind==="group");
+      renderAttachments();renderMentionTray();autosize();syncSendMode();persistComposerDraft();
+    }else if(pending.item&&!localStorage.getItem(draftStorageKey(pending.item))){
+      try{localStorage.setItem(draftStorageKey(pending.item),JSON.stringify({...draft,attachments:draft.attachments.map(({preview,...file})=>file)}));}catch{}
+      state.drafts.set(conversationKey(pending.item),draft);
+    }
+  }
+  async function submitTurnOnce(text = null) {
     const request = composerRequest(text); if (!request) return;
     const turnToken=activeSelectionToken();if(!turnToken)return;
     const submittedDraft=text==null?draftSnapshot():null;
@@ -4784,9 +4819,9 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     state.turnStartedAt = Date.now();
     state.pendingAnswer = null;
     appendDisplay("history",{role:"user",text:request.displayText,initiating_agent_id:request.groupActivation?.execution_waves?.[0]?.[0]||request.groupActivation?.active_agent_ids?.[0]||targetAgent(),attachments:request.files.map(({name,path,size,type})=>({name,path,size,type})),turn_id:request.turnId},true);
-    const prompt = renderUser(request.displayText, request.files),groupWillWake=state.item?.kind!=="group"||Boolean(request.groupActivation?.active_agent_ids?.length); if(submittedDraft)persistComposerDraft(); if(groupWillWake){setWorking(true);beginTurnActivity(prompt);}
+    const prompt = renderUser(request.displayText, request.files),groupWillWake=state.item?.kind!=="group"||Boolean(request.groupActivation?.active_agent_ids?.length); if(submittedDraft){state.unackedSend={turnId:request.turnId,draft:submittedDraft,item:state.item};clearComposerDraft();} if(groupWillWake){setWorking(true);beginTurnActivity(prompt);}
     if (preview) {
-      clearSubmittedDraft(submittedDraft,turnToken);
+      acknowledgeSubmission(request,submittedDraft,turnToken);
       setTimeout(() => {if(selectionIsCurrent(turnToken))renderAgentUpdate(state.item?.id||"phoenix", "Checking the company context before I answer.");},120);
       setTimeout(() => {if(selectionIsCurrent(turnToken))renderTool({kind:"tool_start",agent:state.item?.id||"phoenix",tool:"codebase_search",target:"the company context"});},280);
       setTimeout(() => {if(selectionIsCurrent(turnToken))renderTool({kind:"tool",agent:state.item?.id||"phoenix",tool:"codebase_search",target:"the company context",ok:true,detail:"Found the relevant company memory and current state."});},900);
@@ -4800,7 +4835,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
         // renderer must not silently mint a second turn for this exact send.
         localStorage.setItem(pendingSubmissionKey(turnToken),JSON.stringify({turnId:request.turnId,signature:submissionSignature(request)}));
         socket.send(JSON.stringify({Turn:body}));
-      }catch(error){localStorage.removeItem(pendingSubmissionKey(turnToken));ui.toast("The message could not be sent. Your draft is saved.",true);finishTurn(socket,true,turnToken);}
+      }catch(error){localStorage.removeItem(pendingSubmissionKey(turnToken));restoreUnackedDraft(request,turnToken);ui.toast("The message could not be sent. Your draft is saved.",true);finishTurn(socket,true,turnToken);}
     }else try{socket.close();}catch{}};
     bindTurnSocket(socket,request,turnToken,submittedDraft);
   }
@@ -4878,9 +4913,10 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   // (the gateway then runs it as a normal turn on that same socket).
   function bindTurnSocket(socket,request,turnToken,submittedDraft=null){
     const session=turnToken.sessionId;
-    socket.onmessage=async(message)=>{if(state.turnSocket!==socket||!selectionIsCurrent(turnToken))return;try{const value=JSON.parse(message.data);if(value.Story||value.Done)acknowledgeSubmission(request,submittedDraft,turnToken);consumeFluffyWire(value,fluffyContext());if(value.Done && ["completed","canceled","stopped"].includes(value.Done.completion)) window.PhoenixFluffies?.terminal(value.Done.completion === "canceled" ? "canceled" : value.Done.completion === "completed" ? "turn_completed" : "stopped", {agentId:turnToken.owner.kind==="agent"?turnToken.owner.id:null,owner:turnToken.owner,sessionId:session,execution:window.PhoenixFluffies.activity.snapshot(turnToken.owner.id).execution,turnId:request.turnId},value.Done);if(value.Error)window.PhoenixFluffies?.terminal("error",{agentId:turnToken.owner.kind==="agent"?turnToken.owner.id:null,owner:turnToken.owner,sessionId:session,execution:window.PhoenixFluffies.activity.snapshot(turnToken.owner.id).execution,turnId:request.turnId},value.Error);if(consumeVolumeWorkerLifecycle(value))return;if(value.Story)renderStory(value.Story);if(value.Done?.completion==="queued"){finishTurn(socket,true,turnToken);return;}if(value.Done){const final=value.Done.final_markdown;if(state.item?.kind!=="group"&&final&&!isCompactionText(final)&&state.pendingAnswer?.text!==visibleAnswerText(final,targetAgent()||"phoenix")&&appendDisplay("history",{role:"answer",text:final,agent:targetAgent()||"phoenix"},true))renderAnswer(final);await settleAnswerMeta();if(!selectionIsCurrent(turnToken))return;if(state.item?.kind!=="group"&&!state.turnUsageSeen&&value.Done.context_window){const selected=selectedModelContext().effective,reported=value.Done.context_window[1],limit=selected?Math.min(selected,reported):reported;updateContext(value.Done.context_window[0],limit);}finishTurn(socket,terminalPreservesUnfinished(value.Done),turnToken);}if(value.Error){renderStory(turnFailureCard(value.Error,targetAgent()||"phoenix"));finishTurn(socket,true,turnToken);}}catch(error){if(selectionIsCurrent(turnToken))ui.toast(String(error),true);}};
-    socket.onerror=()=>{if(state.turnSocket!==socket||!selectionIsCurrent(turnToken))return;renderStory({kind:"card",agent:targetAgent()||"phoenix",subject:"Connection lost",body:"Phoenix could not reach the local runtime. Your message remains visible here.",ok:false});finishTurn(socket,true,turnToken);};
+    socket.onmessage=async(message)=>{if(state.turnSocket!==socket||!selectionIsCurrent(turnToken))return;try{const value=JSON.parse(message.data);if(value.Error&&!value.Story&&!value.Done)restoreUnackedDraft(request,turnToken);if(value.Story||value.Done)acknowledgeSubmission(request,submittedDraft,turnToken);consumeFluffyWire(value,fluffyContext());if(value.Done && ["completed","canceled","stopped"].includes(value.Done.completion)) window.PhoenixFluffies?.terminal(value.Done.completion === "canceled" ? "canceled" : value.Done.completion === "completed" ? "turn_completed" : "stopped", {agentId:turnToken.owner.kind==="agent"?turnToken.owner.id:null,owner:turnToken.owner,sessionId:session,execution:window.PhoenixFluffies.activity.snapshot(turnToken.owner.id).execution,turnId:request.turnId},value.Done);if(value.Error)window.PhoenixFluffies?.terminal("error",{agentId:turnToken.owner.kind==="agent"?turnToken.owner.id:null,owner:turnToken.owner,sessionId:session,execution:window.PhoenixFluffies.activity.snapshot(turnToken.owner.id).execution,turnId:request.turnId},value.Error);if(consumeVolumeWorkerLifecycle(value))return;if(value.Story)renderStory(value.Story);if(value.Done?.completion==="queued"){finishTurn(socket,true,turnToken);return;}if(value.Done){const final=value.Done.final_markdown;if(state.item?.kind!=="group"&&final&&!isCompactionText(final)&&state.pendingAnswer?.text!==visibleAnswerText(final,targetAgent()||"phoenix")&&appendDisplay("history",{role:"answer",text:final,agent:targetAgent()||"phoenix"},true))renderAnswer(final);await settleAnswerMeta();if(!selectionIsCurrent(turnToken))return;if(state.item?.kind!=="group"&&!state.turnUsageSeen&&value.Done.context_window){const selected=selectedModelContext().effective,reported=value.Done.context_window[1],limit=selected?Math.min(selected,reported):reported;updateContext(value.Done.context_window[0],limit);}finishTurn(socket,terminalPreservesUnfinished(value.Done),turnToken);}if(value.Error){renderStory(turnFailureCard(value.Error,targetAgent()||"phoenix"));finishTurn(socket,true,turnToken);}}catch(error){if(selectionIsCurrent(turnToken))ui.toast(String(error),true);}};
+    socket.onerror=()=>{restoreUnackedDraft(request,turnToken);if(state.turnSocket!==socket||!selectionIsCurrent(turnToken))return;renderStory({kind:"card",agent:targetAgent()||"phoenix",subject:"Connection lost",body:"Phoenix could not reach the local runtime. Your message remains visible here.",ok:false});finishTurn(socket,true,turnToken);};
     socket.onclose=()=>{
+      restoreUnackedDraft(request,turnToken);
       if(state.turnSocket!==socket||!selectionIsCurrent(turnToken))return;
       renderStory({kind:"failure",agent:targetAgent()||"phoenix",turn_id:request.turnId,text:"Connection to Phoenix was lost before completion was confirmed. Your saved messages remain available. Check the recovered activity before resending the request."});
       finishTurn(socket,true,turnToken);
@@ -5408,7 +5444,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     }
     control.classList.remove("group-summary");
     const levels=selectedEffortLevels(),choices=[null,...levels],index=Math.max(0,choices.indexOf(state.reasoning));
-    label.textContent=state.reasoning?state.reasoning[0].toUpperCase()+state.reasoning.slice(1):levels.length?"Default":"Built in";range.disabled=!levels.length;range.min="0";range.max=String(Math.max(1,choices.length-1));range.value=String(index);range.setAttribute("aria-label",`Reasoning effort ${label.textContent}`);liquidFill($("reasoningRangeFill"),choices.length>1?index/(choices.length-1)*100:0);
+    label.textContent=state.reasoning?state.reasoning[0].toUpperCase()+state.reasoning.slice(1):levels.length?"Default":"Built in";const speed=codexSpeed();if(speed!=="standard")label.textContent+=speed==="fast"?" ⚡":" ⚡⚡";range.disabled=!levels.length;range.min="0";range.max=String(Math.max(1,choices.length-1));range.value=String(index);range.setAttribute("aria-label",`Reasoning effort ${label.textContent}`);liquidFill($("reasoningRangeFill"),choices.length>1?index/(choices.length-1)*100:0);
   }
   function applyLocalModelContext(requested){const laneId=modelLane(),maximum=selectedModelContext().maximum;if(!laneId||!maximum)return;const effective=requested==null?maximum:Number(requested),next={...(state.selectedLane||{lane:laneId,provider_id:state.selectedModel?.provider_id||state.selectedModel?.provider,model:state.selectedModel?.id}),context_window:effective,max_context_window:maximum,context_window_override:effective<maximum?effective:null};state.selectedLane=next;if(state.modelSnapshot){const lanes=state.modelSnapshot.lanes||(state.modelSnapshot.lanes=[]),index=lanes.findIndex((entry)=>entry.lane===laneId||(laneId==="phoenix"&&entry.lane==="orchestrator"));if(index>=0)lanes[index]=next;else lanes.push(next);}syncModelContextLabel();}
   async function saveModelContextWindow(requested){const lane=modelLane(),context=selectedModelContext(),maximum=context.maximum,value=requested==null?null:Number(requested);if(!lane||!maximum)return;if(value!=null&&(!Number.isInteger(value)||value<8192||value>maximum)){ui.toast(`Choose between 8,192 and ${maximum.toLocaleString()} tokens.`,true);return;}const previous={lane:state.selectedLane?{...state.selectedLane}:null};applyLocalModelContext(value);ui.closeLayers();if(preview){ui.toast(value==null?`Using ${formatContextWindow(maximum)} model maximum.`:`Context limited to ${formatContextWindow(value)}.`);return;}try{const reply=await rpc({Settings:{action:"set_model_context_window",lane,context_window:value,expected_config_revision:state.modelSnapshot?.config_revision||null}}),snapshot=reply.Settings?.snapshot||reply.Settings?.models;if(snapshot)state.modelSnapshot=snapshot;await refreshModels();ui.toast(value==null?`Using ${formatContextWindow(maximum)} model maximum.`:`Context limited to ${formatContextWindow(value)}.`);}catch(error){state.selectedLane=previous.lane;syncModelContextLabel();ui.toast(error.message||String(error),true);}}
@@ -5437,6 +5473,40 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     content.insertAdjacentHTML("beforeend",`<p class="goo-note">Max for ${escape(state.selectedModel?.name||state.selectedModel?.id||"this model")}: ${formatContextWindow(maximum)}</p>`);
     kit.gooPopover($("contextControl"),content,{side:"top",align:"start"});
   }
+  function codexSpeedSupport(){
+    const model=state.selectedModel,provider=model?.provider_id||model?.provider;
+    const fast=provider==='openai-codex'&&['gpt-6.1-sol','gpt-6-astra','gpt-6-sol','gpt-6-luna','gpt-5.6-sol','gpt-5.6-terra','gpt-5.6-luna','gpt-5.5'].includes(model?.id);
+    return {fast,ultrafast:fast&&['gpt-6.1-sol','gpt-6-astra'].includes(model.id)};
+  }
+  function codexSpeed(){
+    const support=codexSpeedSupport(),tier=state.selectedLane?.service_tier||laneSetting()?.service_tier||'standard';
+    return support[tier]?tier:'standard';
+  }
+  async function saveCodexSpeed(tier,content){
+    const lane=modelLane(),token=activeSelectionToken(),previous=state.selectedLane?{...state.selectedLane}:null;
+    if(tier!=='standard'&&!codexSpeedSupport()[tier])return;
+    state.selectedLane={...(state.selectedLane||laneSetting()||{}),service_tier:tier};
+    const paint=()=>content.querySelectorAll('[data-codex-speed]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.codexSpeed===codexSpeed())));
+    paint();syncReasoningSlider();
+    if(preview){localStorage.setItem('phoenix-speed:'+lane,tier);return;}
+    const buttons=[...content.querySelectorAll('[data-codex-speed]')];buttons.forEach(button=>button.disabled=true);
+    try{
+      await rpc({Settings:{action:'set_model_service_tier',lane,service_tier:tier,expected_config_revision:state.modelSnapshot?.config_revision||null}});
+      if(selectionIsCurrent(token))await refreshModels(token);
+    }catch(error){if(selectionIsCurrent(token)){state.selectedLane=previous;syncReasoningSlider();}ui.toast(error.message||String(error),true);}
+    finally{if(content.isConnected&&selectionIsCurrent(token)){const support=codexSpeedSupport();buttons.forEach(button=>button.disabled=!support[button.dataset.codexSpeed]);paint();}}
+  }
+  function addCodexSpeedControls(content){
+    if(!codexSpeedSupport().fast)return;
+    const row=document.createElement('div');row.className='codex-speed-controls';row.setAttribute('role','group');row.setAttribute('aria-label','Codex speed');
+    const fastTip='Fast: 2.5× included subscription usage; 2× purchased credits. Click again for Standard.';
+    const ultraTip='Ultrafast: 8× included subscription usage; 6× purchased credits. Requires $500 Pro or eligible Enterprise/Edu. GPT-6.1 Sol and GPT-6 Astra only. Click again for Standard.';
+    const bolt='<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m11.5 2-7 9H10l-1.5 7 7-9H10z"/></svg>';
+    row.innerHTML=['fast','ultrafast'].map(tier=>'<button type="button" data-codex-speed="'+tier+'" aria-label="'+(tier==='fast'?'Fast mode':'Ultrafast mode')+'" aria-pressed="'+(codexSpeed()===tier)+'" title="'+(tier==='fast'?fastTip:ultraTip)+'">'+bolt+(tier==='ultrafast'?bolt:'')+'</button>').join('');
+    row.querySelector('[data-codex-speed="ultrafast"]').disabled=!codexSpeedSupport().ultrafast;
+    row.onclick=event=>{const button=event.target.closest('[data-codex-speed]');if(button&&!button.disabled)saveCodexSpeed(codexSpeed()===button.dataset.codexSpeed?'standard':button.dataset.codexSpeed,content);};
+    content.querySelector('.goo-head').append(row);
+  }
   function openGooReasoning(){
     if(state.item?.kind==="group"){openReasoning();return;}
     const levels=selectedEffortLevels();if(!levels.length){openReasoning();return;}
@@ -5448,6 +5518,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     const glow=(i)=>{slider.root.dataset.glow=i===last&&last>=2?"max":i===last-1&&last>=3?"pre":"";};
     slider.root.addEventListener("is-change",(event)=>glow(event.detail.index));glow(Math.max(0,choices.indexOf(state.reasoning)));
     content.append(slider.root);
+    addCodexSpeedControls(content);
     kit.gooPopover($("reasoningControl"),content,{side:"top",align:"start"});
   }
   function openModelContext(){
@@ -5930,9 +6001,15 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
         if(value.BrowserInteraction||value.TeachWorkflow||value.Error){const pending=state.browserControlPending;state.browserControlPending=null;if(pending){clearTimeout(pending.timer);value.Error?pending.reject(new Error(value.Error.message)):pending.resolve(value);}return;}
         frame=value.BrowserFrame;
       }
-      if(!frame||frame.instance!==state.browserOwnerId)return;state.browserFramePending=frame;queueBrowserFramePaint();
+      if(!frame||frame.instance!==state.browserOwnerId)return;state.browserFrameRetry=0;state.browserFramePending=frame;queueBrowserFramePaint();
     }catch{}};
-    socket.onclose=()=>{if(state.browserSocket!==socket)return;state.browserControlEnabled=false;state.browserControlWaiters.splice(0).forEach((resolve)=>resolve(false));rejectBrowserControl(new Error("Browser control disconnected."));if(!$("browserOverlay").hidden)setTimeout(subscribeBrowserFrames,600);};
+    socket.onclose=()=>{if(state.browserSocket!==socket)return;state.browserControlEnabled=false;state.browserControlWaiters.splice(0).forEach((resolve)=>resolve(false));rejectBrowserControl(new Error("Browser control disconnected."));if(!$("browserOverlay").hidden&&state.browserOwnerId===instance){
+      // Back off instead of reconnecting every 600ms forever when the frame
+      // lane keeps dropping (a dead or relaunching browser): 0.6s, 1.2s, ... 10s.
+      const attempt=state.browserFrameRetry=(state.browserFrameRetry||0)+1,delay=Math.min(10000,600*2**Math.min(attempt-1,5));
+      if(attempt>3)console.warn(`Phoenix browser frame lane closed ${attempt} times; reconnecting in ${delay}ms`);
+      clearTimeout(state.browserFrameRetryTimer);state.browserFrameRetryTimer=setTimeout(()=>{if(state.browserSocket===socket&&state.browserOwnerId===instance&&!$("browserOverlay").hidden)subscribeBrowserFrames();},delay);
+    }};
   }
   function rejectBrowserControl(error){const pending=state.browserControlPending;state.browserControlPending=null;if(pending){clearTimeout(pending.timer);pending.reject(error);}}
   function awaitBrowserControl(timeout=450){if(state.browserControlEnabled&&state.browserSocket?.readyState===WebSocket.OPEN)return Promise.resolve(true);return new Promise((resolve)=>{const done=(value)=>{clearTimeout(timer);resolve(value);};const timer=setTimeout(()=>{const index=state.browserControlWaiters.indexOf(done);if(index>=0)state.browserControlWaiters.splice(index,1);resolve(false);},timeout);state.browserControlWaiters.push(done);});}
@@ -6490,7 +6567,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     const toastSizeObserver=new ResizeObserver(scheduleNativeBrowserBounds);toastSizeObserver.observe($("toastRegion"));
     addEventListener("pagehide",()=>{toastBoundsObserver.disconnect();toastSizeObserver.disconnect();},{once:true});
     bindNativeBrowserTabEvents();
-    $("composer").onsubmit=(event)=>{event.preventDefault();const request=composerRequest();state.working&&!request?stopTurn():submitTurn();};
+    $("composer").onsubmit=(event)=>{event.preventDefault();const request=composerRequest();if(state.working&&!request){if(state.sendInFlight||Date.now()-state.lastSendAt<1200)return;stopTurn();}else submitTurn();};
     $("sendButton").onfocus=()=>syncSendOrb();
     $("sendButton").onblur=()=>syncSendOrb();
     $("sendButton").onpointerenter=()=>{state.sendOrbHovered=true;syncSendOrb();};

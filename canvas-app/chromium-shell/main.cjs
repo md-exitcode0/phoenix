@@ -555,6 +555,8 @@ function createSurfaceTab(entry, initialUrl = "about:blank", activate = true) {
     },
   });
   view.setBackgroundColor(surfaceBackground);
+  // Match the 12px rounded page frame the UI draws around #browserViewport.
+  if (typeof view.setBorderRadius === "function") view.setBorderRadius(12);
   browserState.ensureExtensions(view.webContents.session);
   browserBlocking.attach(view.webContents.session).catch(error => console.warn("[phoenix] ad blocking:", error.message));
   const tab = { view, targetId: view.webContents.getOrCreateDevToolsTargetId(), host: null, inputRevision: 0 };

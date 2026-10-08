@@ -1718,6 +1718,7 @@ async fn execute_inner(
                 .with_reasoning_effort(llm.reasoning_effort.clone())
                 .with_agent_models(agent_models)
                 .with_role_efforts(role_efforts)
+                .with_role_service_tiers(llm.service_tiers.clone().into_iter().collect())
                 .with_role_context_windows(role_context_windows)
                 .with_vision(vision)
                 .with_native_vision(llm.native_vision)

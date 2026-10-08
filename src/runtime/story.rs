@@ -924,6 +924,7 @@ fn visible_gateway_notice(text: &str) -> Option<String> {
         || lower.starts_with("context overflow recovered")
         || lower.starts_with("context overflow could not commit")
         || lower.starts_with("checkpoint ")
+        || lower.starts_with("memory lookup is taking longer")
         || lower.starts_with("talk →")
         || lower == "after barrier"
         || lower.contains(" · trace ")
@@ -1397,6 +1398,7 @@ mod tests {
             "late popup answer queued — waking the agent with it",
             "4.2s · 1820 tokens · route codex:primary · trace turn-0d994.jsonl",
             "checkpoint checkpoint_72ad opened — phoenix rewind undoes this turn's edits",
+            "Memory lookup is taking longer than expected. Continuing with the saved conversation; additional memories may not be included in this reply.",
         ] {
             assert!(
                 reducer

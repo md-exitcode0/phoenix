@@ -168,6 +168,7 @@ impl MeshRunner {
             reasoning_effort: self.reasoning_effort.clone(),
             agent_models: self.agent_models.clone(),
             role_efforts: self.role_efforts.clone(),
+            role_service_tiers: self.role_service_tiers.clone(),
             role_context_windows: self.role_context_windows.clone(),
             permission_mode: self.permission_mode,
             interaction_mode: self.interaction_mode,

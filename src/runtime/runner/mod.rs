@@ -90,6 +90,7 @@ pub struct AgentRunner {
     agent_models: std::collections::HashMap<String, String>,
     /// Reasoning effort per lane (`[profile.llm.efforts]`).
     role_efforts: std::collections::HashMap<String, String>,
+    role_service_tiers: std::collections::HashMap<String, String>,
     /// User-selected usable context ceiling per lane
     /// (`[profile.llm.context_windows]`).
     role_context_windows: std::collections::HashMap<String, u64>,
@@ -235,6 +236,7 @@ impl AgentRunner {
             reasoning_effort: None,
             agent_models: std::collections::HashMap::new(),
             role_efforts: std::collections::HashMap::new(),
+            role_service_tiers: std::collections::HashMap::new(),
             role_context_windows: std::collections::HashMap::new(),
             vision: None,
             native_vision: false,
@@ -314,6 +316,11 @@ impl AgentRunner {
     /// Per-lane reasoning efforts (`[profile.llm.efforts]`).
     pub fn with_role_efforts(mut self, efforts: std::collections::HashMap<String, String>) -> Self {
         self.role_efforts = efforts;
+        self
+    }
+
+    pub fn with_role_service_tiers(mut self, tiers: std::collections::HashMap<String, String>) -> Self {
+        self.role_service_tiers = tiers;
         self
     }
 
@@ -439,6 +446,7 @@ impl AgentRunner {
             reasoning_effort: None,
             agent_models: std::collections::HashMap::new(),
             role_efforts: std::collections::HashMap::new(),
+            role_service_tiers: std::collections::HashMap::new(),
             role_context_windows: std::collections::HashMap::new(),
             vision: None,
             native_vision: false,

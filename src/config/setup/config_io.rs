@@ -851,6 +851,7 @@ pub(super) fn build_runtime_config(
                 timeout_seconds: 0,
                 reasoning_effort: None,
                 efforts: Default::default(),
+                service_tiers: Default::default(),
                 agent_models: Default::default(),
                 auth_by_lane: Default::default(),
                 compaction_modes: Default::default(),

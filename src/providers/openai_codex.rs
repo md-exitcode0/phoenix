@@ -44,6 +44,16 @@ pub(crate) fn codex_oauth_identity(token: &str) -> Option<(String, String)> {
     Some((subject.to_string(), codex_account_id(token)?))
 }
 
+/// Wire tiers for the subscription route. Fast retains the Priority wire
+/// alias; Ultrafast is a separate tier and never changes reasoning effort.
+pub(crate) fn codex_service_tier(model: &str, tier: &str) -> Option<&'static str> {
+    match tier {
+        "fast" | "priority" if matches!(model, "gpt-6.1-sol" | "gpt-6-astra" | "gpt-6-sol" | "gpt-6-luna" | "gpt-5.6-sol" | "gpt-5.6-terra" | "gpt-5.6-luna" | "gpt-5.5") => Some("priority"),
+        "ultrafast" if matches!(model, "gpt-6.1-sol" | "gpt-6-astra") => Some("ultrafast"),
+        _ => None,
+    }
+}
+
 pub struct OpenAICodexProvider {
     client: Client,
     access_token: String,
@@ -1647,6 +1657,16 @@ fn dump_request_body(body: &Value, session: Option<&str>) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn codex_speed_wire_tiers_keep_fast_and_ultrafast_distinct() {
+        for model in ["gpt-6.1-sol", "gpt-6-astra"] {
+            assert_eq!(super::codex_service_tier(model, "fast"), Some("priority"));
+            assert_eq!(super::codex_service_tier(model, "ultrafast"), Some("ultrafast"));
+            assert_eq!(super::codex_service_tier(model, "standard"), None);
+        }
+        assert_eq!(super::codex_service_tier("gpt-6-luna", "ultrafast"), None);
+        assert_eq!(super::codex_service_tier("gpt-4.1-mini", "fast"), None);
+    }
     #[test]
     fn codex_requests_scope_the_account_on_the_subscription_origin_only() {
         use base64::Engine;
