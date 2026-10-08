@@ -3955,6 +3955,57 @@ async fn room_fyi_reaches_a_running_member_as_context_exactly_once() {
 }
 
 #[tokio::test]
+async fn room_follow_up_and_peer_mention_reach_a_running_member_once_user_first() {
+    let home = tempfile::tempdir().unwrap();
+    let _home = crate::config::test_env::PhoenixHomeGuard::set_private(home.path());
+    let workspace = tempfile::tempdir().unwrap();
+    std::fs::write(workspace.path().join("notes.txt"), "hero storyboard").unwrap();
+    let session_id = format!("mesh-room-followup-{}", uuid::Uuid::new_v4());
+    const PEER: &str = "Robin: @Tibo the D1 binding is named WAITLIST";
+    const SAID: &str = "@Tibo keep the waitlist copy under 12 words";
+    let steer_session = session_id.clone();
+    let provider = Arc::new(
+        ScriptedProvider::new(vec![(
+            "Orchestrator",
+            vec![
+                tool_envelope("read", serde_json::json!({"path": "notes.txt"})),
+                final_envelope("plan updated", "Plan updated with the copy limit."),
+            ],
+        )])
+        .during_request(0, move || {
+            use crate::runtime::postbox::{steer_room_user, RoomSteerKind, RoomSteerOutcome};
+            // A teammate's mention lands first, then the user's follow-up.
+            assert_eq!(steer_room_user(&steer_session, "orchestrator", "group-message-robin", RoomSteerKind::PeerMention, PEER), RoomSteerOutcome::Delivered);
+            assert_eq!(steer_room_user(&steer_session, "orchestrator", "turn_room_followup", RoomSteerKind::LeaderSolo, SAID), RoomSteerOutcome::Delivered);
+            // A reconnect retry of the same follow-up is not delivered twice.
+            assert_eq!(steer_room_user(&steer_session, "orchestrator", "turn_room_followup", RoomSteerKind::LeaderSolo, SAID), RoomSteerOutcome::Duplicate);
+        }),
+    );
+    let _live = crate::runtime::postbox::active_turn_guard(&session_id, "orchestrator");
+    let runner = MeshRunner::new(
+        Arc::clone(&provider) as Arc<dyn LLMProvider>,
+        workspace.path().to_path_buf(),
+        home.path().to_path_buf(),
+        session_id.clone(),
+        orchestrator_spec(),
+    );
+    let mut gateway = Gateway::new(runner);
+    gateway.submit(AgentMessage::user_input(AgentAddress::Orchestrator, "plan the site"));
+    let outcome = tokio::time::timeout(std::time::Duration::from_secs(45), gateway.run())
+        .await
+        .expect("steers never start or queue another turn");
+    assert_eq!(outcome.user_messages.len(), 1, "one reply, no duplicate top-level answer");
+    let requests = provider.request_texts.lock().unwrap().clone();
+    assert_eq!(requests.len(), 2);
+    assert_eq!(requests[1].matches(SAID).count(), 1);
+    assert_eq!(requests[1].matches(PEER).count(), 1);
+    let solo = crate::runtime::postbox::RoomSteerKind::LeaderSolo.marker();
+    let peer = crate::runtime::postbox::RoomSteerKind::PeerMention.marker();
+    assert!(requests[1].find(solo).unwrap() < requests[1].find(peer).unwrap(), "the user's message outranks teammate chatter");
+    assert!(crate::runtime::postbox::take_steer(&session_id, "orchestrator").is_empty());
+}
+
+#[tokio::test]
 async fn user_message_sent_mid_turn_reaches_the_next_request_exactly_once() {
     let home = tempfile::tempdir().unwrap();
     let _home = crate::config::test_env::PhoenixHomeGuard::set_private(home.path());

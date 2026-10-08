@@ -79,7 +79,7 @@
     browserBoundKey: "",
     inspectionOpen: false,
     inspectionExpanded: false,
-    inspectionTab: "changes",
+    inspectionTab: "desktop",
     inspectionConversationStates: new Map(),
     inspectionSwitchGeneration: 0,
     inspectionBrowserResumePromise: null,
@@ -96,17 +96,6 @@
     imageCommentDraft: null,
     imageAnnotations: new Map(),
     imageActualSize: false,
-    inspectionChangesFrame: 0,
-    reviewSnapshot: null,
-    reviewRequest: 0,
-    reviewLoading: false,
-    reviewScope: "agent",
-    reviewFilter: "",
-    reviewSelectedPath: "",
-    reviewSelectedContent: null,
-    reviewSelectedLoading: false,
-    reviewFileRequest: 0,
-    reviewCollapsedDirectories: new Set(),
     environmentSnapshot: null,
     environmentRequest: 0,
     environmentLoading: false,
@@ -1337,9 +1326,9 @@
     const node=feedNode("message-row group-message member-message",`${avatar(profile)}<div class="message-content" data-slot="message-content"><header><strong>${escape(agentLabel(from))}</strong></header><div class="markdown">${relayedImagesMarkup(text)}${markdown(text)}</div></div>`,{agentId:from,returnReceipt:id,slot:"message",from:"assistant"});
     if(event.turn_id)node.dataset.turnId=String(event.turn_id);
     node.style.setProperty("--speaker",profile?.color||"var(--ember)");
-    // Teammates speak before the room owner's closing reply for the same turn.
-    const ownerAnswer=[...feed.querySelectorAll(":scope > .group-message:not(.member-message):not(.handoff-checkpoint)")].find(other=>other.dataset.turnId===node.dataset.turnId);
-    if(ownerAnswer&&(ownerAnswer.compareDocumentPosition(node)&Node.DOCUMENT_POSITION_FOLLOWING))feed.insertBefore(node,ownerAnswer);
+    // A room is chronological: the leader's plan (and its assignments) comes
+    // before the pitches it asked for, so a teammate is never moved above an
+    // earlier leader message. Events and history both arrive in commit order.
     const cluster=ensureWorkCluster(from);
     if(cluster){cluster.dataset.teamState=event.historical&&event.status==="returned"&&event.ok==null?"returned":"done";settleWorkCluster(cluster,false);}
     hydrateRelayedImages(node);return node;
@@ -2047,7 +2036,7 @@
     cluster.querySelectorAll(".work-tool:not(.running)").forEach((row)=>{if(!EDIT_TOOLS.has(String(row.dataset.tool||"").toLowerCase()))return;const path=editedPath(row.dataset.toolTarget||row.querySelector(".work-tool-copy small")?.textContent||row.dataset.toolLabel||"Edited file"),diff=row.dataset.toolDiff||"";let additions=0,deletions=0;String(diff).split("\n").forEach((line)=>{if(line.startsWith("+")&&!line.startsWith("+++"))additions+=1;else if(line.startsWith("-")&&!line.startsWith("---"))deletions+=1;});const prior=changes.get(path)||{path,additions:0,deletions:0,known:false};prior.additions+=additions;prior.deletions+=deletions;prior.known||=Boolean(diff);changes.set(path,prior);});
     return[...changes.values()];
   }
-  function turnEditSummaryMarkup(cluster){const rows=clusterEditRows(cluster);if(!rows.length)return"";const additions=rows.reduce((sum,row)=>sum+row.additions,0),deletions=rows.reduce((sum,row)=>sum+row.deletions,0),anyKnown=rows.some((row)=>row.known),counts=(row)=>row.known?`<b>+${row.additions}</b><i>−${row.deletions}</i>`:"";return`<section class="turn-edit-summary"><header><span class="turn-edit-copy"><strong>Edited ${rows.length} file${rows.length===1?"":"s"}</strong>${anyKnown?`<small><b>+${additions}</b><i>−${deletions}</i></small>`:""}</span><button type="button" data-open-review>Review</button></header><div class="turn-edit-files">${rows.map((row,index)=>`<div class="turn-edit-file${index>2?" extra":""}" ${index>2?"hidden":""}><span>${escape(row.path)}</span><code>${counts(row)}</code></div>`).join("")}</div>${rows.length>3?`<button type="button" class="turn-edit-more" data-show-more-edits>Show ${rows.length-3} more file${rows.length-3===1?"":"s"}⌄</button>`:""}</section>`;}
+  function turnEditSummaryMarkup(cluster){const rows=clusterEditRows(cluster);if(!rows.length)return"";const additions=rows.reduce((sum,row)=>sum+row.additions,0),deletions=rows.reduce((sum,row)=>sum+row.deletions,0),anyKnown=rows.some((row)=>row.known),counts=(row)=>row.known?`<b>+${row.additions}</b><i>−${row.deletions}</i>`:"";return`<section class="turn-edit-summary"><header><span class="turn-edit-copy"><strong>Edited ${rows.length} file${rows.length===1?"":"s"}</strong>${anyKnown?`<small><b>+${additions}</b><i>−${deletions}</i></small>`:""}</span></header><div class="turn-edit-files">${rows.map((row,index)=>`<div class="turn-edit-file${index>2?" extra":""}" ${index>2?"hidden":""}><span>${escape(row.path)}</span><code>${counts(row)}</code></div>`).join("")}</div>${rows.length>3?`<button type="button" class="turn-edit-more" data-show-more-edits>Show ${rows.length-3} more file${rows.length-3===1?"":"s"}⌄</button>`:""}</section>`;}
   // An answer receipt proves a response was delivered, not that its goal was
   // achieved. Keep this footer neutral, including on restored partial answers.
   function completionMetaMarkup(meta){const clock=formatClock(meta?.created_at),elapsed=meta?.elapsed_ms!=null?formatElapsed(meta.elapsed_ms):"";if(!clock&&!elapsed)return"";return`<span class="completion-meta"><span>${elapsed?`Responded in ${escape(elapsed)}`:"Responded"}${clock?` · ${escape(clock)}`:""}</span></span>`;}
@@ -3116,7 +3105,6 @@
       syncActivityCursor(cluster,group);
       state.activeTools.set(key, { row, cluster, group, agent, tool:event.tool });
       syncWorkShimmer();
-      scheduleInspectionChanges();
       updateTaskHeadline(`${label}${event.target ? ` · ${humanTarget(event.target)}` : ""}`, true);
       scrollLatest();
       return;
@@ -3148,10 +3136,8 @@
     if (!cluster.classList.contains("live") && !state.activeTools.size) {
       document.querySelectorAll(".commentary-line.live").forEach((line) => line.classList.remove("live"));
     }
-    if(["write","str_replace","apply_patch"].includes(toolName)){state.reviewSnapshot=null;state.reviewRequest+=1;state.reviewLoading=false;}
     syncWorkShimmer();
     syncTeamPresence();
-    scheduleInspectionChanges();
   }
   function compactionIconMarkup(){return '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 4.5h8.5L16 8v7.5H4Z"/><path d="M12.5 4.5V8H16M7 11h6M8.5 14h3"/></svg>';}
   function renderContextCompaction(event,replay=false){
@@ -3786,10 +3772,9 @@
         updateTaskHeadline(event.ok ? "Finished" : "Stopped", false);
         break;
       case "context": feedNode("context-card", `<details><summary>Using ${event.items.length} context item${event.items.length === 1 ? "" : "s"}</summary>${event.items.map((x) => `<div><strong>${escape(x.label)}</strong><small>${escape(x.kind)}</small><p>${escape(x.preview)}</p></div>`).join("")}</details>`); break;
-      // The transcript gets a quiet one-line marker, not a diff dump. The
-      // Review panel is where diffs are read; pasting a <pre> into the feed
-      // buried the conversation under the largest block on the page.
-      case "diff": feedNode("diff-note", `<button type="button" class="diff-note-open" data-open-review>Diffs</button>`); break;
+      // Diffs stay in the tool rows; pasting a <pre> into the feed buried
+      // the conversation under the largest block on the page.
+      case "diff": break;
       case "ask_pending": renderApproval(event); break;
       case "answer":
         if(isInternalRuntimeText(event.markdown))break;
@@ -4055,7 +4040,6 @@
     if(!cached||!displayRowsEqual(priorRows,state.displayRows))repaintConversation(bookmark,!cached,!cached);
     else feed.removeAttribute("aria-busy");
     if(state.historyLoadFailed)renderConversationLoadError();
-    scheduleInspectionChanges();
     syncRestoredWorkVisibility();
     const live=preview&&new URLSearchParams(location.search).get("shot")==="work-live"||selectedConversationIsLive();
     if(live&&!state.working){setWorking(true);beginTurnActivity(null);}else if(!live&&state.working)setWorking(false);
@@ -4093,7 +4077,7 @@
   function cloneImageAnnotationMap(source=state.imageAnnotations){return new Map([...source].map(([id,comments])=>[id,(comments||[]).map((comment)=>({...comment}))]));}
   function rememberInspectionShell(key=conversationKeyOf(state.item)){
     const saved=inspectionConversationState(key);if(!saved)return null;
-    saved.open=Boolean(state.inspectionOpen);saved.expanded=Boolean(state.inspectionExpanded);saved.tab=INSPECTION_TABS.has(state.inspectionTab)?state.inspectionTab:"changes";
+    saved.open=Boolean(state.inspectionOpen);saved.expanded=Boolean(state.inspectionExpanded);saved.tab=INSPECTION_TABS.has(state.inspectionTab)?state.inspectionTab:"desktop";
     try{localStorage.setItem(`phoenix-inspection-shell:${key}`,JSON.stringify({open:saved.open,expanded:saved.expanded,tab:saved.tab}));}catch{}
     return saved;
   }
@@ -4110,8 +4094,8 @@
     return saved;
   }
   function clearInspectionForConversationSwitch(){
-    state.inspectionOpen=false;state.inspectionExpanded=false;state.inspectionTab="changes";state.inspectionImages=[];state.activeInspectionImageId="";state.imageAnnotations=new Map();state.browserTabs=[];state.browserFrameUrl="";state.browserAddressEditing=false;state.browserAddressPending="";
-    document.body.classList.remove("inspection-open","inspection-expanded","inspection-browser-active","inspection-changes-active","inspection-image-active","image-commenting");
+    state.inspectionOpen=false;state.inspectionExpanded=false;state.inspectionTab="desktop";state.inspectionImages=[];state.activeInspectionImageId="";state.imageAnnotations=new Map();state.browserTabs=[];state.browserFrameUrl="";state.browserAddressEditing=false;state.browserAddressPending="";
+    document.body.classList.remove("inspection-open","inspection-expanded","inspection-browser-active","inspection-image-active","image-commenting");
     $("inspectionSidebar")?.setAttribute("aria-hidden","true");syncBrowserAddress("about:blank",true);
     renderInspectionBrowserTabs({tabs:[]});renderInspectionImageTabs();syncPanelControlLocation();syncBrowserChrome();
   }
@@ -4123,10 +4107,10 @@
     const saved={...stored};
     state.inspectionImages=cloneInspectionImages(saved.images||[]);state.activeInspectionImageId=saved.activeImageId||"";state.imageAnnotations=cloneImageAnnotationMap(saved.imageAnnotations||new Map());renderInspectionImageTabs();
     const browser=saved.browser,tabs=(browser?.tabs||[]).map((tab)=>({...tab}));state.browserTabs=tabs;state.browserAddressEditing=false;state.browserAddressPending="";syncBrowserAddress(browser?.url||"about:blank",true);renderInspectionBrowserTabs({tabs});
-    state.inspectionTab=INSPECTION_TABS.has(saved.tab)?saved.tab:"changes";state.inspectionExpanded=Boolean(saved.expanded);
+    state.inspectionTab=INSPECTION_TABS.has(saved.tab)?saved.tab:"desktop";state.inspectionExpanded=Boolean(saved.expanded);
     if(saved.open){showInspectionSidebar(state.inspectionTab);if(state.inspectionTab==="image"&&state.activeInspectionImageId)paintActiveInspectionImage();}
     else{
-      state.inspectionOpen=false;setInspectionTab(state.inspectionTab);document.body.classList.remove("inspection-open","inspection-expanded","inspection-browser-active","inspection-changes-active","inspection-image-active");$("inspectionSidebar")?.setAttribute("aria-hidden","true");syncPanelControlLocation();applyInspectionExpanded(Boolean(saved.expanded),false);
+      state.inspectionOpen=false;setInspectionTab(state.inspectionTab);document.body.classList.remove("inspection-open","inspection-expanded","inspection-browser-active","inspection-image-active");$("inspectionSidebar")?.setAttribute("aria-hidden","true");syncPanelControlLocation();applyInspectionExpanded(Boolean(saved.expanded),false);
     }
   }
   async function selectConversationWithInspection(detail){
@@ -4150,7 +4134,7 @@
     if(state.browserNative){const instance=state.browserOwnerId,generation=state.browserSurfaceGeneration;queueBrowserSurfaceOperation(async()=>{if(!state.browserNative||state.browserOwnerId!==instance||state.browserSurfaceGeneration!==generation)return;await ui.invoke(visible?"browser_surface_show":"browser_surface_hide",{instance});}).catch(()=>{});if(visible)scheduleNativeBrowserBounds();}
   }
 
-  const INSPECTION_TABS=new Set(["browser","changes","image","sources","desktop",...(document.documentElement.dataset.skin==="monocode"?["agents"]:[])]),EDIT_TOOLS=new Set(["write","str_replace","apply_patch"]);
+  const INSPECTION_TABS=new Set(["browser","image","sources","desktop",...(document.documentElement.dataset.skin==="monocode"?["agents"]:[])]),EDIT_TOOLS=new Set(["write","str_replace","apply_patch"]);
   // The right panel's tabs overflow sideways; a normal (vertical) wheel
   // scrolls them, and a trackpad's sideways swipe keeps working.
   $("inspectionTabStrip")?.addEventListener("wheel",(event)=>{
@@ -4269,7 +4253,7 @@
     return [...terminals,...background];
   }
   function environmentFallback(){
-    const review=state.reviewSnapshot||{},workspace=state.workspace||"";
+    const review={},workspace=state.workspace||"";
     return{workspace,workspaceName:workspaceName(workspace)||"Choose workspace",repo:null,branch:null,detached:false,remote:null,upstream:null,changes:Number(review.changes?.length)||0,additions:Number(review.additions)||0,deletions:Number(review.deletions)||0,canCommit:false,canPush:false,canCreatePullRequest:false,ghAvailable:false};
   }
   function environmentSnapshot(){
@@ -4346,7 +4330,6 @@
       const receipt=preview?{message:success,url:null}:await ui.invoke(command,args);
       ui.closeModal("commit");ui.closeLayers();
       await refreshEnvironmentSnapshot(true);
-      if(state.inspectionOpen&&state.inspectionTab==="changes")loadWorkspaceReview(true);
       ui.toast(receipt?.url?`${receipt.message||success} ${receipt.url}`:receipt?.message||success);
       return receipt;
     }catch(error){ui.toast(error?.message||String(error),true);return null;}
@@ -4394,7 +4377,6 @@
     host.querySelector("[data-summary-permission]")?.addEventListener("click",openPermission);
     host.querySelector("[data-summary-git]")?.addEventListener("click",(event)=>openEnvironmentGitActions(event.currentTarget));
     host.querySelector("[data-summary-pull-request]")?.addEventListener("click",openEnvironmentPullRequest);
-    host.querySelector("[data-summary-environment-changes]")?.addEventListener("click",()=>showInspectionSidebar("changes"));
     host.querySelector("[data-summary-agent-fold]")?.addEventListener("click",()=>{state.summaryAgentsFolded=!state.summaryAgentsFolded;localStorage.setItem("phoenix-summary-subagents-folded",String(state.summaryAgentsFolded));syncActivitySummary();});
     host.querySelectorAll("[data-summary-agent]").forEach((button)=>button.addEventListener("click",()=>{const agent=summarySubagents()[Number(button.dataset.summaryAgent)];if(agent&&!agent.ephemeral)ui.selectItem?.({kind:"agent",id:agent.id});}));
     host.querySelectorAll("[data-summary-process]").forEach((button)=>button.addEventListener("click",()=>{const process=summaryBackgroundProcesses()[Number(button.dataset.summaryProcess)];if(process?.kind==="terminal")window.PhoenixView?.toggleTerminal?.(true);else if(process?.kind==="agent")$("conversationFeed").querySelector(`[data-agent="${CSS.escape(process.key.slice(6))}"]`)?.scrollIntoView({block:"center"});}));
@@ -4402,9 +4384,6 @@
     host.querySelector("[data-summary-view-all]")?.addEventListener("click",openSourcesModal);
     host.querySelectorAll("[data-summary-browser-tab]").forEach((button)=>button.addEventListener("click",()=>{showInspectionSidebar("browser");selectInspectionBrowserTab(button.dataset.summaryBrowserTab);}));
     host.querySelectorAll("[data-summary-source]").forEach((button)=>button.addEventListener("click",()=>{const source=conversationSources()[Number(button.dataset.summarySource)];if(!source)return;if(source.url)openBrowser(state.item?.kind==="agent"?state.item.id:"phoenix","browse",source.url);else openImageInspector(source);}));
-    // A change row is a shortcut into Review, scoped to that file.
-    host.querySelectorAll("[data-summary-change]").forEach((button)=>button.addEventListener("click",()=>{const receipts=receiptReviewChanges(),list=receipts.length?receipts:(state.reviewSnapshot?.changes||[]),change=list[Number(button.dataset.summaryChange)];showInspectionSidebar("changes");if(change?.path)openReviewFile(change.path);}));
-    host.querySelector("[data-summary-view-changes]")?.addEventListener("click",()=>showInspectionSidebar("changes"));
   }
   function toggleActivitySummary(force,persist=true){
     const open=force??!state.summaryOpen;state.summaryOpen=Boolean(open);const summary=$("activitySummary");if(summary){summary.hidden=false;summary.dataset.summaryFolded=String(!state.summaryOpen);summary.setAttribute("aria-hidden",String(!state.summaryOpen));summary.toggleAttribute("inert",!state.summaryOpen);}
@@ -4423,7 +4402,7 @@
     const changes=Number(environment.changes)||0,additions=Number(environment.additions)||0,deletions=Number(environment.deletions)||0;
     const changeStat=changes?`<span class="summary-change-stat"><b>+${additions}</b><i>−${deletions}</i></span>`:'<span class="summary-environment-muted">Clean</span>';
     const environmentRows=`<section class="activity-summary-section summary-environment-section">
-      <button type="button" class="summary-environment-row" data-summary-environment-changes><span class="summary-environment-icon">${SUMMARY_ICONS.changes}</span><span><strong>Changes</strong><small>${changes?`${changes} changed file${changes===1?"":"s"}`:"No workspace changes"}</small></span>${changeStat}</button>
+      <div class="summary-environment-row summary-environment-static"><span class="summary-environment-icon">${SUMMARY_ICONS.changes}</span><span><strong>Changes</strong><small>${changes?`${changes} changed file${changes===1?"":"s"}`:"No workspace changes"}</small></span>${changeStat}</div>
       <button type="button" class="summary-environment-row" data-summary-workspace><span class="summary-environment-icon">${SUMMARY_ICONS.folder}</span><span><strong>Local</strong><small title="${escape(environment.workspace||state.workspace||"")}">${escape(environment.workspaceName||workspaceName(state.workspace)||"Choose workspace")}</small></span><i class="summary-environment-chevron">${SUMMARY_ICONS.chevron}</i></button>
       ${environment.repo?`<button type="button" class="summary-environment-row summary-environment-branch" data-summary-branch ${busy?"disabled":""}><span class="summary-environment-icon">${SUMMARY_ICONS.branch}</span><span><strong>${escape(environment.branch||"Detached HEAD")}</strong><small>${environment.detached?"Choose a branch before Git actions":"Local branch"}</small></span><i class="summary-environment-chevron">${SUMMARY_ICONS.chevron}</i></button>`:""}
       <button type="button" class="summary-environment-row summary-environment-access" data-summary-permission><span class="summary-environment-icon">${SUMMARY_ICONS.access}</span><span><strong>${escape(environmentPermissionLabel())}</strong><small>${escape(environmentPermissionNote())}</small></span><i class="summary-environment-chevron">${SUMMARY_ICONS.chevron}</i></button>
@@ -4504,14 +4483,13 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     window.PhoenixDesktopViewer?.update({visible:Boolean(visible),context:conversationKeyOf(state.item),owners:desktopViewerOwners(),rpc});
   }
   function setInspectionTab(next){
-    const tab=INSPECTION_TABS.has(next)?next:"changes";state.inspectionTab=tab;
+    const tab=INSPECTION_TABS.has(next)?next:"desktop";state.inspectionTab=tab;
     window.dispatchEvent(new CustomEvent("phoenix:inspection-tab",{detail:{tab}}));
     if(tab!=="image"&&state.imageCommentMode)setImageCommentMode(false);
     document.querySelectorAll("[data-inspection-tab]").forEach((button)=>{const browserTab=button.dataset.browserTabId,imageTab=button.dataset.imageTabId,selected=button.dataset.inspectionTab===tab&&(!browserTab||state.browserTabs.find((item)=>item.id===browserTab)?.active)&&(!imageTab||imageTab===state.activeInspectionImageId);button.setAttribute("aria-selected",String(Boolean(selected)));button.setAttribute("tabindex",selected?"0":"-1");});
     document.querySelectorAll("[data-inspection-panel]").forEach((panel)=>{panel.hidden=panel.dataset.inspectionPanel!==tab;});
     document.querySelectorAll("[data-inspection-toolbar]").forEach((toolbar)=>{toolbar.hidden=toolbar.dataset.inspectionToolbar!==tab;});
-    document.body.classList.toggle("inspection-browser-active",tab==="browser");document.body.classList.toggle("inspection-changes-active",tab==="changes");document.body.classList.toggle("inspection-image-active",tab==="image");
-    if(tab==="changes"){renderInspectionChanges();if(!state.reviewSnapshot)loadWorkspaceReview();}
+    document.body.classList.toggle("inspection-browser-active",tab==="browser");document.body.classList.toggle("inspection-image-active",tab==="image");
     if(tab==="sources")renderInspectionSources();
     updateDesktopViewer(state.inspectionOpen&&tab==="desktop");
     rememberInspectionShell();revealSelectedInspectionTab();syncInspectionOverlayOffset();syncBrowserChrome();
@@ -4520,106 +4498,12 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     const restore=conversationLayoutRestore();toggleActivitySummary(false);if(!state.inspectionOpen&&innerWidth<=760&&!document.body.classList.contains("sidebar-collapsed")){state.inspectionRestoreSidebar=true;$("sidebarToggle")?.click();}state.inspectionOpen=true;state.revealedInspectionTab="";document.body.classList.add("inspection-open");$("inspectionSidebar").setAttribute("aria-hidden","false");syncPanelControlLocation();applyInspectionExpanded(state.inspectionExpanded,false);applyInspectionWidth();syncInspectionHeader();setInspectionTab(tab);rememberInspectionShell();restore();if(state.inspectionTab==="browser")resumeInspectionBrowser().catch((error)=>ui.toast(error.message||String(error),true));requestAnimationFrame(()=>{scheduleNativeBrowserBounds();syncComposerDensity();});
   }
   function hideInspectionSidebar(){
-    const restore=conversationLayoutRestore(),restoreSidebar=state.inspectionRestoreSidebar;setImageCommentMode(false);state.inspectionRestoreSidebar=false;state.inspectionOpen=false;updateDesktopViewer(false);document.body.classList.remove("inspection-open","inspection-expanded","inspection-browser-active","inspection-changes-active","inspection-image-active");$("inspectionSidebar").setAttribute("aria-hidden","true");syncPanelControlLocation();rememberInspectionShell();syncBrowserChrome();restore();requestAnimationFrame(()=>{if(restoreSidebar&&document.body.classList.contains("sidebar-collapsed"))$("sidebarWake")?.click();syncWorkspaceLeft();syncComposerDensity();});
+    const restore=conversationLayoutRestore(),restoreSidebar=state.inspectionRestoreSidebar;setImageCommentMode(false);state.inspectionRestoreSidebar=false;state.inspectionOpen=false;updateDesktopViewer(false);document.body.classList.remove("inspection-open","inspection-expanded","inspection-browser-active","inspection-image-active");$("inspectionSidebar").setAttribute("aria-hidden","true");syncPanelControlLocation();rememberInspectionShell();syncBrowserChrome();restore();requestAnimationFrame(()=>{if(restoreSidebar&&document.body.classList.contains("sidebar-collapsed"))$("sidebarWake")?.click();syncWorkspaceLeft();syncComposerDensity();});
   }
   function toggleInspectionSidebar(){state.inspectionOpen?hideInspectionSidebar():showInspectionSidebar();}
-  function scheduleInspectionChanges(){if(state.inspectionChangesFrame)return;state.inspectionChangesFrame=requestAnimationFrame(()=>{state.inspectionChangesFrame=0;renderInspectionChanges();if(!state.reviewSnapshot&&state.inspectionOpen&&state.inspectionTab==="changes")loadWorkspaceReview();});}
-  function fileLanguage(path){const ext=String(path).split(".").at(-1).toLowerCase(),known={js:["JavaScript","javascript"],mjs:["JavaScript","javascript"],cjs:["JavaScript","javascript"],jsx:["JavaScript","javascript"],ts:["TypeScript","typescript"],tsx:["TypeScript","typescript"],rs:["Rust","rust"],css:["CSS","css3"],html:["HTML","html5"],htm:["HTML","html5"],json:["JSON","json"],md:["Markdown","markdown"],py:["Python","python"],sh:["Shell","bash"],bash:["Shell","bash"],yaml:["YAML","yaml"],yml:["YAML","yaml"]};return known[ext]||[ext.toUpperCase().slice(0,5)||"FILE",""];}
-  function fileLanguageMarkup(path){const [label,icon]=fileLanguage(path);return icon?`<img class="file-language-icon" src="file-icons/${icon}.png" alt="${escape(label)}" title="${escape(label)}">`:`<span class="file-type-fallback" aria-label="${escape(label)}">${escape(label)}</span>`;}
-  function reviewAgentIds(){
-    if(state.item?.kind==="agent")return new Set([canonicalAgentId(state.item.id)]);
-    if(state.item?.kind!=="group")return new Set(["phoenix"]);
-    const members=ui.state.view?.directory.members||[],agents=ui.state.view?.directory.agents||[];
-    return new Set(members.filter((member)=>member.group_id===state.item.id).map((member)=>agents.find((agent)=>agent.agent_id===member.agent_id)).filter(Boolean).flatMap((agent)=>[canonicalAgentId(agent.agent_id),canonicalAgentId(agent.internal_role)]));
-  }
-  function receiptReviewChanges(){
-    const allowed=reviewAgentIds(),changes=new Map();
-    state.displayRows.forEach((entry,index)=>{
-      const event=entry?.source==="story"?entry.value:null,tool=String(event?.tool||"").toLowerCase(),agent=canonicalAgentId(event?.agent||(state.item?.kind==="agent"?state.item.id:""));
-      if(event?.kind!=="tool"||event.ok===false||!EDIT_TOOLS.has(tool)||!allowed.has(agent))return;
-      const rawPath=humanTarget(event.target,event.tool).replace(/^(?:replace in|edit(?:ed)?|wrote|write|create[d]?)\s+/i,"")||`Edited file ${index+1}`,matches=(state.reviewSnapshot?.files||[]).filter((candidate)=>candidate===rawPath||candidate.endsWith(`/${rawPath}`)),path=matches.length===1?matches[0]:rawPath,diff=event.diff?safeRuntimeCopy(event.diff):"";
-      let additions=0,deletions=0;String(diff).split("\n").forEach((line)=>{if(line.startsWith("+")&&!line.startsWith("+++"))additions+=1;else if(line.startsWith("-")&&!line.startsWith("---"))deletions+=1;});
-      const prior=changes.get(path)||{path,status:humanTool(event.tool,false,event.target),additions:0,deletions:0,diffs:[]};prior.additions+=additions;prior.deletions+=deletions;if(diff)prior.diffs.push(diff);changes.delete(path);changes.set(path,prior);
-    });
-    return[...changes.values()].slice(-80).map(({diffs,...row})=>({...row,diff:diffs.join("\n")}));
-  }
-  async function loadWorkspaceReview(force=false){
-    if(state.reviewLoading||(!force&&state.reviewSnapshot))return;state.reviewLoading=true;const request=++state.reviewRequest;renderInspectionChanges();
-    try{
-      const receipts=receiptReviewChanges();
-      const snapshot=preview?{workspace:state.workspace,additions:receipts.reduce((n,row)=>n+row.additions,0),deletions:receipts.reduce((n,row)=>n+row.deletions,0),changes:receipts,files:["phoenix_agent/canvas-app/ui/conversation.js","phoenix_agent/canvas-app/ui/conversation.css","phoenix_agent/canvas-app/src/main.rs","phoenix_agent/Cargo.toml","README.md"].sort(),truncated:false}:await ui.invoke("workspace_review",{workspace:state.workspace||null});
-      if(request!==state.reviewRequest)return;state.reviewSnapshot=snapshot;
-    }catch(error){if(request===state.reviewRequest){state.reviewSnapshot={workspace:state.workspace,additions:0,deletions:0,changes:[],files:[],truncated:false,error:String(error?.message||error)};ui.toast(`Could not inspect workspace changes: ${error?.message||error}`,true);}}
-    finally{if(request===state.reviewRequest){state.reviewLoading=false;renderInspectionChanges();}}
-  }
-  // Review files are beUI's FileTree: nested folders (open unless the user
-  // folded them), rotating chevrons, open/closed folder icons, branch lines,
-  // one hover highlight that glides between rows, newly shown rows fading in,
-  // and tree keyboard navigation.
-  // The line between the diffs and the file tree drags left/right; the width
-  // is remembered per viewer. Arrow keys nudge it for keyboard users.
-  function bindReviewResizer(){
-    const handle=document.querySelector(".review-resizer"),layout=handle?.closest(".review-layout");if(!handle||!layout)return;
-    const clampWidth=(w)=>Math.round(Math.max(150,Math.min(w,layout.clientWidth-220)));
-    const apply=(w,save)=>{const width=clampWidth(w);layout.style.setProperty("--review-files-w",`${width}px`);if(save)try{localStorage.setItem("phoenix-review-files-w",String(width));}catch{}};
-    try{const saved=Number(localStorage.getItem("phoenix-review-files-w"));if(saved>0)layout.style.setProperty("--review-files-w",`${saved}px`);}catch{}
-    handle.onpointerdown=(event)=>{event.preventDefault();handle.setPointerCapture(event.pointerId);layout.classList.add("resizing");
-      const move=(e)=>apply(layout.getBoundingClientRect().right-e.clientX,false);
-      const up=(e)=>{handle.removeEventListener("pointermove",move);handle.removeEventListener("pointerup",up);handle.removeEventListener("pointercancel",up);layout.classList.remove("resizing");apply(layout.getBoundingClientRect().right-e.clientX,true);};
-      handle.addEventListener("pointermove",move);handle.addEventListener("pointerup",up);handle.addEventListener("pointercancel",up);};
-    handle.onkeydown=(event)=>{if(event.key!=="ArrowLeft"&&event.key!=="ArrowRight")return;event.preventDefault();const pane=handle.parentElement.getBoundingClientRect().width;apply(pane+(event.key==="ArrowLeft"?16:-16),true);};
-  }
-  function renderReviewFileTree(snapshot,changes){
-    const kit=window.PhoenixAgentKit,host=$("reviewFileTree"),changed=new Set(changes.map((row)=>row.path)),files=[...new Set(state.reviewScope==="agent"?[...changed]:[...(snapshot?.files||[]),...changed])].sort(),query=state.reviewFilter.toLowerCase(),INDENT=18;
-    const root={children:new Map()};
-    files.filter((path)=>!query||path.toLowerCase().includes(query)).forEach((path)=>{let node=root,prefix="";const parts=path.split("/");parts.forEach((part,index)=>{prefix=prefix?`${prefix}/${part}`:part;if(!node.children.has(part))node.children.set(part,{name:part,path:prefix,file:index===parts.length-1,children:new Map()});node=node.children.get(part);});});
-    const rows=[];
-    const walk=(node,depth,parent)=>{const entries=[...node.children.values()].sort((a,b)=>(a.file-b.file)||a.name.localeCompare(b.name));entries.forEach((entry,index)=>{const open=!entry.file&&(query||!state.reviewCollapsedDirectories.has(entry.path));rows.push({entry,depth,parent,open,position:index+1,size:entries.length});if(open)walk(entry,depth+1,entry.path);});};
-    walk(root,0,null);
-    const before=new Set(state.reviewTreeShown||[]);state.reviewTreeShown=rows.map((row)=>row.entry.path);
-    const focusPath=state.reviewTreeFocus&&rows.some((row)=>row.entry.path===state.reviewTreeFocus)?state.reviewTreeFocus:rows[0]?.entry.path;
-    host.setAttribute("role","tree");host.setAttribute("aria-label","Files");host.classList.add("file-tree");
-    host.innerHTML=rows.length?`<span class="ft-glide" aria-hidden="true"></span>`+rows.map(({entry,depth,open,position,size},index)=>{const fresh=before.size&&!before.has(entry.path),selected=state.reviewSelectedPath===entry.path,isChanged=entry.file&&changed.has(entry.path),data=entry.file?`data-review-file="${escape(entry.path)}"`:`data-review-directory="${escape(entry.path)}"`;
-      return`<button type="button" role="treeitem" class="ft-row${entry.file?" review-file":" review-folder"}${selected?" selected":""}${isChanged?" changed":""}${fresh?" entering":""}" ${data} aria-level="${depth+1}" aria-posinset="${position}" aria-setsize="${size}" aria-selected="${selected}" ${entry.file?"":`aria-expanded="${open}"`} tabindex="${entry.path===focusPath?0:-1}" title="${escape(entry.path)}" style="padding-left:${8+depth*INDENT}px;--enter-delay:${Math.min(position*25,100)}ms">${depth>0?`<span class="ft-branch" aria-hidden="true" style="left:${16+(depth-1)*INDENT}px"></span>`:""}<span class="ft-chevron${entry.file?" hidden":""}${open?" open":""}" aria-hidden="true">${kit.icon("chevronRight")}</span><span class="ft-icon${open?" open":""}" aria-hidden="true">${entry.file?fileLanguageMarkup(entry.path)||kit.icon("file"):`<span class="ft-folder closed">${kit.icon("folder")}</span><span class="ft-folder opened">${kit.icon("folderOpen")}</span>`}</span><span class="ft-label">${escape(entry.name)}</span>${isChanged?'<i class="review-file-status" aria-label="Changed"></i>':""}</button>`;}).join(""):`<div class="summary-empty">${state.reviewScope==="agent"?"No changed files yet.":"No workspace files match this filter."}</div>`;
-    if(!host.dataset.treeBound){host.dataset.treeBound="1";
-      host.addEventListener("pointerover",(event)=>{const row=event.target.closest(".ft-row"),glide=host.querySelector(".ft-glide");if(!row||!glide)return;const fresh=!host.classList.contains("glide-on");glide.style.transition=fresh?"opacity .15s":"";glide.style.transform=`translateY(${row.offsetTop}px)`;glide.style.height=`${row.offsetHeight}px`;host.classList.add("glide-on");});
-      host.addEventListener("pointerleave",()=>host.classList.remove("glide-on"));
-      host.addEventListener("keydown",(event)=>{const items=[...host.querySelectorAll(".ft-row")],row=event.target.closest(".ft-row");if(!row)return;const index=items.indexOf(row),focus=(target)=>{if(!target)return;items.forEach((item)=>item.tabIndex=-1);target.tabIndex=0;target.focus();state.reviewTreeFocus=target.dataset.reviewFile||target.dataset.reviewDirectory;};const folder=row.dataset.reviewDirectory,open=row.getAttribute("aria-expanded")==="true";
-        if(event.key==="ArrowDown"){event.preventDefault();focus(items[index+1]);}else if(event.key==="ArrowUp"){event.preventDefault();focus(items[index-1]);}else if(event.key==="Home"){event.preventDefault();focus(items[0]);}else if(event.key==="End"){event.preventDefault();focus(items.at(-1));}
-        else if(event.key==="ArrowRight"&&folder){event.preventDefault();if(!open){state.reviewTreeFocus=folder;row.click();host.querySelector(`[data-review-directory="${CSS.escape(folder)}"]`)?.focus();}else focus(items[index+1]);}
-        else if(event.key==="ArrowLeft"){event.preventDefault();if(folder&&open){state.reviewTreeFocus=folder;row.click();host.querySelector(`[data-review-directory="${CSS.escape(folder)}"]`)?.focus();}else{const level=Number(row.getAttribute("aria-level"));for(let i=index-1;i>=0;i--)if(Number(items[i].getAttribute("aria-level"))===level-1){focus(items[i]);break;}}}});
-    }
-    requestAnimationFrame(()=>host.querySelectorAll(".ft-row.entering").forEach((row)=>row.classList.remove("entering")));
-  }
-  function reviewFilePreviewMarkup(path,content){const lines=String(content||"").split("\n").map((line,index)=>`<span class="review-file-line"><i>${index+1}</i><span>${escape(line||" ")}</span></span>`).join("");return`<article class="review-file-preview"><header class="inspection-change-header">${fileLanguageMarkup(path)}<span><strong>${escape(path)}</strong><small>Workspace file</small></span></header><pre class="review-file-content">${lines}</pre></article>`;}
-  async function openReviewFile(path){
-    if(!path)return;state.reviewSelectedPath=path;const changes=state.reviewScope==="agent"?receiptReviewChanges():(state.reviewSnapshot?.changes||[]);renderReviewFileTree(state.reviewSnapshot,changes);const target=changes.find((row)=>row.path===path);
-    if(target){state.reviewSelectedContent=null;state.reviewSelectedLoading=false;renderInspectionChanges();requestAnimationFrame(()=>$("inspectionChangesList").querySelector(`[data-review-path="${CSS.escape(path)}"]`)?.scrollIntoView({block:"start"}));return;}
-    state.reviewSelectedContent=null;state.reviewSelectedLoading=true;const request=++state.reviewFileRequest;renderInspectionChanges();
-    try{const root=state.reviewSnapshot?.workspace||state.workspace||"",absolute=`${String(root).replace(/[\\/]+$/,"")}/${path}`;const content=preview?`// ${path}\n// Workspace file preview\n\nOpen this file in the native Phoenix build to read its current contents.`:await ui.invoke("read_file",{path:absolute});if(request!==state.reviewFileRequest)return;state.reviewSelectedContent=String(content);}
-    catch(error){if(request!==state.reviewFileRequest)return;state.reviewSelectedContent=`Could not read this file.\n\n${error?.message||error}`;}
-    finally{if(request===state.reviewFileRequest){state.reviewSelectedLoading=false;renderInspectionChanges();}}
-  }
-  function renderInspectionChanges(){
-    const list=$("inspectionChangesList"),receipts=receiptReviewChanges(),snapshot=state.reviewSnapshot,changes=state.reviewScope==="agent"?receipts:(snapshot?.changes||[]);let additions=0,deletions=0;
-    changes.forEach((row)=>{additions+=Number(row.additions)||0;deletions+=Number(row.deletions)||0;});
-    $("inspectionChangesCount").textContent=String(changes.length);$("reviewDiffStats").innerHTML=`<b>+${additions}</b><i>−${deletions}</i>`;$("reviewWorkspaceLabel").textContent=workspaceName(snapshot?.workspace||state.workspace||"");$("reviewTurnPicker").querySelector("strong").textContent=state.reviewScope==="agent"?`${currentName()} edits`:"Workspace status";
-    renderReviewFileTree(snapshot,changes);
-    list.classList.toggle("review-overflow",changes.length>4);list.style.gridTemplateRows=changes.length&&changes.length<=4?`repeat(${changes.length},minmax(0,1fr))`:"";
-    if(state.reviewLoading&&!snapshot){list.innerHTML='<div class="review-loading">Reading workspace changes…</div>';return;}
-    if(state.reviewSelectedPath&&!changes.some((row)=>row.path===state.reviewSelectedPath)){if(state.reviewSelectedLoading){list.innerHTML='<div class="review-loading">Reading file…</div>';return;}if(state.reviewSelectedContent!=null){list.innerHTML=reviewFilePreviewMarkup(state.reviewSelectedPath,state.reviewSelectedContent);return;}}
-    if(!changes.length){const team=state.item?.kind==="group",who=team?`Nobody in ${escape(currentName())}`:escape(currentName());list.innerHTML=`<div class="inspection-empty review-empty"><span class="review-empty-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3.5h6.5L18 8v12.5H7z"/><path d="M13.5 3.5V8H18M10 13h5M10 16.5h3.5"/></svg></span><strong>No file changes yet</strong><small>${who} ${team?"has":"hasn't"} edited files in this conversation${team?" yet":""}. Edits show up here as soon as they happen.</small></div>`;$("reviewDiffStats").hidden=true;syncActivitySummary();return;}
-    $("reviewDiffStats").hidden=false;
-    list.innerHTML=changes.map((row)=>{const lines=String(row.diff||"No textual diff is available for this file.").split("\n"),diff=lines.map((line)=>{const kind=line.startsWith("+++")||line.startsWith("---")?"meta":line.startsWith("+")?"add":line.startsWith("-")?"del":line.startsWith("@@")?"hunk":"context";return`<span class="inspection-diff-line ${kind}">${escape(line||" ")}</span>`;}).join("");return`<article class="inspection-change" data-review-path="${escape(row.path)}" data-review-filter="${escape(`${row.path} ${row.status||""}`.toLowerCase())}"><header class="inspection-change-header">${fileLanguageMarkup(row.path)}<span><strong>${escape(row.path)}</strong><small>${escape(row.status||"Modified")}</small></span><span class="inspection-change-stats"><b>+${Number(row.additions)||0}</b><i>−${Number(row.deletions)||0}</i></span></header><div class="inspection-diff">${diff}</div></article>`;}).join("");syncActivitySummary();
-  }
   function renderInspectionSources(){const sources=conversationSources(),host=$("inspectionSourcesGrid");$("inspectionSourcesCount").textContent=String(sources.length);$("inspectionSourcesLabel").textContent=sources.length?`${sources.length} conversation image${sources.length===1?"":"s"}`:"Conversation images";host.innerHTML=sources.map((source,index)=>`<button type="button" class="inspection-source-card${source.source?"":" source-loading"}" data-source-card="${index}">${source.source?`<img src="${escape(source.source)}" alt="${escape(sourceLabel(source))}">`:'<span class="source-preview-placeholder">Loading preview…</span>'}<strong>${escape(sourceLabel(source)||`Image ${index+1}`)}</strong><small>${escape(source.kind||"Image")}</small></button>`).join("")||'<div class="inspection-empty review-empty"><strong>No conversation images yet</strong><small>Screenshots posted in this conversation will appear here.</small></div>';resolveInspectionSourceThumbnails(sources);}
   function resolveInspectionSourceThumbnails(sources){$("inspectionSourcesGrid")?.querySelectorAll(".source-loading[data-source-card]").forEach(async(card)=>{const source=sources[Number(card.dataset.sourceCard)],path=source?.path;if(!path)return;try{const data=await ui.invoke("image_data_url",{path});if(!card.isConnected)return;source.source=data;card.classList.remove("source-loading");card.querySelector(".source-preview-placeholder")?.replaceWith(Object.assign(document.createElement("img"),{src:data,alt:source.name||"Conversation image"}));}catch{card.classList.add("source-unavailable");const placeholder=card.querySelector(".source-preview-placeholder");if(placeholder)placeholder.textContent="Preview unavailable";}});}
   function openSourcesModal(){$("inspectionSourcesTab").hidden=false;showInspectionSidebar("sources");renderInspectionSources();}
-  function openReviewScopePicker(){
-    const button=$("reviewTurnPicker"),receipts=receiptReviewChanges(),workspaceCount=state.reviewSnapshot?.changes?.length||0;
-    const pop=ui.openPopover(button,`<button type="button" class="choice-row${state.reviewScope==="agent"?" selected":""}" data-review-scope="agent"><span><strong>${escape(currentName())} edits</strong><small>${receipts.length} edited file${receipts.length===1?"":"s"} across retained history</small></span></button><button type="button" class="choice-row${state.reviewScope==="workspace"?" selected":""}" data-review-scope="workspace"><span><strong>Workspace status</strong><small>${workspaceCount} uncommitted file${workspaceCount===1?"":"s"}</small></span></button>`,`review-scope-popover`,{align:"start"});
-    pop.onclick=(event)=>{const scope=event.target.closest("[data-review-scope]")?.dataset.reviewScope;if(!scope)return;state.reviewScope=scope;state.reviewSelectedPath="";state.reviewSelectedContent=null;state.reviewSelectedLoading=false;state.reviewFileRequest+=1;ui.closeLayers();renderInspectionChanges();};
-  }
   function browserCursorPoint(event){
     const payload=parseToolPayload(event?.target),x=Number(payload?.x??payload?.cx),y=Number(payload?.y??payload?.cy);
     if(Number.isFinite(x)&&Number.isFinite(y)){const rect=$("browserViewport").getBoundingClientRect();return{real:true,x:Math.max(8,Math.min(92,x/Math.max(1,rect.width)*100)),y:Math.max(8,Math.min(88,y/Math.max(1,rect.height)*100))};}
@@ -4639,7 +4523,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   function renderInspectionImageTabs(){const host=$("inspectionImageTabs");if(!host)return;host.innerHTML=state.inspectionImages.map((item)=>`<button type="button" role="tab" class="inspection-tab image-page-tab" data-inspection-tab="image" data-image-tab-id="${escape(item.id)}" aria-selected="${String(state.inspectionTab==="image"&&item.id===state.activeInspectionImageId)}" tabindex="${state.inspectionTab==="image"&&item.id===state.activeInspectionImageId?"0":"-1"}" title="${escape(item.name)}"><img class="image-tab-thumbnail" src="${escape(item.source||ui.phoenixLogoSource())}" alt=""><strong>${escape(item.name)}</strong><span class="browser-tab-close" data-close-image-tab aria-label="Close ${escape(item.name)}">×</span></button>`).join("");revealSelectedInspectionTab();}
   async function paintActiveInspectionImage(){const item=activeInspectionImage(),request=++state.inspectionImageRequest,figure=$("inspectionImageFigure"),empty=$("inspectionImageEmpty"),image=$("inspectionImage"),loading=$("inspectionImageLoading");if(!item){empty.hidden=false;figure.hidden=true;return;}empty.hidden=true;figure.hidden=false;image.hidden=true;image.removeAttribute("src");loading.hidden=false;loading.textContent="Loading image…";try{const data=item.source||(preview?ui.phoenixLogoSource():await ui.invoke("image_data_url",{path:item.path}));if(request!==state.inspectionImageRequest||item.id!==state.activeInspectionImageId)return;item.source=data;await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=data;});if(request!==state.inspectionImageRequest||item.id!==state.activeInspectionImageId)return;image.alt=item.name;image.hidden=false;loading.hidden=true;renderInspectionImageTabs();renderImageCommentState();}catch{if(request!==state.inspectionImageRequest)return;loading.textContent="This image is no longer available.";renderImageCommentState();}}
   async function selectInspectionImageTab(id){if(!id||id===state.activeInspectionImageId)return;setImageCommentMode(false);state.activeInspectionImageId=id;renderInspectionImageTabs();setInspectionTab("image");await paintActiveInspectionImage();}
-  function closeInspectionImageTab(id=state.activeInspectionImageId){const index=state.inspectionImages.findIndex((item)=>item.id===id);if(index<0)return;setImageCommentMode(false);state.inspectionImages.splice(index,1);if(state.activeInspectionImageId===id)state.activeInspectionImageId=state.inspectionImages[Math.min(index,state.inspectionImages.length-1)]?.id||"";renderInspectionImageTabs();if(state.activeInspectionImageId){setInspectionTab("image");paintActiveInspectionImage();}else setInspectionTab(conversationSources().length?"sources":"changes");}
+  function closeInspectionImageTab(id=state.activeInspectionImageId){const index=state.inspectionImages.findIndex((item)=>item.id===id);if(index<0)return;setImageCommentMode(false);state.inspectionImages.splice(index,1);if(state.activeInspectionImageId===id)state.activeInspectionImageId=state.inspectionImages[Math.min(index,state.inspectionImages.length-1)]?.id||"";renderInspectionImageTabs();if(state.activeInspectionImageId){setInspectionTab("image");paintActiveInspectionImage();}else setInspectionTab(conversationSources().length?"sources":"desktop");}
   function setImageCommentMode(open){state.imageCommentMode=Boolean(open&&activeInspectionImage());if(!state.imageCommentMode)state.imageCommentDraft=null;document.body.classList.toggle("image-commenting",state.imageCommentMode);$("imageCommentToggle")?.setAttribute("aria-pressed",String(state.imageCommentMode));$("imageCommentInstruction").hidden=!state.imageCommentMode;renderImageCommentState();}
   function imageCommentPosition(point){const image=$("inspectionImage").getBoundingClientRect(),canvas=$("inspectionImageCanvas").getBoundingClientRect();return`left:${image.left-canvas.left+image.width*point.x/100}px;top:${image.top-canvas.top+image.height*point.y/100}px`;}
   function renderImageCommentState(){
@@ -5590,10 +5474,9 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   }
   function saveWorkspace(path){
     state.workspace=String(path||"").trim();
-    state.reviewSnapshot=null;state.reviewSelectedPath="";state.reviewSelectedContent=null;state.reviewSelectedLoading=false;state.reviewFileRequest+=1;
     if(state.workspace){localStorage.setItem(workspaceStorageKey(),state.workspace);localStorage.setItem("phoenix-workspace:last",state.workspace);}
     else{localStorage.removeItem(workspaceStorageKey());localStorage.removeItem("phoenix-workspace:last");}
-    state.environmentSnapshot=null;renderWorkspaceChip();updateComposerLabels();if(state.inspectionOpen&&state.inspectionTab==="changes")loadWorkspaceReview(true);if(state.summaryOpen)refreshEnvironmentSnapshot(true);
+    state.environmentSnapshot=null;renderWorkspaceChip();updateComposerLabels();if(state.summaryOpen)refreshEnvironmentSnapshot(true);
   }
   function renderWorkspaceChip(){
     const label=$("workspaceLabel"),button=$("workspaceButton"),bar=$("workspaceBar");
@@ -6379,7 +6262,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     rememberInspectionBrowser(requestedBoundKey);
     if(preview&&new URLSearchParams(location.search).get("shot")==="teach-download")setTimeout(()=>showBrowserDownload({name:"ChatGPT Image Aug 22, 2026.png",path:"/preview/image.png",bytes:5033165,modified_ms:Date.now(),complete:true}),120);
   }
-  function closeBrowser({preserveWorkspace=false}={}){const surfaceInstance=state.browserOwnerId,boundKey=state.browserBoundKey;if(!preserveWorkspace&&boundKey){const saved=inspectionConversationState(boundKey);if(saved)saved.browser=null;}clearTimeout(state.browserTypingTimer);clearTimeout(state.browserResizeTimer);cancelAnimationFrame(state.browserWheelFrame);state.browserWheelFrame=0;state.browserWheelX=0;state.browserWheelY=0;state.browserWheelPoint=null;clearInterval(state.browserDownloadTimer);state.browserDownloadTimer=null;state.browserDownloadPending=false;state.browserDownloadSnapshot.clear();state.browserDownloadCurrent=null;$("browserDownloadShelf").hidden=true;state.browserTyping="";state.browserTypingPending=null;state.browserAddressEditing=false;state.browserAddressPending="";state.browserControlEnabled=false;state.browserControlWaiters.splice(0).forEach((resolve)=>resolve(false));rejectBrowserControl(new Error("Browser closed."));state.browserSocket?.close();state.browserSocket=null;const released=releaseBrowserSurface(surfaceInstance);state.browserActivationPromise=null;state.inspectionBrowserResumePromise=null;$("browserOverlay").hidden=true;$("browserFrame").removeAttribute("src");$("browserCanvas").hidden=true;if(state.browserFrameObjectUrl)URL.revokeObjectURL(state.browserFrameObjectUrl);state.browserFrameObjectUrl="";state.browserMode=null;state.browserFrame=null;state.browserFramePending=null;state.browserFramePainting=false;state.browserFramePaintQueued=false;state.browserFrameUrl="";state.browserResizeKey="";state.browserOwnerAgentId=null;state.browserOwnerId=null;state.browserBoundKey="";state.teaching=null;$("teachingTopbar").hidden=true;renderInspectionBrowserTabs({tabs:[]});if(!preserveWorkspace&&state.inspectionTab==="browser")setInspectionTab("changes");syncActivitySummary();return released;}
+  function closeBrowser({preserveWorkspace=false}={}){const surfaceInstance=state.browserOwnerId,boundKey=state.browserBoundKey;if(!preserveWorkspace&&boundKey){const saved=inspectionConversationState(boundKey);if(saved)saved.browser=null;}clearTimeout(state.browserTypingTimer);clearTimeout(state.browserResizeTimer);cancelAnimationFrame(state.browserWheelFrame);state.browserWheelFrame=0;state.browserWheelX=0;state.browserWheelY=0;state.browserWheelPoint=null;clearInterval(state.browserDownloadTimer);state.browserDownloadTimer=null;state.browserDownloadPending=false;state.browserDownloadSnapshot.clear();state.browserDownloadCurrent=null;$("browserDownloadShelf").hidden=true;state.browserTyping="";state.browserTypingPending=null;state.browserAddressEditing=false;state.browserAddressPending="";state.browserControlEnabled=false;state.browserControlWaiters.splice(0).forEach((resolve)=>resolve(false));rejectBrowserControl(new Error("Browser closed."));state.browserSocket?.close();state.browserSocket=null;const released=releaseBrowserSurface(surfaceInstance);state.browserActivationPromise=null;state.inspectionBrowserResumePromise=null;$("browserOverlay").hidden=true;$("browserFrame").removeAttribute("src");$("browserCanvas").hidden=true;if(state.browserFrameObjectUrl)URL.revokeObjectURL(state.browserFrameObjectUrl);state.browserFrameObjectUrl="";state.browserMode=null;state.browserFrame=null;state.browserFramePending=null;state.browserFramePainting=false;state.browserFramePaintQueued=false;state.browserFrameUrl="";state.browserResizeKey="";state.browserOwnerAgentId=null;state.browserOwnerId=null;state.browserBoundKey="";state.teaching=null;$("teachingTopbar").hidden=true;renderInspectionBrowserTabs({tabs:[]});if(!preserveWorkspace&&state.inspectionTab==="browser")setInspectionTab("desktop");syncActivitySummary();return released;}
   function updateTeachingSteps(){if(state.browserMode!=="teach")return;const steps=state.teaching?.teaching?.steps||[],count=steps.length;$("teachingStepCount").textContent=`${count} action${count===1?"":"s"} learned`;$("teachingLatestStep").textContent=teachingStepLabel(steps.at(-1));}
   async function focusTeachingOwner(ownerId){if(!ownerId||state.item?.kind==="group"||state.item?.id===ownerId)return;await ui.selectItem?.({kind:"agent",id:ownerId});}
   async function startTeaching(ownerId,startUrl=null,scope=null,groupId=null){
@@ -6649,10 +6532,6 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     document.querySelector(".inspection-tabbar").addEventListener("click",(event)=>{const button=event.target.closest("[data-inspection-tab]"),tabId=button?.dataset.browserTabId,imageId=button?.dataset.imageTabId;if(event.target.closest("[data-close-browser-tab]")){event.stopPropagation();closeInspectionBrowserTab(tabId);return;}if(event.target.closest("[data-close-image-tab]")){event.stopPropagation();closeInspectionImageTab(imageId);return;}if(button){showInspectionSidebar(button.dataset.inspectionTab);if(tabId)selectInspectionBrowserTab(tabId);if(imageId)selectInspectionImageTab(imageId);}});
     document.querySelector(".inspection-tabbar").addEventListener("keydown",(event)=>{if(!["ArrowLeft","ArrowRight","Home","End"].includes(event.key))return;const tabs=[...document.querySelectorAll('.inspection-tabbar [role="tab"]:not([hidden])')],current=Math.max(0,tabs.indexOf(event.target.closest('[role="tab"]'))),next=event.key==="Home"?0:event.key==="End"?tabs.length-1:(current+(event.key==="ArrowLeft"?-1:1)+tabs.length)%tabs.length;event.preventDefault();tabs[next]?.click();setTimeout(()=>{const selected=document.querySelector('.inspection-tabbar [role="tab"][aria-selected="true"]');selected?.focus();},0);});
     $("inspectionResize").onpointerdown=beginInspectionResize;$("inspectionResize").onpointermove=moveInspectionResize;$("inspectionResize").onpointerup=endInspectionResize;$("inspectionResize").onpointercancel=endInspectionResize;$("inspectionResize").onlostpointercapture=endInspectionResize;$("inspectionResize").onkeydown=(event)=>{if(!["ArrowLeft","ArrowRight"].includes(event.key))return;event.preventDefault();applyInspectionWidth(state.inspectionWidth+(event.key==="ArrowLeft"?16:-16),true);};
-    bindReviewResizer();
-    $("reviewFilter").oninput=(event)=>{state.reviewFilter=event.currentTarget.value.trim();renderReviewFileTree(state.reviewSnapshot,state.reviewScope==="agent"?receiptReviewChanges():(state.reviewSnapshot?.changes||[]));};
-    $("reviewTurnPicker").onclick=openReviewScopePicker;
-    $("reviewFileTree").onclick=(event)=>{const directory=event.target.closest("[data-review-directory]")?.dataset.reviewDirectory;if(directory){state.reviewCollapsedDirectories.has(directory)?state.reviewCollapsedDirectories.delete(directory):state.reviewCollapsedDirectories.add(directory);renderReviewFileTree(state.reviewSnapshot,state.reviewScope==="agent"?receiptReviewChanges():(state.reviewSnapshot?.changes||[]));return;}const button=event.target.closest("[data-review-file]");if(button)openReviewFile(button.dataset.reviewFile);};
     $("inspectionSourcesGrid").onclick=(event)=>{const index=event.target.closest("[data-source-card]")?.dataset.sourceCard,source=conversationSources()[Number(index)];if(source)openImageInspector(source);};
     $("imageCommentToggle").onclick=()=>setImageCommentMode(!state.imageCommentMode);$("imageCommentCancel").onclick=clearImageComments;$("imageCommentSend").onclick=()=>sendCommentedComposer().catch((error)=>ui.toast(error.message||String(error),true));$("imageCommentSave").onclick=()=>saveImageComment().catch((error)=>ui.toast(error.message||String(error),true));$("imageRemoveTab").onclick=()=>closeInspectionImageTab();$("imageResizeToggle").onclick=toggleImageActualSize;$("inspectionImageStage").onclick=placeImageComment;$("imageCommentText").oninput=(event)=>{if(!state.imageCommentDraft)return;const input=event.currentTarget;state.imageCommentDraft.text=input.value;$("imageCommentSave").disabled=!state.imageCommentDraft.text.trim();requestAnimationFrame(()=>{input.scrollLeft=input.scrollWidth;});};$("imageCommentText").onkeydown=(event)=>{if(event.key==="Enter"&&!event.isComposing){event.preventDefault();saveImageComment().catch((error)=>ui.toast(error.message||String(error),true));}};
     $("approvalStack").onclick=(event)=>{const button=event.target.closest("button");if(button)approvalAction(button);};$("approvalStack").onsubmit=(event)=>{if(event.target.matches(".approval-vault")){event.preventDefault();unlockApprovalVault(event.target.closest(".approval-card"));}};$("approvalStack").oninput=(event)=>{if(!event.target.matches(".approval-inline-custom [data-ask-custom-input]"))return;const card=event.target.closest(".approval-card"),model=card._askState;model.customAnswers[model.index]=event.target.value;model.answers[model.index]=null;model.multiSelections[model.index].clear();card.querySelectorAll(".qa-option.selected").forEach((option)=>{option.classList.remove("selected");option.setAttribute("aria-checked","false");});card.querySelector("[data-ask-continue]").disabled=!event.target.value.trim();};$("approvalStack").onkeydown=(event)=>{if(event.key!=="Enter"||!event.target.matches("[data-ask-custom-input]"))return;event.preventDefault();const card=event.target.closest(".approval-card");if(event.target.closest(".approval-inline-custom")){const value=event.target.value.trim();if(value)recordAskAnswer(card,value);return;}approvalAction(card.querySelector("[data-ask-custom-save]"));};$("queueList").onclick=(event)=>{const b=event.target.closest("[data-queue]");if(b)queueAction(b);};
@@ -6680,7 +6559,6 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     $("conversationFeed").addEventListener("wheel",(event)=>{if(event.deltaY<0)state.historyScrollIntentUntil=performance.now()+1000;},{passive:true});
     $("conversationFeed").addEventListener("keydown",(event)=>{if(["ArrowUp","PageUp","Home"].includes(event.key))state.historyScrollIntentUntil=performance.now()+1000;});
     $("conversationFeed").addEventListener("click",(event)=>{
-      if(event.target.closest("[data-open-review]")){showInspectionSidebar("changes");return;}
       const relayed=event.target.closest("[data-relayed-image-path]");if(relayed){openImageInspector({path:relayed.dataset.relayedImagePath,source:relayed._inspectionSource||"",name:relayed.querySelector("span")?.textContent||"Image"});return;}
       const generated=event.target.closest("[data-inspect-image-path]");if(generated){openImageInspector({path:generated.dataset.inspectImagePath,source:generated._inspectionSource||"",name:generated.querySelector("small")?.textContent||"Generated image"});return;}
       const messageImage=event.target.closest("[data-message-image]");if(messageImage){const row=messageImage.closest(".user-message"),file=row?._messageAttachments?.[Number(messageImage.dataset.messageImage)];if(file)openImageInspector({path:file.path,source:file.preview,name:file.name});return;}
@@ -6702,7 +6580,6 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
         ui.invoke("open_workspace_file",{path,workspace:state.workspace||null}).catch((error)=>ui.toast(`Could not open file: ${error.message||error}`,true));return;}
       const copy=event.target.closest("[data-copy-answer]");
       if(copy){copyAnswer(copy);return;}
-      if(event.target.closest("[data-open-review]")){showInspectionSidebar("changes");return;}
       const moreEdits=event.target.closest("[data-show-more-edits]");if(moreEdits){const card=moreEdits.closest(".turn-edit-summary");card?.querySelectorAll(".turn-edit-file.extra").forEach((row)=>row.hidden=false);moreEdits.remove();return;}
       const toolCopy=event.target.closest(".tool-detail-copy");
       if(toolCopy){const row=toolCopy.closest(".work-tool"),text=row?.dataset.copyText||"",label=toolCopy.getAttribute("aria-label");if(text)navigator.clipboard?.writeText(text).catch(()=>{});toolCopy.classList.add("copied");toolCopy.innerHTML=window.PhoenixAgentKit.icon("check");toolCopy.setAttribute("aria-label","Copied");clearTimeout(toolCopy._copyTimer);toolCopy._copyTimer=setTimeout(()=>{if(toolCopy.isConnected){toolCopy.classList.remove("copied");toolCopy.innerHTML=window.PhoenixAgentKit.icon("copy");toolCopy.setAttribute("aria-label",label==="Copied"?"Copy result":label);}},1600);return;}
@@ -6858,8 +6735,6 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
       setInspectionTab,
       showInspectionSidebar,
       hideInspectionSidebar,
-      receiptReviewChanges,
-      renderInspectionChanges,
       renderInspectionSources,
       setImageCommentMode,
       renderImageCommentState,

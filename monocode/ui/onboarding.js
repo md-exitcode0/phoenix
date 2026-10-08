@@ -271,7 +271,7 @@
   }
 
   function brand() {
-    return `<aside class="onboarding-brand"><div class="onboarding-logo">${ui.avatarSvg({ agent_id: "phoenix", color: "#e55732", icon_seed: "phoenix" })}<span><strong>Phoenix</strong><small>your company</small></span></div><div class="onboarding-promise"><h1>A company that learns how you work.</h1><p>Your coworkers share context when it helps, keep private work private, and get sharper every time you correct them.</p></div><span class="onboarding-trust">${shield} Local-first · encrypted credentials · explicit authority</span></aside>`;
+    return `<aside class="onboarding-brand"><div class="onboarding-logo">${phoenixBrandMark()}<span><strong>Phoenix</strong><small>your company</small></span></div><div class="onboarding-promise"><h1>A company that learns how you work.</h1><p>Your coworkers share context when it helps, keep private work private, and get sharper every time you correct them.</p></div><span class="onboarding-trust">${shield} Local-first · encrypted credentials · explicit authority</span></aside>`;
   }
 
   function ensureShell() {
@@ -342,7 +342,7 @@
   function renderCompany() {
     const selected = state.selectedCompany;
     const existing = detectedCoworkers();
-    shell(`<span class="onboarding-step-label">Your company</span><h2>How do you want to begin?</h2><p class="onboarding-lead">Phoenix is always your chief of staff. Start with Phoenix alone, or bring in the founding company of 12 human-named coworkers. You can archive or add coworkers whenever you want.</p><div class="onboarding-options"><button type="button" class="onboarding-option ${selected === "founding_company" ? "selected" : ""}" data-company="founding_company"><span class="onboarding-option-mark">${company}</span><span><strong>Start with the founding company</strong><small>Phoenix plus 11 focused coworkers for inbox, calendar, research, engineering, product design, knowledge, operations, finance, relationships, publishing, and reliability.</small></span>${optionEnd}</button><button type="button" class="onboarding-option ${selected === "phoenix_only" ? "selected" : ""}" data-company="phoenix_only"><span class="onboarding-option-mark">${ui.avatarSvg({ agent_id: "phoenix", color: "#e55732", icon_seed: "phoenix" })}</span><span><strong>Start with Phoenix</strong><small>A clean company with one chief of staff. Phoenix can create each coworker with you later, usually in about a minute.</small></span>${optionEnd}</button></div>${existing ? autodetectNote(`Detected ${state.snapshot.agents.length} coworkers already on this computer. Skip keeps them and continues.`) : ""}<div class="onboarding-actions"><button type="button" id="companySkip" class="button secondary">Skip</button><button type="button" id="companyContinue" class="button primary" ${selected ? "" : "disabled"}>Continue</button></div><div class="onboarding-note">${shield}<span>Existing Phoenix data is never cleared. If this computer already has canonical threads or memory, onboarding links them into the new company.</span></div>`, (root) => {
+    shell(`<span class="onboarding-step-label">Your company</span><h2>How do you want to begin?</h2><p class="onboarding-lead">Phoenix is always your chief of staff. Start with Phoenix alone, or bring in the founding company of 12 human-named coworkers. You can archive or add coworkers whenever you want.</p><div class="onboarding-options"><button type="button" class="onboarding-option ${selected === "founding_company" ? "selected" : ""}" data-company="founding_company"><span class="onboarding-option-mark">${company}</span><span><strong>Start with the founding company</strong><small>Phoenix plus 11 focused coworkers for inbox, calendar, research, engineering, product design, knowledge, operations, finance, relationships, publishing, and reliability.</small></span>${optionEnd}</button><button type="button" class="onboarding-option ${selected === "phoenix_only" ? "selected" : ""}" data-company="phoenix_only"><span class="onboarding-option-mark">${phoenixBrandMark()}</span><span><strong>Start with Phoenix</strong><small>A clean company with one chief of staff. Phoenix can create each coworker with you later, usually in about a minute.</small></span>${optionEnd}</button></div>${existing ? autodetectNote(`Detected ${state.snapshot.agents.length} coworkers already on this computer. Skip keeps them and continues.`) : ""}<div class="onboarding-actions"><button type="button" id="companySkip" class="button secondary">Skip</button><button type="button" id="companyContinue" class="button primary" ${selected ? "" : "disabled"}>Continue</button></div><div class="onboarding-note">${shield}<span>Existing Phoenix data is never cleared. If this computer already has canonical threads or memory, onboarding links them into the new company.</span></div>`, (root) => {
       root.querySelectorAll("[data-company]").forEach((button) => button.onclick = () => {
         state.selectedCompany = button.dataset.company;
         root.querySelectorAll("[data-company]").forEach((item) => item.classList.toggle("selected", item.dataset.company === state.selectedCompany));
@@ -704,6 +704,9 @@
       root.querySelector("#continueChannels").onclick = next;
     });
   }
+
+  // The Phoenix brand mark, not an agent avatar, so it keeps its drawn form.
+  function phoenixBrandMark() { return window.PhoenixMorphAvatar?.markup({ kind: "phoenix", gradient: "01-amber", agent: "phoenix" }) || ui.phoenixLogoMarkup(); }
 
   function renderReady() {
     const snap = state.snapshot;

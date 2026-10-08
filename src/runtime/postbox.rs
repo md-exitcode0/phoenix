@@ -1722,10 +1722,12 @@ pub enum RoomSteerKind {
     Fyi,
     /// Members were @mentioned; the running leader only keeps the board straight.
     LeaderFyi,
+    /// A teammate @mentioned this member in the room while it was working.
+    PeerMention,
 }
 
 impl RoomSteerKind {
-    pub const ALL: [RoomSteerKind; 7] = [
+    pub const ALL: [RoomSteerKind; 8] = [
         Self::LeaderAct,
         Self::MentionAct,
         Self::EveryoneAct,
@@ -1733,6 +1735,7 @@ impl RoomSteerKind {
         Self::LeaderSolo,
         Self::Fyi,
         Self::LeaderFyi,
+        Self::PeerMention,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -1744,6 +1747,7 @@ impl RoomSteerKind {
             Self::LeaderSolo => "leader-solo",
             Self::Fyi => "fyi",
             Self::LeaderFyi => "leader-fyi",
+            Self::PeerMention => "peer-mention",
         }
     }
 
@@ -1768,6 +1772,7 @@ impl RoomSteerKind {
             Self::LeaderSolo => "[The user just @mentioned only you in the room while you were working. Answer it yourself — do not dispatch, assign, or fan it out to members.]",
             Self::Fyi => "[FYI — the user just said this in the room. It was not addressed to you and someone else is handling it: do not reply to it or start new work for it. If it changes the work you are doing right now (for example a new requirement on what you are building), adapt immediately.]",
             Self::LeaderFyi => "[FYI for the leader — the user just said this in the room to specific members, who own it and act on it directly. Do not take over, redo, or reassign that work. Only keep the board straight: record it (decide / plan item / claims) so claims do not collide.]",
+            Self::PeerMention => "[A teammate just @mentioned you in the room while you were working (their message is below). Handle what it asks of you within your current work and answer in the room; do not redo work another member owns or has claimed, and do not repeat what they already said.]",
         }
     }
 }
@@ -1839,8 +1844,10 @@ pub fn steer_room_user(
         let queue = sbox.steer.entry(base.clone()).or_default();
         // An actionable user message goes ahead of coworker chatter; FYI
         // context keeps arrival order behind it.
-        let index = if kind.is_actionable() {
-            queue.iter().position(|queued| !(queued.from == "user" && room_steer_parts(&queued.subject).is_some_and(|(k, _)| k.is_actionable()))).unwrap_or(queue.len())
+        // A teammate's mention keeps arrival order too: the user outranks it.
+        let user_priority = |kind: RoomSteerKind| kind.is_actionable() && kind != RoomSteerKind::PeerMention;
+        let index = if user_priority(kind) {
+            queue.iter().position(|queued| !(queued.from == "user" && room_steer_parts(&queued.subject).is_some_and(|(k, _)| user_priority(k)))).unwrap_or(queue.len())
         } else {
             queue.len()
         };

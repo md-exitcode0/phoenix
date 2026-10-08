@@ -1,0 +1,560 @@
+/* Phoenix "soft sky" theme.
+ * A dusk-sky backdrop with frosted glass surfaces, chat bubbles and a calm
+ * pill composer. Loaded last so it settles the MonoCode skin's stacked
+ * corrections; every rule is scoped to the MonoCode skin.
+ * Tune the look from the tokens in the first two blocks.
+ */
+@font-face{font-family:"Inter";src:url("fonts/inter-var.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}
+@font-face{font-family:"Inter";src:url("fonts/inter-italic-var.woff2") format("woff2");font-weight:100 900;font-style:italic;font-display:swap}
+
+html:root[data-skin="monocode"]{
+  /* Sky: soft-sky.js rewrites these from the local time once a minute;
+     these are the dusk values it starts from. */
+  --sky-top:#1d1f48;--sky-mid:#383368;--sky-low:#6a4a7e;--sky-glow:rgb(214 124 176 / 28%);
+  --sky-cloud:#e8b6e0;--sky-cloud-far:.10;--sky-cloud-near:.08;--sky-stars:.25;--sky-sun-x:88%;
+  /* Glass */
+  --glass-1:rgb(16 18 32 / 42%);        /* panels: sidebar, header pills */
+  --glass-2:rgb(16 18 30 / 46%);        /* agent bubbles, cards */
+  --glass-3:rgb(255 255 255 / 8.5%);    /* user bubbles, selected rows */
+  --glass-hover:rgb(255 255 255 / 6%);
+  --glass-press:rgb(255 255 255 / 10%);
+  --glass-pop:rgb(30 32 52 / 86%);      /* menus, popovers, modals */
+  --glass-line:rgb(255 255 255 / 7.5%);
+  --glass-line-strong:rgb(255 255 255 / 13%);
+  --glass-blur:22px;
+  --glass-shadow:0 10px 40px rgb(8 10 24 / 28%);
+  /* Ink */
+  --soft-ink:rgb(238 239 247 / 94%);
+  --soft-ink-2:rgb(214 217 234 / 74%);
+  --soft-ink-3:rgb(200 204 228 / 56%);
+  --soft-accent:#c9c6ff;
+  /* Type */
+  --soft-font:"Inter",ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --soft-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --soft-text:15px;--soft-leading:1.5;--soft-small:12.5px;--soft-tiny:11.5px;
+  /* Layout */
+  --soft-column:760px;--soft-bubble:min(680px,84%);--soft-radius:20px;--soft-tail:7px;
+  --soft-ease:cubic-bezier(.2,.75,.25,1);
+
+  /* Map onto the skin's own tokens so untouched components follow along. */
+  --mc-bg:transparent;--mc-surface:var(--glass-2);--mc-raised:rgb(34 37 58 / 72%);
+  --mc-ink:var(--soft-ink);--mc-muted:var(--soft-ink-2);--mc-line:var(--glass-line);--mc-selection:var(--glass-3);
+  --bg:transparent;--sidebar:transparent;--sidebar-solid:transparent;--surface:var(--glass-2);--surface-raised:rgb(34 37 58 / 72%);--surface-muted:var(--glass-1);
+  --hover:var(--glass-hover);--pressed:var(--glass-press);--line:var(--glass-line);--line-strong:var(--glass-line-strong);
+  --ink:var(--soft-ink);--ink-soft:var(--soft-ink-2);--ink-faint:var(--soft-ink-3);--muted:var(--soft-ink-3);
+  --control-bg:var(--glass-3);--control-line:var(--glass-line);--ember:#d9d7ff;--accent-ink:#e1dfff;--accent-contrast:#191b2c;
+  --font:var(--soft-font);--ui-font:var(--soft-font);
+  --mc-button-radius:10px;--radius:14px;--radius-sm:10px;
+  --overlay:rgb(10 12 26 / 46%);
+  --menu-shadow:0 18px 50px rgb(6 8 20 / 42%),0 2px 8px rgb(6 8 20 / 24%);
+  color-scheme:dark;
+}
+html:root[data-skin="monocode"][data-theme="light"]{
+  --sky-top:#c6daf1;--sky-mid:#dce5f3;--sky-low:#f1e8e4;--sky-glow:rgb(255 246 236 / 50%);
+  --sky-cloud:#fff;--sky-cloud-far:.44;--sky-cloud-near:.32;--sky-stars:0;
+  --glass-1:rgb(255 255 255 / 38%);
+  --glass-2:rgb(255 255 255 / 58%);
+  --glass-3:rgb(64 70 120 / 9%);
+  --glass-hover:rgb(40 46 90 / 5.5%);
+  --glass-press:rgb(40 46 90 / 9%);
+  --glass-pop:rgb(250 250 255 / 90%);
+  --glass-line:rgb(40 46 90 / 9%);
+  --glass-line-strong:rgb(40 46 90 / 16%);
+  --glass-shadow:0 10px 40px rgb(60 66 120 / 12%);
+  --soft-ink:rgb(28 30 48 / 94%);
+  --soft-ink-2:rgb(52 56 84 / 76%);
+  --soft-ink-3:rgb(60 64 96 / 62%);
+  --soft-accent:#4b45a8;
+  --mc-raised:rgb(255 255 255 / 80%);--surface-raised:rgb(255 255 255 / 80%);
+  --ember:#4d4a9c;--accent-ink:#3e3a8a;--accent-contrast:#fff;
+  --overlay:rgb(60 66 110 / 22%);
+  --menu-shadow:0 18px 50px rgb(50 56 110 / 18%),0 2px 8px rgb(50 56 110 / 10%);
+  color-scheme:light;
+}
+
+/* ── Sky ─────────────────────────────────────────────────────────────── */
+/* The colours interpolate in JS; registering them lets a large jump (a
+   window shown after hours, a forced preview time) ease instead of snap. */
+@property --sky-top{syntax:"<color>";inherits:true;initial-value:#1d1f48}
+@property --sky-mid{syntax:"<color>";inherits:true;initial-value:#383368}
+@property --sky-low{syntax:"<color>";inherits:true;initial-value:#6a4a7e}
+@property --sky-glow{syntax:"<color>";inherits:true;initial-value:transparent}
+html:root[data-skin="monocode"],
+html:root[data-skin="monocode"][data-mc-glass="true"]{
+  --sky-layers:radial-gradient(70% 55% at var(--sky-sun-x,80%) 108%,var(--sky-glow),transparent 70%),linear-gradient(180deg,var(--sky-top),var(--sky-mid) 58%,var(--sky-low));
+  background:var(--sky-layers)!important;
+  background-attachment:fixed!important;
+  font-family:var(--soft-font)!important;
+  font-feature-settings:"cv11","ss01";
+  -webkit-font-smoothing:antialiased;
+}
+/* The living layer sits under everything (z-index -1 in the root context)
+   and never takes input. Each moving part is its own composited layer that
+   only animates transform or opacity, so no layout or paint runs per frame. */
+html:root[data-skin="monocode"] #softSky{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none;contain:strict}
+html:root:not([data-skin="monocode"]) #softSky{display:none}
+#softSky>i,#softSky>span,#softSky .sky-stars>i{position:absolute;display:block;pointer-events:none}
+#softSky .sky-base{inset:0;background:var(--sky-layers)}
+html:root[data-sky-ease="true"] #softSky .sky-base{transition:--sky-top 1.5s ease,--sky-mid 1.5s ease,--sky-low 1.5s ease,--sky-glow 1.5s ease}
+/* Horizon glow: sits under the sun's position and breathes sideways. */
+#softSky .sky-glow{left:calc(var(--sky-sun-x,80%) - 45vw);bottom:-38vh;width:90vw;height:76vh;border-radius:50%;
+  background:radial-gradient(closest-side,var(--sky-glow),transparent);will-change:transform;animation:sky-glow 150s ease-in-out infinite alternate}
+@keyframes sky-glow{from{transform:translate3d(-6vw,0,0) scale(1)}to{transform:translate3d(6vw,-2vh,0) scale(1.08)}}
+/* Stars: three sparse tiles; two twinkle out of phase, all drift slowly. */
+#softSky .sky-stars{inset:-64px 0 0 -64px;opacity:var(--sky-stars);
+  -webkit-mask-image:linear-gradient(180deg,#000 0,#000 45%,transparent 88%);mask-image:linear-gradient(180deg,#000 0,#000 45%,transparent 88%)}
+html:root[data-sky-stars="off"] #softSky .sky-stars{display:none}
+#softSky .sky-stars>i{inset:0;background-repeat:repeat;will-change:transform,opacity}
+#softSky .sky-stars-a{background-image:url("assets/sky-stars-a.png");background-size:512px;animation:sky-star-drift 360s linear infinite}
+#softSky .sky-stars-b{background-image:url("assets/sky-stars-b.png");background-size:384px;animation:sky-star-drift 360s linear infinite,sky-twinkle 5.5s ease-in-out infinite alternate}
+#softSky .sky-stars-c{background-image:url("assets/sky-stars-b.png");background-size:448px;background-position:173px 91px;animation:sky-star-drift 360s linear infinite,sky-twinkle 8s ease-in-out -3s infinite alternate}
+@keyframes sky-star-drift{from{transform:translate3d(0,0,0)}to{transform:translate3d(64px,32px,0)}}
+@keyframes sky-twinkle{from{opacity:.25}to{opacity:1}}
+/* Haze: two tileable cloud masks tinted by the hour, drifting at different
+   speeds for parallax. The strip is two tiles wide and slides one tile. */
+#softSky .sky-clouds{left:0;width:200%;background:var(--sky-cloud);will-change:transform;
+  -webkit-mask-repeat:repeat-x;mask-repeat:repeat-x;-webkit-mask-size:50% 100%;mask-size:50% 100%}
+#softSky .sky-clouds-far{top:2vh;height:62vh;opacity:var(--sky-cloud-far);
+  -webkit-mask-image:url("assets/sky-clouds-far.webp");mask-image:url("assets/sky-clouds-far.webp");animation:sky-drift 180s linear infinite}
+#softSky .sky-clouds-near{bottom:-6vh;height:58vh;opacity:var(--sky-cloud-near);
+  -webkit-mask-image:url("assets/sky-clouds-near.webp");mask-image:url("assets/sky-clouds-near.webp");animation:sky-drift 110s linear infinite reverse}
+@keyframes sky-drift{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}
+/* Still frame: hidden window, reduced motion, or minimal motion. Reduced
+   (the app setting) keeps the slow drift but drops the twinkle. */
+html:root[data-sky-paused="true"] #softSky *{animation-play-state:paused!important}
+html:root[data-motion="reduced"] #softSky :is(.sky-stars-b,.sky-stars-c){animation:sky-star-drift 360s linear infinite}
+html:root[data-motion="minimal"] #softSky *{animation:none!important}
+@media (prefers-reduced-motion:reduce){html:root #softSky *{animation:none!important}}
+html:root[data-skin="monocode"] body,
+html:root[data-skin="monocode"] #appShell{background:transparent!important}
+html:root[data-skin="monocode"] body{color:var(--soft-ink);font-family:var(--soft-font)!important}
+html:root[data-skin="monocode"] :is(button,input,textarea,select){font-family:inherit}
+
+/* ── Floating glass sidebar ──────────────────────────────────────────── */
+html:root[data-skin="monocode"] #companySidebar{
+  margin:10px 0 10px 10px;height:calc(100% - 20px);
+  background:var(--glass-1)!important;
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.15)!important;backdrop-filter:blur(var(--glass-blur)) saturate(1.15)!important;
+  border:1px solid var(--glass-line)!important;border-radius:20px;overflow:hidden;box-shadow:var(--glass-shadow);
+}
+html:root[data-skin="monocode"] #sidebarList,
+html:root[data-skin="monocode"] .sidebar-footer{background:transparent!important}
+html:root[data-skin="monocode"] .sidebar-header{border-bottom:0!important;height:48px;min-height:48px;padding:0 14px}
+html:root[data-skin="monocode"] .phoenix-brand{height:47px}
+html:root[data-skin="monocode"] .brand-copy strong{font:600 14px/1.3 var(--soft-font);letter-spacing:-.01em;color:var(--soft-ink)}
+html:root[data-skin="monocode"] .sidebar-tools{padding:2px 10px 6px}
+html:root[data-skin="monocode"] .search-box{height:34px;border-radius:12px!important;background:var(--glass-hover)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important}
+html:root[data-skin="monocode"] .search-box input{font:400 13px var(--soft-font);color:var(--soft-ink)}
+html:root[data-skin="monocode"] .search-box kbd{font:500 10.5px var(--soft-font);color:var(--soft-ink-3);background:transparent;border:0}
+html:root[data-skin="monocode"] .sidebar-actions{padding:2px 10px 10px}
+html:root[data-skin="monocode"] .sidebar-actions button{min-height:32px;border-radius:10px!important;font:450 13px var(--soft-font);color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] .sidebar-actions button:hover{background:var(--glass-hover);color:var(--soft-ink)}
+html:root[data-skin="monocode"] .sidebar-list{padding:0 8px}
+html:root[data-skin="monocode"] .company-section>header{padding:10px 8px 4px;font:600 11px/1.3 var(--soft-font);letter-spacing:.02em;color:var(--soft-ink-3)}
+html:root[data-skin="monocode"] .company-row{border-radius:14px!important;min-height:54px;padding:7px 9px;margin:1px 0;transition:background-color .18s var(--soft-ease)}
+html:root[data-skin="monocode"] .company-row:hover{background:var(--glass-hover)!important}
+html:root[data-skin="monocode"] .company-row.selected{background:var(--glass-3)!important;box-shadow:inset 0 0 0 1px var(--glass-line)!important}
+html:root[data-skin="monocode"] .company-row .row-name{font:550 13.5px/1.3 var(--soft-font);letter-spacing:-.005em;color:var(--soft-ink)}
+html:root[data-skin="monocode"] .company-row .row-role{font:400 12px/1.35 var(--soft-font);color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] .company-row :is(.row-time,time,.row-meta){font:400 11px var(--soft-font);color:var(--soft-ink-3)}
+html:root[data-skin="monocode"] .sidebar-footer{border-top:1px solid var(--glass-line)!important;padding:8px 10px;min-height:50px}
+html:root[data-skin="monocode"] .settings-button{border-radius:10px!important;font:500 13px var(--soft-font);color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] .settings-button:hover{background:var(--glass-hover);color:var(--soft-ink)}
+html:root[data-skin="monocode"] #sidebarResize{right:-6px}
+
+/* ── Stage and header ────────────────────────────────────────────────── */
+html:root[data-skin="monocode"] #conversationStage{background:transparent!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+  --chat-user:var(--glass-3);--chat-user-ink:var(--soft-ink);--chat-reply:var(--glass-2);--chat-composer:var(--glass-2);--chat-control:var(--glass-line)}
+html:root[data-skin="monocode"] #conversationHeader{--mc-button-radius:999px;border-bottom:0!important;background:transparent!important;height:52px;min-height:52px;flex-basis:52px;padding:0 128px 0 18px;gap:8px}
+html:root[data-skin="monocode"] #stageName{font:600 14px/1.3 var(--soft-font);letter-spacing:-.01em;color:var(--soft-ink)}
+html:root[data-skin="monocode"] #conversationHeader :is(button,.stage-panel-button){border-radius:999px!important}
+html:root[data-skin="monocode"] #conversationHeader .stage-panel-button{width:32px;height:32px;min-height:32px;color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] #conversationHeader .stage-panel-button:hover{background:var(--glass-hover);color:var(--soft-ink)}
+/* Header pills share one shape: 30px glass capsule, content centred. */
+html:root[data-skin="monocode"] #conversationHeader :is(#conversationDetailToggle,.group-roster-trigger){
+  display:inline-flex!important;align-items:center;justify-content:center;flex:0 0 auto;box-sizing:border-box;
+  width:auto!important;min-width:0;height:30px!important;min-height:30px;margin:0!important;line-height:1;white-space:nowrap;
+  border-radius:999px!important;background:var(--glass-1)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important;
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+}
+html:root[data-skin="monocode"] #conversationDetailToggle{padding:0 13px!important;font:500 12px/1 var(--soft-font)!important;color:var(--soft-ink-2)!important}
+html:root[data-skin="monocode"] #conversationHeader .group-roster-trigger{padding:0 10px 0 5px!important;gap:6px}
+html:root[data-skin="monocode"] #conversationHeader .group-roster-trigger>small{font:500 11.5px/1 var(--soft-font);color:var(--soft-ink-3);font-variant-numeric:tabular-nums}
+html:root[data-skin="monocode"] #conversationHeader .group-roster-trigger:hover{background:var(--glass-hover)!important;border-color:var(--glass-line-strong)!important}
+html:root[data-skin="monocode"] #conversationHeader #stageMore{display:grid;place-items:center;width:30px!important;height:30px!important;min-height:30px;padding:0!important;margin:0!important;border-radius:999px!important;background:transparent;border:0;color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] #conversationHeader #stageMore svg{width:16px;height:16px;fill:currentColor}
+html:root[data-skin="monocode"] #conversationHeader #stageMore:hover{background:var(--glass-hover);color:var(--soft-ink)}
+html:root[data-skin="monocode"] #conversationDetailToggle:hover{background:var(--glass-hover)!important;color:var(--soft-ink)!important;border-color:var(--glass-line-strong)!important}
+html:root[data-skin="monocode"] .mc-window-controls{height:44px;top:6px;right:8px}
+html:root[data-skin="monocode"] .mc-window-controls button{width:36px;height:32px;border-radius:999px!important;color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] .mc-window-controls button:hover{background:var(--glass-hover)}
+html:root[data-skin="monocode"] .mc-window-controls button:last-child:hover{background:rgb(225 80 96 / 85%);color:#fff}
+
+/* ── Feed column ─────────────────────────────────────────────────────── */
+html:root[data-skin="monocode"] #conversationFeed{max-width:calc(var(--soft-column) + 76px)!important;margin:0 auto;padding:20px 38px 28px!important;font-family:var(--soft-font)}
+html:root[data-skin="monocode"] #conversationFeed .message-row{margin-bottom:18px}
+html:root[data-skin="monocode"] #conversationFeed .message-row.message-group-start{margin-bottom:6px}
+
+/* User bubble: right, light glass. */
+html:root[data-skin="monocode"] #conversationFeed .user-message{display:flex;justify-content:flex-end}
+html:root[data-skin="monocode"] #conversationFeed .user-message>.message-content{display:flex;justify-content:flex-end;align-items:center;gap:6px;width:100%;max-width:100%;margin-left:auto}
+html:root[data-skin="monocode"] #conversationFeed .user-bubble{
+  --mc-button-radius:var(--soft-radius);
+  max-width:var(--soft-bubble)!important;padding:11px 16px!important;
+  border-radius:var(--soft-radius) var(--soft-radius) var(--soft-tail) var(--soft-radius)!important;
+  background:var(--glass-3)!important;color:var(--soft-ink)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important;
+  -webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur));
+  font:400 var(--soft-text)/var(--soft-leading) var(--soft-font)!important;letter-spacing:-.003em;
+}
+html:root[data-skin="monocode"] #conversationFeed .user-bubble :is(p,.markdown,a,code){color:var(--soft-ink)}
+html:root[data-skin="monocode"] #conversationFeed .user-bubble p{margin:0}
+html:root[data-skin="monocode"] #conversationFeed .user-message .turn-delete-button{opacity:0!important;transition:opacity .18s}
+html:root[data-skin="monocode"] #conversationFeed .user-message:hover .turn-delete-button,
+html:root[data-skin="monocode"] #conversationFeed .user-message .turn-delete-button:focus-visible{opacity:.7!important}
+
+/* Agent bubble: left, dark glass; avatar beside it. */
+html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message,.commentary-message){display:grid;grid-template-columns:32px minmax(0,1fr);column-gap:10px;align-items:start}
+html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message)>.message-avatar{width:32px;height:32px;margin-top:2px}
+html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message)>.message-avatar :is(svg,img,canvas,.fluffy-token,.agent-avatar,.avatar-custom){width:32px!important;height:32px!important}
+html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message)>.message-content{min-width:0}
+html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message) .message-content>header{min-height:22px;margin:0 0 5px 4px!important;gap:8px}
+html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message) .message-content>header strong{font:550 12.5px/1.3 var(--soft-font)!important;letter-spacing:0;color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] #conversationFeed .member-message .message-content>header strong{color:color-mix(in srgb,var(--speaker,var(--soft-ink-2)) 45%,var(--soft-ink-2))!important}
+html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message) .message-content>header small{font:400 11.5px var(--soft-font);color:var(--soft-ink-3)}
+/* In a 1:1 chat the avatar says who it is; the name stays for rooms. */
+html:root[data-skin="monocode"] #conversationFeed .agent-message .message-content>header strong{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+html:root[data-skin="monocode"] #conversationFeed .agent-message .message-content>header:not(:has(.answer-work-toggle)){display:none}
+html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message,.commentary-message)>.message-content>.markdown{
+  width:fit-content;max-width:var(--soft-bubble)!important;padding:12px 16px!important;
+  border-radius:var(--soft-radius) var(--soft-radius) var(--soft-radius) var(--soft-tail)!important;
+  background:var(--glass-2)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important;
+  -webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur));
+  color:var(--soft-ink);font:400 var(--soft-text)/var(--soft-leading) var(--soft-font)!important;letter-spacing:-.003em;
+}
+html:root[data-skin="monocode"] #conversationFeed .message-continuation>.message-content>.markdown{border-top-left-radius:var(--soft-tail)!important}
+html:root[data-skin="monocode"][data-conversation-text="small"] #conversationFeed :is(.user-bubble,.message-content>.markdown){--soft-text:14px}
+html:root[data-skin="monocode"][data-conversation-text="smaller"] #conversationFeed :is(.user-bubble,.message-content>.markdown){--soft-text:13px}
+
+/* Markdown inside bubbles */
+html:root[data-skin="monocode"] #conversationFeed .markdown :is(p,ul,ol,blockquote,pre,.markdown-table-wrap){margin:0 0 10px}
+html:root[data-skin="monocode"] #conversationFeed .markdown>:last-child{margin-bottom:0}
+html:root[data-skin="monocode"] #conversationFeed .markdown :is(ul,ol){padding-left:20px}
+html:root[data-skin="monocode"] #conversationFeed .markdown li{margin:3px 0}
+html:root[data-skin="monocode"] #conversationFeed .markdown li::marker{color:var(--soft-ink-3)}
+html:root[data-skin="monocode"] #conversationFeed .markdown strong{font-weight:600;color:var(--soft-ink)}
+html:root[data-skin="monocode"] #conversationFeed .markdown :is(h1,h2,h3,h4){font-family:var(--soft-font);color:var(--soft-ink);letter-spacing:-.012em;margin:4px 0 8px;line-height:1.3}
+html:root[data-skin="monocode"] #conversationFeed .markdown h1{font-size:19px;font-weight:600}
+html:root[data-skin="monocode"] #conversationFeed .markdown h2{font-size:17px;font-weight:600}
+html:root[data-skin="monocode"] #conversationFeed .markdown :is(h3,h4){font-size:15.5px;font-weight:600}
+html:root[data-skin="monocode"] #conversationFeed .markdown a{color:var(--soft-accent);text-decoration-color:color-mix(in srgb,var(--soft-accent) 40%,transparent);text-underline-offset:3px}
+html:root[data-skin="monocode"] #conversationFeed .markdown :not(pre)>code{font:500 .88em var(--soft-mono);padding:.12em .42em;border-radius:7px!important;background:rgb(255 255 255 / 8%);border:1px solid var(--glass-line);color:var(--soft-ink)}
+html:root[data-skin="monocode"][data-theme="light"] #conversationFeed .markdown :not(pre)>code{background:rgb(40 46 90 / 6%)}
+html:root[data-skin="monocode"] #conversationFeed .markdown :is(pre,.code-block){--mc-button-radius:14px;border-radius:14px!important;background:rgb(6 8 18 / 34%)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important;overflow:hidden}
+html:root[data-skin="monocode"][data-theme="light"] #conversationFeed .markdown :is(pre,.code-block){background:rgb(255 255 255 / 55%)!important}
+html:root[data-skin="monocode"] #conversationFeed .markdown pre code,
+html:root[data-skin="monocode"] #conversationFeed .markdown .code-block code{font:400 13px/1.6 var(--soft-mono);background:transparent!important;border:0!important;padding:0}
+html:root[data-skin="monocode"] #conversationFeed .markdown pre{padding:12px 14px}
+html:root[data-skin="monocode"] #conversationFeed .markdown .code-block pre{margin:0;border:0!important;border-radius:0!important;background:transparent!important}
+html:root[data-skin="monocode"] #conversationFeed .markdown .code-block :is(header,.code-block-header,.code-head){background:rgb(255 255 255 / 3%);border-bottom:1px solid var(--glass-line);font:500 11.5px var(--soft-font);color:var(--soft-ink-3)}
+html:root[data-skin="monocode"] #conversationFeed .markdown blockquote{padding:2px 0 2px 12px;border-left:2px solid var(--glass-line-strong);color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] #conversationFeed .markdown .markdown-table-wrap{border-radius:12px;border:1px solid var(--glass-line);overflow:auto}
+html:root[data-skin="monocode"] #conversationFeed .markdown table{font-size:13.5px;border-collapse:collapse;width:100%}
+html:root[data-skin="monocode"] #conversationFeed .markdown :is(th,td){padding:7px 11px;border-bottom:1px solid var(--glass-line);border-left:0;border-right:0}
+html:root[data-skin="monocode"] #conversationFeed .markdown th{font-weight:600;color:var(--soft-ink-2);background:rgb(255 255 255 / 3%)}
+html:root[data-skin="monocode"] #conversationFeed .markdown tr:last-child td{border-bottom:0}
+
+/* Quiet footer under answers: time and copy, louder on hover. */
+html:root[data-skin="monocode"] #conversationFeed .answer-footer{margin:4px 0 0 6px;gap:2px;opacity:.55;transition:opacity .2s}
+html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message):hover .answer-footer,
+html:root[data-skin="monocode"] #conversationFeed .answer-footer:focus-within{opacity:1}
+html:root[data-skin="monocode"] #conversationFeed .answer-footer button{width:26px;height:26px;border-radius:999px!important;color:var(--soft-ink-3)}
+html:root[data-skin="monocode"] #conversationFeed .answer-footer button:hover{background:var(--glass-hover);color:var(--soft-ink)}
+html:root[data-skin="monocode"] #conversationFeed .completion-meta{font:400 11.5px var(--soft-font);color:var(--soft-ink-3)}
+
+/* Edited-files card stays a calm glass panel. */
+html:root[data-skin="monocode"] #conversationFeed .turn-edit-summary{--mc-button-radius:14px;max-width:var(--soft-bubble);margin-top:8px;border-radius:16px!important;background:var(--glass-1)!important;border:1px solid var(--glass-line)!important;font-family:var(--soft-font)}
+html:root[data-skin="monocode"] #conversationFeed .turn-edit-summary header strong{font:500 12.5px var(--soft-font);color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] #conversationFeed .turn-edit-file{font:400 12px var(--soft-mono);color:var(--soft-ink-2);border-color:var(--glass-line)}
+
+/* ── Work activity: quiet, collapsible, never a wall ──────────────────── */
+html:root[data-skin="monocode"] #conversationFeed :is(.work-cluster,.team-work-block,.team-work-row){background:transparent!important;border:0!important;box-shadow:none!important;font-family:var(--soft-font)}
+html:root[data-skin="monocode"] #conversationFeed .work-cluster{margin:2px 0 10px 42px;max-width:var(--soft-bubble)}
+html:root[data-skin="monocode"] #conversationFeed .team-work-block{margin:0 0 12px}
+html:root[data-skin="monocode"] #conversationFeed .team-work-block .work-cluster{margin-left:0}
+html:root[data-skin="monocode"] #conversationFeed .group-work-agent{--mc-button-radius:999px;min-height:30px!important;padding:3px 12px 3px 4px!important;border-radius:999px!important;background:var(--glass-1)!important;border:1px solid var(--glass-line)!important;font:500 12.5px var(--soft-font)!important;color:var(--soft-ink-2);gap:8px;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+html:root[data-skin="monocode"] #conversationFeed .group-work-agent:hover{background:var(--glass-hover)!important;color:var(--soft-ink)}
+html:root[data-skin="monocode"] #conversationFeed .group-work-agent strong{font-weight:550;color:var(--soft-ink)}
+html:root[data-skin="monocode"] #conversationFeed .group-work-agent small{font:400 12px var(--soft-font);color:var(--soft-ink-3)}
+html:root[data-skin="monocode"] #conversationFeed .group-work-avatar{width:22px;height:22px}
+html:root[data-skin="monocode"] #conversationFeed .group-work-avatar :is(svg,img,canvas){width:22px!important;height:22px!important}
+html:root[data-skin="monocode"] #conversationFeed .work-trace{margin-top:4px;padding-left:12px}
+html:root[data-skin="monocode"] #conversationFeed .work-trace-line{background:var(--glass-line)!important}
+html:root[data-skin="monocode"] #conversationFeed :is(.work-tool-summary,.trace-subgroup>summary,.reasoning-subgroup>summary,.work-row,.tool-row){min-height:26px!important;padding:3px 8px!important;border-radius:10px!important;background:transparent!important;font:400 12.5px/1.4 var(--soft-font)!important;color:var(--soft-ink-3)!important}
+html:root[data-skin="monocode"] #conversationFeed :is(.work-tool-summary,.trace-subgroup>summary,.reasoning-subgroup>summary):hover{background:var(--glass-hover)!important;color:var(--soft-ink-2)!important}
+html:root[data-skin="monocode"] #conversationFeed :is(.work-tool-summary .tr-title,.reasoning-subgroup-label){font:450 12.5px/1.4 var(--soft-font)!important;color:inherit!important}
+html:root[data-skin="monocode"] #conversationFeed :is(.work-tool,.work-tool-detail,.tr-well,.trace-subgroup,.trace-subgroup-body){background:transparent!important;border-color:var(--glass-line)!important;box-shadow:none!important}
+html:root[data-skin="monocode"] #conversationFeed :is(.work-tool-detail,.tr-well,.tr-output) pre{font:400 12px/1.55 var(--soft-mono);border-radius:12px!important;background:rgb(6 8 18 / 30%)!important;border:1px solid var(--glass-line)!important}
+html:root[data-skin="monocode"] #conversationFeed .answer-work-toggle{height:22px;padding:0 8px;border-radius:999px!important;font:500 11.5px var(--soft-font);color:var(--soft-ink-3)}
+html:root[data-skin="monocode"] #conversationFeed .answer-work-toggle:hover{background:var(--glass-hover);color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] #conversationFeed :is(.work-progress,.mc-commentary,.commentary-line){font:400 13.5px/1.5 var(--soft-font)!important;color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] #conversationFeed .context-compaction{font-family:var(--soft-font);color:var(--soft-ink-3)}
+html:root[data-skin="monocode"] #conversationFeed .context-compaction strong{font-weight:500;font-size:12.5px;color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] #conversationFeed .context-compaction small{font-size:11.5px;color:var(--soft-ink-3)}
+
+/* Prompt rail and jump control */
+html:root[data-skin="monocode"] #jumpLatest{height:30px;padding:0 14px;border-radius:999px!important;background:var(--glass-pop)!important;border:1px solid var(--glass-line)!important;font:500 12px var(--soft-font);color:var(--soft-ink-2);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:var(--glass-shadow)}
+
+/* ── Composer ────────────────────────────────────────────────────────── */
+html:root[data-skin="monocode"] #composerZone{background:transparent!important;width:calc(100% - 48px)!important;max-width:var(--soft-column)!important;margin:0 auto 34px!important;gap:10px!important}
+html:root[data-skin="monocode"] #composerZone::before{content:none!important}
+html:root[data-skin="monocode"] #composerZone #composer{
+  /* Radii here go through --mc-button-radius: the skin's layered !important
+     radius rule reads it, so it is the only lever that wins. */
+  --mc-button-radius:var(--composer-r);
+  position:relative;display:flex;flex-direction:column;
+  /* Geometry: end radius R=28. The 36px send circle and the 32px + sit on
+     the corner arcs' centres (inset R-r: 10px and 12px from the outer edge), so both read as
+     concentric with the pill's ends; text starts in line with the + glyph. */
+  --composer-r:28px;
+  min-height:0!important;padding:14px 9px 9px 11px!important;
+  border-radius:var(--composer-r)!important;border:1px solid var(--glass-line-strong)!important;
+  background:var(--glass-2)!important;
+  -webkit-backdrop-filter:blur(26px) saturate(1.2);backdrop-filter:blur(26px) saturate(1.2);
+  box-shadow:0 14px 44px rgb(6 8 22 / 30%),inset 0 1px 0 rgb(255 255 255 / 5%)!important;
+  transition:border-color .25s var(--soft-ease),box-shadow .35s var(--soft-ease),background-color .25s;
+}
+html:root[data-skin="monocode"][data-theme="light"] #composerZone #composer{box-shadow:0 14px 44px rgb(60 66 120 / 14%),inset 0 1px 0 rgb(255 255 255 / 60%)!important}
+html:root[data-skin="monocode"] #composerZone #composer:focus-within{
+  border-color:rgb(220 222 255 / 24%)!important;
+  box-shadow:0 0 0 4px rgb(190 190 255 / 7%),0 18px 54px rgb(6 8 22 / 34%),inset 0 1px 0 rgb(255 255 255 / 6%)!important;
+}
+html:root[data-skin="monocode"][data-theme="light"] #composerZone #composer:focus-within{border-color:rgb(80 80 170 / 26%)!important;box-shadow:0 0 0 4px rgb(90 90 200 / 8%),0 18px 54px rgb(60 66 120 / 16%)!important}
+html:root[data-skin="monocode"] #composer :is(button,[role="button"],summary){--mc-button-radius:999px}
+html:root[data-skin="monocode"] #composerInput{
+  order:1;min-height:28px!important;max-height:40vh;padding:2px 12px 6px 7px!important;margin:0;
+  font:400 15.5px/24px var(--soft-font)!important;letter-spacing:-.005em;color:var(--soft-ink)!important;caret-color:var(--soft-ink);
+}
+html:root[data-skin="monocode"] #composerInput:empty::before{color:var(--soft-ink-3)!important;font-weight:400}
+html:root[data-skin="monocode"] #composer :is(#attachmentTray,#mentionTray,#composerCommentPopover){order:0}
+/* Project label whispers under the composer instead of crowding it. */
+html:root[data-skin="monocode"] #composer .mc-composer-head{
+  position:absolute;left:19px;right:20px;bottom:-25px;height:18px!important;padding:0!important;
+  font:450 11.5px/18px var(--soft-font)!important;color:var(--soft-ink-2)!important;pointer-events:none;
+  /* It sits on the brightest band of the sky (dawn, golden hour): a soft
+     halo keeps it legible without a chip behind it. */
+  text-shadow:0 0 8px rgb(10 12 30 / 55%),0 1px 2px rgb(10 12 30 / 35%);
+}
+html:root[data-skin="monocode"][data-theme="light"] #composer .mc-composer-head{text-shadow:0 0 8px rgb(255 255 255 / 70%)}
+html:root[data-skin="monocode"] #composer .mc-composer-head svg{width:12px;height:12px;opacity:.8}
+html:root[data-skin="monocode"] #composer .mc-composer-head .mc-context{font:450 11.5px var(--soft-font)!important;font-variant-numeric:tabular-nums}
+
+/* One calm row: + · model · context · reasoning · access … mic · send */
+html:root[data-skin="monocode"] #composer .composer-toolbar{order:2;display:flex;align-items:center;flex-wrap:wrap;gap:6px!important;min-height:36px!important;height:auto;padding:4px 0 0 0!important;margin:0!important}
+html:root[data-skin="monocode"] #composer :is(#modelButton,#contextControl,#reasoningControl,#permissionButton){
+  height:30px!important;min-height:30px!important;padding:0 12px!important;gap:6px!important;
+  display:inline-flex!important;align-items:center;flex:0 0 auto;width:auto!important;min-width:0!important;max-width:220px;
+  border-radius:999px!important;border:1px solid var(--glass-line)!important;
+  background:rgb(255 255 255 / 4.5%)!important;color:var(--soft-ink-2)!important;box-shadow:none!important;
+  font:500 12.5px/1 var(--soft-font)!important;letter-spacing:0;white-space:nowrap;
+  transition:background-color .18s,color .18s,border-color .18s;
+}
+html:root[data-skin="monocode"][data-theme="light"] #composer :is(#modelButton,#contextControl,#reasoningControl,#permissionButton){background:rgb(255 255 255 / 45%)!important}
+html:root[data-skin="monocode"] #composer :is(#modelButton,#contextControl,#reasoningControl,#permissionButton):hover{background:var(--glass-press)!important;color:var(--soft-ink)!important;border-color:var(--glass-line-strong)!important}
+html:root[data-skin="monocode"] #composer :is(#modelButton,#contextControl,#reasoningControl,#permissionButton) :is(strong,small,span,em){font:inherit!important;line-height:1!important;letter-spacing:0;margin:0}
+html:root[data-skin="monocode"] #composer :is(#modelButton,#permissionButton) strong,
+html:root[data-skin="monocode"] #composer .composer-liquid-copy strong{color:var(--soft-ink)!important;font-weight:500!important;overflow:hidden;text-overflow:ellipsis}
+html:root[data-skin="monocode"] #composer .composer-liquid-copy{display:inline-flex!important;align-items:center;gap:5px;flex-direction:row!important}
+html:root[data-skin="monocode"] #composer .composer-liquid-copy small{color:var(--soft-ink-3)!important;font-weight:450!important;text-transform:none!important}
+html:root[data-skin="monocode"] #composer :is(#contextControl,#reasoningControl) :is(.composer-liquid-track,.composer-liquid-detail){display:none!important}
+html:root[data-skin="monocode"] #composer :is(#contextControl,#reasoningControl) input[type="range"]{position:absolute;inset:0;opacity:0;pointer-events:none}
+html:root[data-skin="monocode"] #composer :is(#contextControl,#reasoningControl){position:relative;cursor:pointer}
+html:root[data-skin="monocode"] #composer :is(#modelButton,#permissionButton) svg{width:14px!important;height:14px!important;flex:0 0 14px;opacity:.8}
+html:root[data-skin="monocode"] #composer :is(#modelButton,#permissionButton) svg:last-child{width:12px!important;height:12px!important;flex-basis:12px;opacity:.55;margin-right:-3px}
+html:root[data-skin="monocode"] #composer #composerProviderIcon{display:inline-flex;align-items:center}
+html:root[data-skin="monocode"] #composer #composerProviderIcon :is(.provider-chip,svg,img){width:14px!important;height:14px!important;min-width:0;padding:0;border:0;background:transparent;box-shadow:none}
+html:root[data-skin="monocode"] #composer #attachButton,
+html:root[data-skin="monocode"] #composer #voiceButton,
+html:root[data-skin="monocode"] #composer #stashButton{
+  width:32px!important;min-width:32px!important;height:32px!important;min-height:32px!important;padding:0!important;margin:0!important;display:grid;place-items:center;flex:0 0 32px;
+  border-radius:999px!important;border:0!important;background:transparent!important;color:var(--soft-ink-2)!important;box-shadow:none!important;
+}
+html:root[data-skin="monocode"] #composer :is(#attachButton,#voiceButton,#stashButton):hover{background:var(--glass-hover)!important;color:var(--soft-ink)!important}
+html:root[data-skin="monocode"] #composer :is(#attachButton,#voiceButton,#stashButton) svg{width:18px!important;height:18px!important}
+html:root[data-skin="monocode"] #composer #attachButton svg{width:20px!important;height:20px!important;stroke-width:1.6}
+html:root[data-skin="monocode"] #composer .mc-composer-actions{display:flex;align-items:center;gap:6px;margin-left:auto;height:36px}
+html:root[data-skin="monocode"] #composer #attachmentMenu{flex:0 0 auto;display:flex;align-items:center;margin:0 2px 0 0}
+html:root[data-skin="monocode"] #composer .composer-toolbar>.toolbar-spacer{flex:1 1 0;min-width:0;height:0}
+html:root[data-skin="monocode"] #composer #sendButton{
+  width:36px!important;height:36px!important;min-height:36px!important;min-width:36px;padding:0!important;margin:0!important;flex:0 0 36px;display:grid!important;place-items:center;
+  border-radius:999px!important;border:0!important;background:#f4f4fb!important;color:#1b1d2e!important;
+  box-shadow:0 4px 14px rgb(0 0 0 / 22%)!important;transition:transform .18s var(--soft-ease),opacity .18s,background-color .18s;
+}
+html:root[data-skin="monocode"][data-theme="light"] #composer #sendButton{background:#22243a!important;color:#fff!important}
+html:root[data-skin="monocode"] #composer #sendButton:hover{transform:scale(1.05)}
+html:root[data-skin="monocode"] #composer #sendButton:active{transform:scale(.96)}
+html:root[data-skin="monocode"] #composer #sendButton:disabled{opacity:.45;transform:none}
+html:root[data-skin="monocode"] #composer #sendButton svg{width:18px;height:18px;stroke-width:2}
+html:root[data-skin="monocode"] #composerZone.working #composer #sendButton{background:#f4f4fb!important}
+/* Composer status cards above the field share the glass language. */
+html:root[data-skin="monocode"] #composerZone :is(#taskBlock,#queueBlock){--mc-button-radius:16px;border-radius:18px!important;background:var(--glass-1)!important;border:1px solid var(--glass-line)!important;-webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur));font-family:var(--soft-font)}
+html:root[data-skin="monocode"] #composerZone :is(#taskBlock,#queueBlock)>summary{min-height:40px;padding:8px 14px!important;font:500 13px var(--soft-font)!important;color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] #composerZone .approval-card{--ak-muted:var(--glass-1);--ak-r-lg:18px;--ak-r-sm:12px;--mc-button-radius:12px;border-radius:20px!important;background:var(--glass-2)!important;border:1px solid var(--glass-line-strong)!important;-webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);box-shadow:var(--glass-shadow)!important;font-family:var(--soft-font)}
+html:root[data-skin="monocode"] #composerZone .approval-question-card{padding:14px 16px!important;font-size:13.5px}
+html:root[data-skin="monocode"] #composerZone .approval-card :is(.qa-option,.qa-submit,.qa-custom-submit,.button){min-height:34px!important;border-radius:12px!important;font:500 13px var(--soft-font)!important}
+html:root[data-skin="monocode"] #composerZone .approval-card .qa-option{background:rgb(255 255 255 / 4%);border:1px solid var(--glass-line)}
+html:root[data-skin="monocode"] #composerZone .approval-card .qa-option:hover{background:var(--glass-hover)}
+html:root[data-skin="monocode"] #composerZone .approval-card :is(.qa-submit,.button.primary){background:#f4f4fb!important;color:#1b1d2e!important;border:0!important}
+
+/* ── Empty state: centered, heading above the composer ───────────────── */
+html:root[data-skin="monocode"] #conversationStage.mc-empty{padding-bottom:9vh}
+html:root[data-skin="monocode"] #conversationStage.mc-empty #composerZone{margin:auto auto!important;transform:none!important}
+html:root[data-skin="monocode"] .mc-empty-heading{
+  margin:0 0 18px!important;text-align:center;
+  font:400 28px/1.25 var(--soft-font)!important;letter-spacing:-.022em;color:var(--soft-ink)!important;
+}
+
+/* ── Right workspace pane and overlays ───────────────────────────────── */
+html:root[data-skin="monocode"] #inspectionSidebar{background:var(--glass-1)!important;-webkit-backdrop-filter:blur(var(--glass-blur))!important;backdrop-filter:blur(var(--glass-blur))!important;border-left:1px solid var(--glass-line)!important}
+html:root[data-skin="monocode"] #inspectionSidebar :is(.inspection-tabbar,.inspection-toolbar,.inspection-panel,.inspection-desktop-panel,#desktopObservationEmpty,.inspection-empty){background:transparent!important}
+html:root[data-skin="monocode"] #desktopObservationStage.no-frame{background:transparent!important}
+html:root[data-skin="monocode"] :is(.inspection-tab,.browser-tab){border-radius:999px!important;font:500 12px/16px var(--soft-font)!important;padding:3px 10px!important}
+html:root[data-skin="monocode"] :is(.modal,.popover,.menu,.menu-layer .menu,.mention-picker,.toast,.prompt-rail-card){
+  background:var(--glass-pop)!important;-webkit-backdrop-filter:blur(28px) saturate(1.2);backdrop-filter:blur(28px) saturate(1.2);
+  border:1px solid var(--glass-line-strong)!important;border-radius:16px!important;box-shadow:var(--menu-shadow)!important;color:var(--soft-ink);font-family:var(--soft-font);
+}
+html:root[data-skin="monocode"] .modal-layer{background:var(--overlay)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+
+/* ── Settings ────────────────────────────────────────────────────────── */
+html:root[data-skin="monocode"] #settingsView{background:var(--sky-layers)!important;background-attachment:fixed!important}
+html:root[data-skin="monocode"] #settingsView :is(#settingsMain,.settings-main){background:transparent!important}
+html:root[data-skin="monocode"] .settings-view{font-family:var(--soft-font)}
+html:root[data-skin="monocode"] .settings-sidebar{margin:10px 0 10px 10px;border-radius:20px;background:var(--glass-1)!important;border:1px solid var(--glass-line)!important;-webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur))}
+html:root[data-skin="monocode"] .settings-card{border-radius:18px!important;background:var(--glass-2)!important;border:1px solid var(--glass-line)!important;-webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur))}
+html:root[data-skin="monocode"] .settings-title h1{font:600 22px/1.3 var(--soft-font)!important;letter-spacing:-.02em}
+html:root[data-skin="monocode"] .settings-title p{font:400 13px/1.5 var(--soft-font)!important;color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] .settings-view .setting-copy strong{font:500 13.5px/1.35 var(--soft-font)!important;color:var(--soft-ink)}
+html:root[data-skin="monocode"] .settings-view .setting-copy p{font:400 12.5px/1.45 var(--soft-font)!important;color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] .settings-view .setting-row{padding:12px 16px!important;min-height:56px!important}
+html:root[data-skin="monocode"] .settings-view :is(.menu-select,.button,.wheel-stepper){border-radius:12px!important;min-height:32px!important;font:500 12.5px var(--soft-font)!important;background:rgb(255 255 255 / 5%);border:1px solid var(--glass-line)}
+html:root[data-skin="monocode"] .settings-view .ember-toggle{background:rgb(255 255 255 / 14%)!important;border-radius:999px!important}
+html:root[data-skin="monocode"] .settings-view .ember-toggle.on{background:#d9d8ff!important}
+html:root[data-skin="monocode"] .settings-view .ember-toggle .ember-check-box{border-radius:999px!important}
+html:root[data-skin="monocode"] .settings-view .ember-toggle.on .ember-check-box{background:#1f2136!important}
+html:root[data-skin="monocode"] :is(.settings-nav button,.settings-sidebar button){border-radius:10px!important;font-family:var(--soft-font)}
+
+/* ── Motion ──────────────────────────────────────────────────────────── */
+@keyframes soft-rise{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes soft-rise-right{from{opacity:0;transform:translate(10px,6px) scale(.985)}to{opacity:1;transform:none}}
+html:root[data-skin="monocode"] #conversationFeed>:is(.agent-message,.group-message,.work-cluster,.team-work-block):nth-last-child(-n+3){animation:soft-rise .42s var(--soft-ease) both}
+html:root[data-skin="monocode"] #conversationFeed>.user-message:nth-last-child(-n+3){animation:soft-rise-right .38s var(--soft-ease) both}
+html:root[data-skin="monocode"] #conversationFeed>.user-message .user-bubble{transform-origin:100% 100%}
+@media (prefers-reduced-motion:reduce){
+  html:root[data-skin="monocode"] #conversationFeed>*{animation:none!important}
+  html:root[data-skin="monocode"] #composerZone #composer,html:root[data-skin="monocode"] #composer #sendButton{transition:none!important}
+}
+html:root[data-skin="monocode"][data-motion="minimal"] #conversationFeed>*{animation:none!important}
+
+/* Without blur support, keep surfaces readable rather than see-through. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  html:root[data-skin="monocode"]{--glass-1:rgb(30 33 52 / 92%);--glass-2:rgb(26 28 46 / 94%);--glass-pop:rgb(34 36 56 / 98%)}
+  html:root[data-skin="monocode"][data-theme="light"]{--glass-1:rgb(246 246 252 / 94%);--glass-2:rgb(255 255 255 / 96%);--glass-pop:#fff}
+}
+
+/* Team member work pills: name and state sit together, no stretched gap. */
+html:root[data-skin="monocode"] #conversationFeed .group-work-agent{display:inline-flex!important;align-items:center;width:auto!important;max-width:100%}
+html:root[data-skin="monocode"] #conversationFeed .group-work-agent>span:not(.group-work-avatar):not(.group-work-live){display:inline-flex;align-items:baseline;gap:7px;min-width:0}
+html:root[data-skin="monocode"] #conversationFeed .group-work-agent>svg{width:12px;height:12px;opacity:.6}
+/* Empty state groups the hero, the question and the composer as one block. */
+html:root[data-skin="monocode"] #conversationStage.mc-empty.has-fluffy #fluffyHero{margin:auto 0 6px!important}
+html:root[data-skin="monocode"] #conversationStage.mc-empty.has-fluffy #composerZone{margin:0 auto auto!important}
+/* Scroll edge: a soft mask instead of a blurred strip under the hero. */
+html:root[data-skin="monocode"] #conversationStage #conversationBody::before{content:none!important;display:none!important}
+html:root[data-skin="monocode"] #conversationBody{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 22px,#000 calc(100% - 14px),transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 22px,#000 calc(100% - 14px),transparent 100%)}
+html:root[data-skin="monocode"] #fluffyHero::before{background:var(--glass-1)!important;border-color:var(--glass-line)!important;box-shadow:0 10px 36px rgb(6 8 22 / 22%)!important;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+html:root[data-skin="monocode"][data-theme="light"] #fluffyHero::before{box-shadow:0 10px 36px rgb(60 66 120 / 12%)!important}
+html:root[data-skin="monocode"] #conversationStage.mc-empty.has-fluffy #fluffyHero{margin-bottom:22px!important}
+/* Steered messages keep their label stacked over the bubble. */
+html:root[data-skin="monocode"] #conversationFeed .user-message.steered-message>.message-content{flex-direction:column;align-items:flex-end;gap:4px}
+html:root[data-skin="monocode"] #conversationFeed .user-message .steered-label{font:500 11px var(--soft-font);color:var(--soft-ink-3);margin-right:8px}
+/* Delete controls stay out of sight until the row is hovered or focused. */
+html:root[data-skin="monocode"] #conversationFeed .work-cluster>.work-delete-button{opacity:0!important;transition:opacity .18s}
+html:root[data-skin="monocode"] #conversationFeed .work-cluster:hover>.work-delete-button,
+html:root[data-skin="monocode"] #conversationFeed .work-cluster>.work-delete-button:focus-visible{opacity:.65!important}
+
+/* ── Avatar picker: Fluffies first, then a custom photo ──────────────── */
+/* Primary buttons sat on --mc-bg, which is transparent under the sky. */
+html:root[data-skin="monocode"] .modal-footer .button.primary{color:var(--accent-contrast)!important}
+html:root[data-skin="monocode"] #modalLayer .avatar-studio{
+  --picker-card:rgb(255 255 255 / 3.5%);--picker-pick:rgb(201 198 255 / 12%);--picker-ring:rgb(201 198 255 / 55%);
+  gap:16px!important;padding:18px!important;border-radius:20px!important;border:1px solid var(--glass-line)!important;
+  background:var(--glass-1)!important;-webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur));
+  box-shadow:inset 0 1px 0 rgb(255 255 255 / 4%);font-family:var(--soft-font)
+}
+html:root[data-skin="monocode"][data-theme="light"] #modalLayer .avatar-studio{--picker-card:rgb(255 255 255 / 55%);--picker-pick:rgb(75 69 168 / 9%);--picker-ring:rgb(75 69 168 / 45%);box-shadow:inset 0 1px 0 rgb(255 255 255 / 60%)}
+/* Preview: the chosen avatar on a soft halo. */
+html:root[data-skin="monocode"] #modalLayer .avatar-studio-preview{gap:18px!important;align-items:center}
+html:root[data-skin="monocode"] #modalLayer .avatar-studio-preview>i{
+  width:112px!important;height:112px!important;flex:0 0 112px!important;border-radius:50%;
+  background:radial-gradient(circle at 50% 42%,rgb(255 255 255 / 9%),rgb(255 255 255 / 2%) 70%);border:1px solid var(--glass-line);overflow:hidden
+}
+html:root[data-skin="monocode"] #modalLayer .avatar-studio-preview>i :is(canvas,.fluffy-token,.fluffy-studio-mirror){width:100px!important;height:100px!important}
+html:root[data-skin="monocode"] #modalLayer .avatar-studio-preview>i>.custom-avatar-shell{width:112px!important;height:112px!important;border-radius:50%!important}
+html:root[data-skin="monocode"] #modalLayer .avatar-studio-preview strong{font:500 15px/1.3 var(--soft-font)!important;letter-spacing:-.01em;color:var(--soft-ink)}
+html:root[data-skin="monocode"] #modalLayer .avatar-studio-preview small{display:block;margin-top:3px;font:400 12.5px/1.45 var(--soft-font)!important;color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] #modalLayer .avatar-photo-empty{display:grid;place-items:center;width:100%;height:100%}
+html:root[data-skin="monocode"] #modalLayer .avatar-photo-empty svg{width:44px;height:44px;fill:none;stroke:var(--soft-ink-3);stroke-width:1.5;stroke-linecap:round}
+/* Two kinds, as a calm segmented pill. */
+html:root[data-skin="monocode"] #modalLayer .avatar-studio .avatar-mode-tabs{
+  display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:4px!important;padding:4px!important;
+  border-radius:16px!important;background:rgb(0 0 0 / 14%)!important;border:1px solid var(--glass-line)!important
+}
+html:root[data-skin="monocode"][data-theme="light"] #modalLayer .avatar-studio .avatar-mode-tabs{background:rgb(40 46 90 / 5%)!important}
+html:root[data-skin="monocode"] #modalLayer .avatar-studio .avatar-mode-tabs button{
+  display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:50px!important;height:auto!important;padding:7px 12px!important;
+  border:1px solid transparent!important;border-radius:12px!important;background:transparent!important;color:var(--soft-ink-2)!important;
+  transition:background .18s var(--soft-ease),color .18s,border-color .18s
+}
+html:root[data-skin="monocode"] #modalLayer .avatar-studio .avatar-mode-tabs button strong{font:500 13.5px/1.3 var(--soft-font);color:inherit}
+html:root[data-skin="monocode"] #modalLayer .avatar-studio .avatar-mode-tabs button small{font:400 11.5px/1.3 var(--soft-font);color:var(--soft-ink-3)}
+html:root[data-skin="monocode"] #modalLayer .avatar-studio .avatar-mode-tabs button:hover{background:var(--glass-hover)!important;color:var(--soft-ink)!important}
+html:root[data-skin="monocode"] #modalLayer .avatar-studio .avatar-mode-tabs button.selected{
+  background:var(--glass-3)!important;border-color:var(--glass-line-strong)!important;color:var(--soft-ink)!important;box-shadow:0 4px 16px rgb(6 8 22 / 18%)
+}
+html:root[data-skin="monocode"][data-theme="light"] #modalLayer .avatar-studio .avatar-mode-tabs button.selected{background:rgb(255 255 255 / 85%)!important;box-shadow:0 4px 14px rgb(60 66 120 / 10%)}
+html:root[data-skin="monocode"] #modalLayer .avatar-studio .avatar-mode-tabs button:focus-visible{outline:2px solid var(--picker-ring);outline-offset:2px}
+/* Fluffy choices: frosted tiles, a lavender ring on the chosen one. */
+html:root[data-skin="monocode"] #modalLayer .avatar-fluffy-controls{gap:18px!important}
+html:root[data-skin="monocode"] #modalLayer .avatar-fluffy-controls legend{margin-bottom:10px!important;font:500 12.5px/1.3 var(--soft-font)!important;color:var(--soft-ink-2)!important;letter-spacing:.01em}
+html:root[data-skin="monocode"] #modalLayer :is(.fluffy-shape-grid,.fluffy-preview-grid,.fluffy-palette-grid) button{
+  border:1px solid var(--glass-line)!important;border-radius:16px!important;background:var(--picker-card)!important;color:var(--soft-ink-2)!important;
+  font:500 12px/1.3 var(--soft-font)!important;box-shadow:none!important;transition:background .18s var(--soft-ease),border-color .18s,transform .18s var(--soft-ease)
+}
+html:root[data-skin="monocode"] #modalLayer :is(.fluffy-shape-grid,.fluffy-preview-grid,.fluffy-palette-grid) button:hover:not(:disabled){background:var(--glass-hover)!important;border-color:var(--glass-line-strong)!important;color:var(--soft-ink)!important;transform:translateY(-1px)}
+html:root[data-skin="monocode"] #modalLayer :is(.fluffy-shape-grid,.fluffy-palette-grid) button.selected,
+html:root[data-skin="monocode"] #modalLayer .fluffy-preview-grid button.playing{
+  background:var(--picker-pick)!important;border-color:var(--picker-ring)!important;color:var(--soft-ink)!important;box-shadow:0 0 0 3px rgb(201 198 255 / 10%)!important
+}
+html:root[data-skin="monocode"] #modalLayer :is(.fluffy-shape-grid,.fluffy-palette-grid,.fluffy-preview-grid) button:focus-visible{outline:2px solid var(--picker-ring)!important;outline-offset:2px}
+html:root[data-skin="monocode"] #modalLayer .fluffy-palette-grid{grid-template-columns:repeat(8,minmax(0,1fr))!important;gap:8px!important}
+html:root[data-skin="monocode"] #modalLayer .fluffy-palette-grid button{min-height:96px!important;padding:6px 4px 9px!important;gap:2px!important}
+html:root[data-skin="monocode"] #modalLayer .fluffy-palette-grid img{width:64px!important;height:64px!important}
+html:root[data-skin="monocode"] #modalLayer .fluffy-shape-grid button{padding:12px 10px 14px!important}
+html:root[data-skin="monocode"] #modalLayer .fluffy-shape-grid img{width:104px!important;height:104px!important}
+html:root[data-skin="monocode"] #modalLayer .fluffy-live-preview{background:transparent!important}
+html:root[data-skin="monocode"] #modalLayer .fluffy-palette-status{display:none}
+html:root[data-skin="monocode"] #modalLayer .fluffy-preview-help{font:400 12px/1.45 var(--soft-font)!important;color:var(--soft-ink-3)!important}
+/* Custom photo: one frosted drop target. */
+html:root[data-skin="monocode"] #modalLayer .avatar-custom-controls .avatar-drop{
+  display:flex!important;align-items:center;gap:16px;width:100%;min-height:92px;padding:18px 20px!important;text-align:left;
+  border:1px dashed var(--glass-line-strong)!important;border-radius:18px!important;background:var(--picker-card)!important;color:var(--soft-ink)!important;
+  transition:background .18s var(--soft-ease),border-color .18s
+}
+html:root[data-skin="monocode"] #modalLayer .avatar-custom-controls .avatar-drop:hover{background:var(--glass-hover)!important;border-color:var(--picker-ring)!important}
+html:root[data-skin="monocode"] #modalLayer .avatar-drop-icon{display:grid;place-items:center;flex:0 0 46px;width:46px;height:46px;border-radius:50%;background:var(--glass-3);border:1px solid var(--glass-line)}
+html:root[data-skin="monocode"] #modalLayer .avatar-drop-icon svg{width:22px;height:22px;fill:none;stroke:var(--soft-ink);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+html:root[data-skin="monocode"] #modalLayer .avatar-drop strong{display:block;font:500 14px/1.3 var(--soft-font)!important;color:var(--soft-ink)}
+html:root[data-skin="monocode"] #modalLayer .avatar-drop small{display:block;margin-top:3px;font:400 12px/1.4 var(--soft-font)!important;color:var(--soft-ink-3)}
+@media(max-width:620px){
+  html:root[data-skin="monocode"] #modalLayer .fluffy-palette-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  html:root[data-skin="monocode"] #modalLayer .avatar-studio-preview>i{width:88px!important;height:88px!important;flex-basis:88px!important}
+}

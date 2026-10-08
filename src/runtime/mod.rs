@@ -257,6 +257,9 @@ pub(crate) fn stream_observer(
 }
 
 #[cfg(test)]
+mod group_room_qa_tests;
+
+#[cfg(test)]
 mod live_ticker_tests {
     use super::*;
 

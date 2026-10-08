@@ -232,11 +232,6 @@
 :root[data-skin="monocode"] #composerZone.working #composer .send-button:focus-visible {outline:2px solid var(--mc-ink)!important;outline-offset:3px;border-radius:50%!important}
 :root[data-skin="monocode"] .inspection-tabbar {height:26px;min-height:26px}
 :root[data-skin="monocode"] :is(.inspection-tab,.browser-tab) {height:20px;min-height:20px;padding-block:1px}
-:root[data-skin="monocode"] #inspectionChangesList {grid-auto-rows:min-content;align-content:start}
-:root[data-skin="monocode"] .inspection-change {padding:4px 8px;margin-bottom:6px;gap:4px}
-:root[data-skin="monocode"] .inspection-change-header {padding:3px 8px;height:auto;min-height:32px}
-:root[data-skin="monocode"] .inspection-diff {min-height:0;padding-block:2px;background:transparent}
-:root[data-skin="monocode"] .inspection-diff-line {padding-block:1px;min-height:0;line-height:17px}
 /* Keep the left splitter's hit area inside the clipped sidebar. */
 :root[data-skin="monocode"] #sidebarResize {right:0;width:12px}
 :root[data-skin="monocode"] #sidebarResize::before {left:auto;right:0}
@@ -252,7 +247,7 @@
 :root[data-skin="monocode"] #inspectionSidebar {border-top:1px solid var(--mc-line);box-sizing:border-box}
 :root[data-skin="monocode"] .inspection-tabbar {align-items:center;border-bottom:1px solid var(--mc-line);box-sizing:border-box}
 :root[data-skin="monocode"] .inspection-tab {margin:0;align-self:center;line-height:16px;box-sizing:border-box}
-:root[data-skin="monocode"] #inspectionSidebar :is(.inspection-panel,.inspection-desktop-panel,#desktopObservationEmpty,#desktopObservationSurface,.inspection-change,.inspection-diff,.inspection-changes-panel,.inspection-empty) {background:var(--mc-bg)!important;color:var(--mc-ink);border-color:var(--mc-line)}
+:root[data-skin="monocode"] #inspectionSidebar :is(.inspection-panel,.inspection-desktop-panel,#desktopObservationEmpty,#desktopObservationSurface,.inspection-empty) {background:var(--mc-bg)!important;color:var(--mc-ink);border-color:var(--mc-line)}
 :root[data-skin="monocode"] :is(#conversationStage,#inspectionSidebar) {--hover:color-mix(in srgb,var(--mc-ink) 7%,var(--mc-bg));--ink-faint:var(--mc-muted)}
 :root[data-skin="monocode"] #inspectionBrowserToolbar>button {background:transparent}
 :root[data-skin="monocode"] #inspectionBrowserToolbar .browser-address-shell {background:var(--mc-surface);border:1px solid var(--mc-line)}

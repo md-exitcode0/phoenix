@@ -623,12 +623,6 @@ pub fn resolve_group_turn(
         "group `{group_id}` has too many members"
     );
 
-    let mentions = mentioned_tokens(user_message);
-    let mentions_everyone = mentions.iter().any(|mention| is_everyone_mention(mention));
-    let explicit_member_ping=members.iter().any(|member|snapshot.agents.iter()
-        .find(|agent|agent.profile.agent_id==member.agent_id).is_some_and(|agent|
-            [&agent.profile.agent_id,&agent.profile.internal_role,&agent.profile.display_name]
-                .iter().any(|name|mentions.contains(&normalized_mention(name)))));
     let mut participants = Vec::with_capacity(members.len());
     for member in members {
         let agent = snapshot
@@ -644,20 +638,7 @@ pub fn resolve_group_turn(
         if agent.profile.lifecycle != LifecycleState::Active {
             continue;
         }
-        let explicitly_mentioned = mentions_everyone
-            || [
-                agent.profile.agent_id.as_str(),
-                agent.profile.internal_role.as_str(),
-                agent.profile.display_name.as_str(),
-            ]
-            .into_iter()
-            .map(normalized_mention)
-            .any(|candidate| mentions.iter().any(|mention| mention == &candidate))
-            // Canvas renders an exact display-name occurrence as an inline
-            // metal agent token and serializes it to @agent_id. Keep the
-            // backend equally capable for other clients: `Theo` wakes Theo,
-            // while `theo`, `THEO`, or `ThEo` remain ordinary prose.
-            || (!explicit_member_ping&&contains_exact_display_name(user_message,&agent.profile.display_name));
+        let explicitly_mentioned = false;
         participants.push(GroupParticipant {
             agent_id: agent.profile.agent_id.clone(),
             internal_role: agent.profile.internal_role.clone(),
@@ -678,6 +659,26 @@ pub fn resolve_group_turn(
         !participants.is_empty(),
         "group `{group_id}` has no active members"
     );
+    // One parser for user and coworker messages: markdown-aware (code,
+    // quotes and links are not pings), first-name aliases (`@Leon` for
+    // "Leon Lin"), `@everyone`/`@all`, punctuation after names.
+    let (mentions_everyone, explicit) = parse_room_pings(user_message, &participants);
+    // Bare URLs, emails and handles are not someone's name either.
+    let prose = authored_prose(user_message)
+        .split_inclusive(char::is_whitespace)
+        .map(|word| if word.contains("://") || word.contains('@') || word.starts_with("www.") { " " } else { word })
+        .collect::<String>();
+    let explicit = explicit.into_iter().map(|p| p.agent_id.clone()).collect::<std::collections::HashSet<_>>();
+    for participant in &mut participants {
+        participant.explicitly_mentioned = mentions_everyone
+            || explicit.contains(&participant.agent_id)
+            // Canvas renders an exact display-name occurrence as an inline
+            // metal agent token and serializes it to @agent_id. Keep the
+            // backend equally capable for other clients: `Theo` wakes Theo,
+            // while `theo`, `THEO`, or `ThEo` remain ordinary prose.
+            || (explicit.is_empty()
+                && contains_exact_display_name(&prose, &participant.display_name));
+    }
 
     let leader_agent_id = super::company_directory::effective_group_leader(snapshot, group_id)
         .filter(|leader| participants.iter().any(|participant| &participant.agent_id == leader));
@@ -710,10 +711,7 @@ pub fn preview_group_activation(
     user_message: &str,
 ) -> Result<GroupActivationPreview> {
     let context = resolve_group_turn(snapshot, group_id, user_message)?;
-    let selection = if mentioned_tokens(user_message)
-        .iter()
-        .any(|mention| is_everyone_mention(mention))
-    {
+    let selection = if addresses_everyone(user_message) {
         GroupActivationSelection::Everyone
     } else {
         GroupActivationSelection::Explicit
@@ -730,8 +728,31 @@ pub fn preview_group_activation(
         .iter()
         .map(|participant| participant.agent_id.clone())
         .collect::<Vec<_>>();
-    let (execution_mode, execution_waves, execution_dependencies) =
+    let (mut execution_mode, mut execution_waves, mut execution_dependencies) =
         plan_execution_waves(user_message, &active_agent_ids, &context.participants)?;
+    // `@everyone` in a led room: the leader re-plans and assigns FIRST, then
+    // every member starts in parallel with the plan, the mode (blind diverge,
+    // research, build claims) and its assignment already on the board.
+    // Starting all members beside the leader made them work before any plan
+    // existed, and the leader's assignment pings were no-ops (they were already
+    // activated), so the mission never ran the leader's phases.
+    if selection == GroupActivationSelection::Everyone && active_agent_ids.len() > 1 {
+        if let Some(leader) = context.leader_agent_id.clone().filter(|id| active_agent_ids.contains(id)) {
+            let mut edges = execution_dependencies
+                .into_iter()
+                .filter(|edge| edge.dependent != leader)
+                .collect::<Vec<_>>();
+            for member in active_agent_ids.iter().filter(|id| **id != leader) {
+                edges.push(GroupDependency { prerequisite: leader.clone(), dependent: member.clone() });
+            }
+            edges.sort();
+            edges.dedup();
+            execution_waves = dependency_waves(&active_agent_ids, &edges)?;
+            validate_execution_waves(GroupExecutionMode::Ordered, &execution_waves, &active_agent_ids)?;
+            execution_mode = GroupExecutionMode::Ordered;
+            execution_dependencies = edges;
+        }
+    }
     let execution_wave_display_names = execution_waves
         .iter()
         .map(|wave| {
@@ -1350,12 +1371,9 @@ impl GroupTurnContext {
     }
 }
 
-/// Only explicit mentions in authored prose create deliveries. Quoted examples,
-/// code, links, images and email addresses are never interpreted as pings.
-/// This deliberately does not use the legacy display-name prose heuristic.
-pub(crate) fn authored_ping_targets<'a>(
-    body: &str, participants: &'a [GroupParticipant],
-) -> Vec<&'a GroupParticipant> {
+/// The authored prose of a markdown message: quotes, code, links, images and
+/// HTML are blanked, so nothing inside them reads as a ping or a name.
+fn authored_prose(body: &str) -> String {
     use pulldown_cmark::{Event, Parser, Tag, TagEnd};
     let mut prose = String::new();
     let mut suppressed = 0usize;
@@ -1374,16 +1392,31 @@ pub(crate) fn authored_ping_targets<'a>(
             _ => {}
         }
     }
-    let prose = prose.to_lowercase();
+    prose
+}
+
+/// Explicit `@` pings in authored prose: `(addresses_everyone, members)`.
+/// Quoted examples, code, links, images and email addresses are never pings.
+/// Names match the agent id, internal role, full display name, or the
+/// display name's first word (`@Leon` for "Leon Lin"); the longest alias wins
+/// and an alias shared by two members pings nobody. `@everyone`/`@all` set the
+/// flag. This deliberately does not use the legacy display-name prose
+/// heuristic.
+pub(crate) fn parse_room_pings<'a>(
+    body: &str, participants: &'a [GroupParticipant],
+) -> (bool, Vec<&'a GroupParticipant>) {
+    let prose = authored_prose(body).to_lowercase();
     let word = |ch: char| ch.is_alphanumeric() || matches!(ch, '_' | '-');
+    let mut everyone = false;
     let mut found = std::collections::HashSet::new();
     for (at, _) in prose.match_indices('@') {
         if prose[..at].chars().next_back().is_some_and(|ch| word(ch) || matches!(ch, '.' | '/' | '@')) {
             continue;
         }
         let tail = &prose[at + 1..];
-        if tail.starts_with("everyone") && tail[8..].chars().next().is_none_or(|ch| !word(ch)) {
-            found.extend(participants.iter().map(|member| member.agent_id.as_str()));
+        if ["everyone", "all"].iter().any(|alias| tail.starts_with(alias)
+            && tail[alias.len()..].chars().next().is_none_or(|ch| !word(ch))) {
+            everyone = true;
             continue;
         }
         let mut candidates = Vec::new();
@@ -1405,27 +1438,22 @@ pub(crate) fn authored_ping_targets<'a>(
             if ids.len() == 1 { found.extend(ids); }
         }
     }
-    participants.iter().filter(|member| found.contains(member.agent_id.as_str())).collect()
+    (everyone, participants.iter().filter(|member| found.contains(member.agent_id.as_str())).collect())
 }
 
-fn mentioned_tokens(message: &str) -> Vec<String> {
-    message
-        .split_whitespace()
-        .filter_map(|word| word.strip_prefix('@'))
-        .map(|word| word.trim_matches(|ch: char| !ch.is_alphanumeric() && ch != '_' && ch != '-'))
-        .filter(|word| !word.is_empty())
-        .map(normalized_mention)
-        .collect()
-}
-
-/// `@everyone` and `@all` address the whole room.
-fn is_everyone_mention(mention: &str) -> bool {
-    matches!(mention, "everyone" | "all")
+/// Members an authored room contribution pings (`@everyone` = all of them).
+pub(crate) fn authored_ping_targets<'a>(
+    body: &str, participants: &'a [GroupParticipant],
+) -> Vec<&'a GroupParticipant> {
+    match parse_room_pings(body, participants) {
+        (true, _) => participants.iter().collect(),
+        (false, explicit) => explicit,
+    }
 }
 
 /// Does this room message address everyone (`@everyone` / `@all`)?
 pub fn addresses_everyone(message: &str) -> bool {
-    mentioned_tokens(message).iter().any(|mention| is_everyone_mention(mention))
+    parse_room_pings(message, &[]).0
 }
 
 fn normalized_mention(value: &str) -> String {

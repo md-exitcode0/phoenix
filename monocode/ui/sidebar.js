@@ -363,12 +363,9 @@ function inferredAvatar(profile, requestedStyle = null) {
     if (legacySlot === name) return saved.accessory;
     return fallback;
   };
-  // New coworkers start with the compact procedural marks. Explicitly saved
-  // legacy flame/custom choices keep rendering as saved, so this is a visual
-  // default change rather than a migration of existing customization.
-  // Every non-custom avatar is an animated morph mark now; saved flame and
-  // fire-form choices render as a morph in the nearest gradient.
-  const savedMode = saved.mode === "fluffy" ? "fluffy" : saved.mode === "custom" && typeof saved.custom_image_id === "string" ? "custom" : "morph";
+  // Only two kinds remain: a Fluffy or a custom photo. Anything else saved
+  // earlier (drawn marks, flames) shows as a Fluffy.
+  const savedMode = saved.mode === "custom" && typeof saved.custom_image_id === "string" && saved.custom_image_id ? "custom" : "fluffy";
   const generatedSidekick = !saved.mode && id !== "phoenix";
   const savedExpression = savedMode === "sidekick"
     ? saved.expression
@@ -544,12 +541,13 @@ function avatarSvg(profile, kind = "agent", requestedStyle = null, interactive =
   const id = profile?.agent_id ?? "phoenix";
   const avatar = inferredAvatar(profile, requestedStyle);
   if (avatar.mode === "fluffy") return window.PhoenixFluffies.markup({ ...profile, ...avatar });
-  const mark = morphAvatarMarkup(avatar, id);
-  if (avatar.mode !== "custom" || !avatar.custom_image_id) return mark;
+  if (avatar.mode !== "custom" || !avatar.custom_image_id) return window.PhoenixFluffies.markup({ ...profile, ...avatar, mode:"fluffy" });
   requestCustomAvatar(avatar.custom_image_id);
   const cached = customAvatarCache.get(avatar.custom_image_id);
   const src = cached && !["loading","failed"].includes(cached) ? ` src="${escapeHtml(cached)}"` : "";
-  return `<span class="custom-avatar-shell ${src ? "ready" : ""}">${mark}<img${src} data-avatar-id="${escapeHtml(avatar.custom_image_id)}" alt=""></span>`;
+  // While the photo loads, or if it cannot, a still Fluffy stands in.
+  const fallback = `<span class="flame-avatar custom-avatar-fallback" aria-hidden="true" style="background-image:url('${escapeHtml(window.PhoenixFluffyFamily.poster(avatar.fluffy_shape, avatar.fluffy_palette))}')"></span>`;
+  return `<span class="custom-avatar-shell ${src ? "ready" : ""}">${fallback}<img${src} data-avatar-id="${escapeHtml(avatar.custom_image_id)}" alt=""></span>`;
 }
 
 function colorField(name, current) {
@@ -569,24 +567,19 @@ function bindColorField(root, onChange) {
   });
 }
 
-// Additive third mode; existing morph/image controls and paths retained.
+// Two kinds of avatar: Fluffies first (the default), then a custom photo.
+// The drawn morph marks are no longer offered; their hidden fields stay so a
+// saved photo config keeps the shape the backend already accepts.
 function avatarEditor(profile = null) {
-  const avatar = inferredAvatar(profile || {}), morph = window.PhoenixMorphAvatar;
-  const stops = morph?.stopsOf(avatar.gradient, avatar.gradient_stops) || ["#e85600", "#ff8b0b", "#ffd23d"];
-  const marks = (morph?.KINDS || []).map((kind) => `<button type="button" class="avatar-morph-choice ${avatar.morph_id === kind ? "selected" : ""}" data-morph-choice="${kind}" aria-pressed="${avatar.morph_id === kind}"><span class="avatar-morph-demo">${morph.markup({ kind, gradient:avatar.gradient, stops:avatar.gradient_stops, demo:true })}</span><strong>${escapeHtml(morph.labelOf(kind))}</strong></button>`).join("");
-  const swatches = (morph?.GRADIENTS || []).map(([gid, name, colors]) => `<button type="button" class="avatar-gradient-swatch ${avatar.gradient === gid ? "selected" : ""}" data-gradient-choice="${gid}" aria-pressed="${avatar.gradient === gid}" aria-label="${escapeHtml(name)}" title="${escapeHtml(name)}" style="--swatch:linear-gradient(135deg,${colors.join(",")})"></button>`).join("");
-  const custom = avatar.gradient === "custom";
-  return `<section class="avatar-studio" data-avatar-mode="${avatar.mode}">
-    <div class="avatar-studio-preview"><i data-avatar-preview>${avatarSvg(profile || { agent_id:"new-coworker", color:"#e55732", icon_seed:"new" }, "agent", null, true)}</i><span><strong>Make them recognizable</strong><small data-avatar-preview-note>${avatar.mode === "custom" ? "Your own picture, cropped to a circle." : "It moves while they work and settles when they stop."}</small></span></div>
-    <nav class="avatar-mode-tabs" aria-label="Avatar style"><button type="button" data-avatar-mode-value="morph" aria-pressed="${avatar.mode === "morph"}" class="${avatar.mode === "morph" ? "selected" : ""}">Avatars</button><button type="button" data-avatar-mode-value="custom" aria-pressed="${avatar.mode === "custom"}" class="${avatar.mode === "custom" ? "selected" : ""}">Custom image</button><button type="button" data-avatar-mode-value="fluffy" aria-pressed="${avatar.mode === "fluffy"}" class="${avatar.mode === "fluffy" ? "selected" : ""}">Fluffies</button></nav>
-    <input type="hidden" name="avatar_mode" value="${avatar.mode}"><input type="hidden" name="avatar_morph_id" value="${escapeHtml(avatar.morph_id)}"><input type="hidden" name="avatar_gradient" value="${escapeHtml(avatar.gradient)}"><input type="hidden" name="custom_image_id" value="${escapeHtml(avatar.custom_image_id || "")}">
-    <div class="avatar-morph-controls">
-      <div class="avatar-morph-grid" role="group" aria-label="Avatar">${marks}</div>
-      <div class="avatar-gradient-row" role="group" aria-label="Gradient">${swatches}<button type="button" class="avatar-gradient-swatch custom ${custom ? "selected" : ""}" data-gradient-choice="custom" aria-pressed="${custom}" aria-label="Custom gradient" title="Custom gradient"><span>+</span></button></div>
-      <div class="avatar-gradient-custom" ${custom ? "" : "hidden"}>${stops.map((stop, i) => `<label><input type="color" name="avatar_gradient_stop_${i}" value="${escapeHtml(stop)}"><span>${["Start", "Middle", "End"][i]}</span></label>`).join("")}</div>
-    </div>
+  const avatar = inferredAvatar(profile || {});
+  const mode = avatar.mode === "custom" ? "custom" : "fluffy";
+  const tab = (value, label, hint) => `<button type="button" role="tab" data-avatar-mode-value="${value}" aria-pressed="${mode === value}" aria-selected="${mode === value}" class="${mode === value ? "selected" : ""}"><strong>${label}</strong><small>${hint}</small></button>`;
+  return `<section class="avatar-studio" data-avatar-mode="${mode}">
+    <div class="avatar-studio-preview"><i data-avatar-preview>${avatarSvg(profile || { agent_id:"new-coworker", color:"#e55732", icon_seed:"new" }, "agent", null, true)}</i><span><strong>Make them recognizable</strong><small data-avatar-preview-note>${mode === "custom" ? "Your own picture, cropped to a circle." : "A Fluffy that follows their activity."}</small></span></div>
+    <nav class="avatar-mode-tabs" role="tablist" aria-label="Avatar style">${tab("fluffy", "Fluffies", "Animated companions")}${tab("custom", "Custom photo", "Upload your own")}</nav>
+    <input type="hidden" name="avatar_mode" value="${mode}"><input type="hidden" name="avatar_morph_id" value="${escapeHtml(avatar.morph_id)}"><input type="hidden" name="avatar_gradient" value="${escapeHtml(avatar.gradient)}"><input type="hidden" name="custom_image_id" value="${escapeHtml(avatar.custom_image_id || "")}">
     ${window.PhoenixFluffies.editorMarkup(avatar.fluffy_palette,avatar.fluffy_shape)}
-    <div class="avatar-custom-controls"><input class="avatar-file-fallback" type="file" accept="image/png,image/jpeg,image/webp,image/avif"><button class="avatar-drop" type="button" data-avatar-pick><span><strong>Choose an image</strong><small>PNG, JPEG, WebP, or AVIF</small></span></button></div>
+    <div class="avatar-custom-controls"><input class="avatar-file-fallback" type="file" accept="image/png,image/jpeg,image/webp,image/avif"><button class="avatar-drop" type="button" data-avatar-pick><span class="avatar-drop-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 16.5V18a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1.5M12 4v11M7.5 8.5 12 4l4.5 4.5"/></svg></span><span><strong data-avatar-pick-label>${avatar.custom_image_id ? "Choose a different photo" : "Choose a photo"}</strong><small>PNG, JPEG, WebP, or AVIF · up to 12 MB · cropped to a circle</small></span></button></div>
   </section>`;
 }
 
@@ -595,7 +588,7 @@ function avatarFormValues(form) {
   const stops = [0, 1, 2].map((i) => String(values.get(`avatar_gradient_stop_${i}`) || "").toLowerCase());
   return {
     ...(form._avatarOriginal || {}),
-    mode:String(values.get("avatar_mode") || "morph"),
+    mode:String(values.get("avatar_mode") || "fluffy"),
     fluffy_palette:String(values.get("fluffy_palette") || "butter"),
     fluffy_shape:String(values.get("fluffy_shape") || "round"),
     morph_id:String(values.get("avatar_morph_id") || "phoenix"),
@@ -619,33 +612,21 @@ function avatarFormProfile(form, original = null) {
 function bindAvatarEditor(form, original = null) {
   const studio = form.querySelector(".avatar-studio"); if (!studio) return;
   form._avatarOriginal = { ...backendAvatarMetadata(original) };
-  const morph = window.PhoenixMorphAvatar;
   const refresh = () => {
-    const profile = avatarFormProfile(form, original), avatar = inferredAvatar(profile);
-    studio.dataset.avatarMode = ["morph","custom","fluffy"].includes(form.elements.avatar_mode.value) ? form.elements.avatar_mode.value : "morph";
+    const profile = avatarFormProfile(form, original);
+    studio.dataset.avatarMode = form.elements.avatar_mode.value === "custom" ? "custom" : "fluffy";
+    const custom = studio.dataset.avatarMode === "custom";
     studio.querySelectorAll("[data-avatar-mode-value]").forEach((button) => {
       const selected = button.dataset.avatarModeValue === studio.dataset.avatarMode;
-      button.classList.toggle("selected", selected); button.setAttribute("aria-pressed", String(selected));
+      button.classList.toggle("selected", selected); button.setAttribute("aria-pressed", String(selected)); button.setAttribute("aria-selected", String(selected));
     });
-    const config = avatarFormValues(form);
-    studio.querySelectorAll("[data-morph-choice]").forEach((button) => {
-      const kind = button.dataset.morphChoice, selected = kind === config.morph_id;
-      button.classList.toggle("selected", selected); button.setAttribute("aria-pressed", String(selected));
-      button.querySelector(".avatar-morph-demo").innerHTML = morph.markup({ kind, gradient:config.gradient, stops:config.gradient_stops, demo:true });
-    });
-    studio.querySelectorAll("[data-gradient-choice]").forEach((button) => {
-      const selected = button.dataset.gradientChoice === config.gradient;
-      button.classList.toggle("selected", selected); button.setAttribute("aria-pressed", String(selected));
-    });
-    studio.querySelector(".avatar-gradient-custom").hidden = config.gradient !== "custom";
-    studio.querySelector("[data-avatar-preview-note]").textContent = studio.dataset.avatarMode === "custom"
-      ? "Your own picture, cropped to a circle."
-      : "It moves while they work and settles when they stop.";
+    studio.querySelector("[data-avatar-preview-note]").textContent = custom ? "Your own picture, cropped to a circle." : "A Fluffy that follows their activity.";
+    const hasPhoto = Boolean(form.dataset.customAvatarDataUrl || form.elements.custom_image_id.value);
+    const pickLabel = studio.querySelector("[data-avatar-pick-label]"); if (pickLabel) pickLabel.textContent = hasPhoto ? "Choose a different photo" : "Choose a photo";
     const preview = studio.querySelector("[data-avatar-preview]");
-    if (studio.dataset.avatarMode === "custom" && form.dataset.customAvatarDataUrl) preview.innerHTML = `<span class="custom-avatar-shell ready"><img src="${escapeHtml(form.dataset.customAvatarDataUrl)}" alt="Custom avatar preview"></span>`;
-    else if (studio.dataset.avatarMode === "custom") preview.innerHTML = avatarSvg(profile, "agent", null, true);
-    else if (studio.dataset.avatarMode !== "fluffy") preview.innerHTML = morph.markup({ kind:config.morph_id, gradient:config.gradient, stops:config.gradient_stops, demo:true });
-    if (studio.dataset.avatarMode === "fluffy") studio.querySelector("[data-avatar-preview-note]").textContent = "A Fluffy that follows their activity.";
+    if (custom && form.dataset.customAvatarDataUrl) preview.innerHTML = `<span class="custom-avatar-shell ready"><img src="${escapeHtml(form.dataset.customAvatarDataUrl)}" alt="Custom avatar preview"></span>`;
+    else if (custom && form.elements.custom_image_id.value) preview.innerHTML = avatarSvg(profile, "agent", null, true);
+    else if (custom) preview.innerHTML = `<span class="avatar-photo-empty" aria-label="No photo chosen yet"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="3.6"/><path d="M5.5 19.5c1.3-3.3 3.8-5 6.5-5s5.2 1.7 6.5 5"/></svg></span>`;
     window.PhoenixFluffies.refreshEditor(form);
   };
   const applyCustomPreview = (dataUrl, imageId = "") => {
@@ -655,19 +636,12 @@ function bindAvatarEditor(form, original = null) {
   };
   studio.addEventListener("click", (event) => {
     const mode = event.target.closest("[data-avatar-mode-value]")?.dataset.avatarModeValue;
-    if (["morph", "custom", "fluffy"].includes(mode)) { form.elements.avatar_mode.value = mode; refresh(); return; }
+    if (["custom", "fluffy"].includes(mode)) { form.elements.avatar_mode.value = mode; refresh(); return; }
     const fluffyShape = event.target.closest("[data-fluffy-shape-choice]")?.dataset.fluffyShapeChoice;
     if (fluffyShape && window.PhoenixFluffyFamily.available().includes(fluffyShape)) { form.elements.fluffy_shape.value = fluffyShape; if(!window.PhoenixFluffyFamily.palettes(fluffyShape).includes(form.elements.fluffy_palette.value))form.elements.fluffy_palette.value="butter"; form.elements.avatar_mode.value="fluffy"; refresh(); return; }
     const color = event.target.closest("[data-fluffy-color-choice]")?.dataset.fluffyColorChoice;
     if (window.PhoenixFluffyFamily.palettes(form.elements.fluffy_shape.value).includes(color)) { form.elements.fluffy_palette.value = color; form.elements.avatar_mode.value = "fluffy"; refresh(); return; }
-    const kind = event.target.closest("[data-morph-choice]")?.dataset.morphChoice;
-    if (morph?.KINDS.includes(kind)) { form.elements.avatar_morph_id.value = kind; form.elements.avatar_mode.value = "morph"; refresh(); return; }
-    const gradient = event.target.closest("[data-gradient-choice]")?.dataset.gradientChoice;
-    if (gradient && (gradient === "custom" || morph?.GRADIENTS.some(([gid]) => gid === gradient))) {
-      form.elements.avatar_gradient.value = gradient; form.elements.avatar_mode.value = "morph"; refresh();
-    }
   });
-  studio.addEventListener("input", (event) => { if (/^avatar_gradient_stop_/.test(event.target.name || "")) refresh(); });
   const fallbackInput = studio.querySelector('input[type="file"]');
   studio.querySelector("[data-avatar-pick]").onclick = async () => {
     if (!TAURI || SIDEBAR_PREVIEW) { fallbackInput.click(); return; }
@@ -692,7 +666,7 @@ async function avatarConfigFromForm(form) {
   if (mode === "fluffy") { if(!window.PhoenixAvatarPreferences.validColor(config.fluffy_palette))throw Error("Choose a Fluffy color."); if(!window.PhoenixFluffyFamily.available().includes(config.fluffy_shape))throw Error("This native shape is still rendering."); if(config.fluffy_shape!=="round")await window.PhoenixFluffyFamily.resolve(config.fluffy_shape,config.fluffy_palette); return undefined; }
   delete config.fluffy_palette;
   delete config.fluffy_shape;
-  if (!["morph", "custom"].includes(mode)) throw new Error("Choose a supported avatar style.");
+  if (mode !== "custom") throw new Error("Choose a Fluffy or a photo.");
   if (!window.PhoenixMorphAvatar?.KINDS.includes(config.morph_id)) throw new Error("Choose an avatar.");
   if (config.gradient === "custom" && !config.gradient_stops) throw new Error("Pick three colors for the custom gradient.");
   let customImageId = config.custom_image_id;
@@ -1345,7 +1319,7 @@ function openCreateModal(tab = "agent") {
       if (await mutate(command,{quiet:true})) {
         if(tab==='agent'){
           const created=state.view.directory.agents.find(a=>!oldIds.has(a.agent_id));
-          if(created&&avatarDraft?.mode==='fluffy'){window.PhoenixAvatarPreferences.set(created.agent_id,'fluffy',avatarDraft.fluffy_palette);render();window.dispatchEvent(new CustomEvent('phoenix:directory-updated',{detail:{view:state.view}}));}
+          if(created&&avatarDraft?.mode==='fluffy'){window.PhoenixAvatarPreferences.set(created.agent_id,'fluffy',avatarDraft.fluffy_palette,avatarDraft.fluffy_shape);render();window.dispatchEvent(new CustomEvent('phoenix:directory-updated',{detail:{view:state.view}}));}
         }
         closeModal();toast(tab==='agent' ? (window.__PHOENIX_ISOLATED_BACKEND__?.enabled?'Coworker request saved. Role setup needs an authorized subscription.':'Phoenix is setting up your new coworker.') : 'Group created.');
       } else submit.disabled = false;

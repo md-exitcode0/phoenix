@@ -241,17 +241,75 @@ fn reserve_saved_group_pings(
         if saved_turn != turn_id || group_id != &group.group_id
             || AgentMessage::failed_result_parts(subject, body) { continue; }
         if !group.participants.iter().any(|member| member.agent_id == *agent_id) { continue; }
-        for target in crate::runtime::group_conversation::authored_ping_targets(body, &group.participants) {
+        for target in room_ping_targets(group, agent_id, body) {
             if target.agent_id == *agent_id { continue; }
             // Group leader architecture: a leader assignment whose plan
             // dependencies are unfinished stays asleep until they are done.
             if crate::runtime::group_coordination::ping_is_gated(company, group, agent_id, &target.agent_id) { continue; }
             if company.reserve_group_ping(group, turn_id, agent_id, message_id, target)? {
                 added.push(target.agent_id.clone());
+            } else {
+                // Already activated in this turn (an `@everyone` wave, or an
+                // earlier ping). If it is still working, the mention reaches
+                // its live turn instead of being dropped.
+                steer_peer_mention(group, turn_id, agent_id, message_id, body, target);
             }
         }
     }
     Ok(added)
+}
+
+/// Who an authored room contribution wakes. Only the leader fans out with
+/// `@everyone`: a member's `@everyone` reaches the leader (plus anyone it
+/// named explicitly), so one member cannot wake the whole room.
+fn room_ping_targets<'a>(
+    group: &'a crate::runtime::group_conversation::GroupTurnContext,
+    author_agent_id: &str,
+    body: &str,
+) -> Vec<&'a crate::runtime::group_conversation::GroupParticipant> {
+    let (everyone, mut explicit) =
+        crate::runtime::group_conversation::parse_room_pings(body, &group.participants);
+    if !everyone {
+        return explicit;
+    }
+    match group.leader() {
+        Some(leader) if leader.agent_id != author_agent_id => {
+            if !explicit.iter().any(|member| member.agent_id == leader.agent_id) {
+                explicit.push(leader);
+            }
+            group.participants.iter()
+                .filter(|member| explicit.iter().any(|picked| picked.agent_id == member.agent_id))
+                .collect()
+        }
+        _ => group.participants.iter().collect(),
+    }
+}
+
+/// Deliver a teammate's room mention into the target's running turn. Never
+/// during an open diverge round when the room would hide the author's pitch.
+fn steer_peer_mention(
+    group: &crate::runtime::group_conversation::GroupTurnContext,
+    turn_id: &str,
+    author_agent_id: &str,
+    message_id: &str,
+    body: &str,
+    target: &crate::runtime::group_conversation::GroupParticipant,
+) {
+    let Some(lane) = crate::runtime::group_conversation::participant_lane(target) else { return };
+    if crate::runtime::group_coordination::diverge_view(group, &target.agent_id)
+        .is_some_and(|view| view.hides_contribution(author_agent_id, turn_id))
+    {
+        return;
+    }
+    let author = group.participants.iter().find(|member| member.agent_id == author_agent_id)
+        .map(|member| member.display_name.as_str()).unwrap_or(author_agent_id);
+    let _ = crate::runtime::postbox::steer_room_user(
+        &group.canonical_session_id,
+        &lane,
+        message_id,
+        crate::runtime::postbox::RoomSteerKind::PeerMention,
+        &format!("{author}: {body}"),
+    );
 }
 
 fn saved_group_ping_message(
@@ -271,7 +329,7 @@ fn saved_group_ping_message(
     }).context("room ping source receipt is unavailable")?;
     let sender = group.participants.iter().find(|participant| participant.agent_id == *author)
         .context("room ping author is not a participant")?;
-    anyhow::ensure!(crate::runtime::group_conversation::authored_ping_targets(body, &group.participants)
+    anyhow::ensure!(room_ping_targets(group, author, body)
         .iter().any(|target| target.agent_id == member.participant.agent_id),
         "saved room contribution does not mention this recipient");
     let mut message = AgentMessage::talk(
@@ -1480,6 +1538,9 @@ impl AgentRunner {
                 let mut persisted = Vec::<(String, String)>::new();
                 let mut recovered_failures = Vec::new();
                 let company = crate::runtime::company::global()?;
+                if let Err(error) = crate::runtime::group_coordination::bind_turn_to_open_round(company.as_ref(), group, &task.id) {
+                    tracing::warn!("group diverge round binding failed: {error:#}");
+                }
                 reserve_saved_group_pings(&self.state_root, company.as_ref(), group, &task.id)?;
                 let ledger = company.group_turn(&group.canonical_session_id, &task.id)?
                     .context("room turn has no activation ledger")?;
@@ -2606,6 +2667,84 @@ mod accountability_tests {
         let saved=SessionStore::read_one_from_disk(&directory.path().join("sessions"),&group.canonical_session_id).unwrap().unwrap();
         assert_eq!(saved.messages.iter().filter(|message|matches!(message,Message::User{..})).count(),1,"no invented human message");
         assert_eq!(saved.messages.iter().filter(|message|matches!(message,Message::GroupContribution{..})).count(),2,"one real contribution per speaker");
+    }
+
+    /// The pasted Build Group mission: leader first, members in one wave.
+    /// Leader assignment pings to members already in the wave never create a
+    /// second activation; a mention of a member that is still working reaches
+    /// its live turn exactly once; a member's `@everyone` wakes only the
+    /// leader; concurrent member saves keep one contribution each.
+    #[test]
+    fn mission_wave_pings_steer_running_members_once_and_never_double_activate() {
+        use crate::runtime::group_conversation::{preview_group_activation,resolve_group_turn_from_activation};
+        use crate::runtime::company_directory::{GroupProfile,LifecycleState};
+        let directory=tempfile::tempdir().unwrap();
+        let company=crate::runtime::company::CompanyStore::open(directory.path().join("company.sqlite")).unwrap();
+        company.ensure_full_catalog_team().unwrap();
+        let session=format!("group-mission-{}",uuid::Uuid::new_v4().simple());
+        let roster=["phoenix","researcher","coder","frontend","critic","marketing"];
+        company.create_group("user",GroupProfile {
+            group_id:"mission-room".into(),name:"Build Group".into(),description:"test".into(),
+            color:"#123456".into(),icon_seed:"test".into(),lifecycle:LifecycleState::Active,
+            pinned:false,sort_order:1,canonical_session_id:Some(session.clone()),metadata_json:"{}".into(),
+            leader_agent_id: Some("phoenix".into()),
+        },roster.iter().map(|id|id.to_string()).collect()).unwrap();
+        let snapshot=company.directory_snapshot().unwrap();
+        let prompt=std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"),"/tests/fixtures/phoenix-website-mission.md")).unwrap();
+        let intent=preview_group_activation(&snapshot,"mission-room",&prompt).unwrap().intent();
+        assert_eq!(intent.execution_waves.len(),2,"leader plans first, then one parallel wave");
+        let group=resolve_group_turn_from_activation(&snapshot,&intent).unwrap();
+        assert_eq!(group.leader_agent_id.as_deref(),Some("phoenix"));
+        let participants=group.explicitly_pinged().cloned().collect::<Vec<_>>();
+        assert_eq!(participants.len(),6);
+        company.reserve_group_turn(&group.canonical_session_id,"mission-turn",&prompt,&intent,&participants).unwrap();
+        persist_group_user_boundary(directory.path(),&group,"mission-turn",&prompt,"test").unwrap();
+        // Leon (frontend) is already working when Tibo's plan lands.
+        let _leon_live=crate::runtime::postbox::active_turn_guard(&session,"frontend");
+        let lead=AgentMessage::talk(AgentAddress::Orchestrator,AgentAddress::User,"Plan",
+            "Diverge first. @frontend pitch the hero film, @coder pitch the stack, @researcher study launch sites. `@marketing` waits.",false);
+        persist_group_messages_with_events(directory.path(),&group,"mission-turn",&[lead]).unwrap();
+        for _ in 0..3 {
+            assert!(reserve_saved_group_pings(directory.path(),&company,&group,"mission-turn").unwrap().is_empty(),
+                "members already in the wave are never activated twice");
+        }
+        let notes=crate::runtime::postbox::take_steer(&session,"frontend");
+        assert_eq!(notes.len(),1,"the running member hears the mention exactly once: {notes:?}");
+        assert!(notes[0].subject.contains("peer-mention"));
+        assert!(notes[0].body.contains("pitch the hero film"));
+        assert!(crate::runtime::postbox::take_steer(&session,"coder").is_empty(),"idle members read the plan when their wave starts");
+        assert!(crate::runtime::postbox::take_steer(&session,"marketing").is_empty(),"code is not a ping");
+        // A member's @everyone wakes only the leader.
+        let robin=group.participants.iter().find(|p|p.agent_id=="coder").unwrap();
+        let targets=room_ping_targets(&group,"coder","Stack pitch posted. @everyone have a look");
+        assert_eq!(targets.iter().map(|p|p.agent_id.as_str()).collect::<Vec<_>>(),vec!["phoenix"]);
+        let targets=room_ping_targets(&group,"coder","@everyone and @frontend: done");
+        assert_eq!(targets.iter().map(|p|p.agent_id.as_str()).collect::<Vec<_>>(),vec!["phoenix","frontend"]);
+        assert_eq!(room_ping_targets(&group,"phoenix","@everyone converge").len(),6,"the leader may fan out");
+        // Five members finish at once: one contribution each, in a stable
+        // order, and a replay never appends a second copy.
+        let members=group.participants.iter().filter(|p|p.agent_id!="phoenix").cloned().collect::<Vec<_>>();
+        let state_root=directory.path().to_path_buf();
+        let handles=members.iter().map(|member|{
+            let (group,state_root,member)=(group.clone(),state_root.clone(),member.clone());
+            std::thread::spawn(move||{
+                let from=group_participant_address(&member).unwrap();
+                let reply=AgentMessage::talk(from,AgentAddress::User,"Pitch",&format!("{} pitch",member.display_name),false);
+                persist_group_messages_with_events(&state_root,&group,"mission-turn",&[reply]).unwrap().0
+            })
+        }).collect::<Vec<_>>();
+        let receipts=handles.into_iter().map(|handle|handle.join().unwrap()).collect::<Vec<_>>();
+        let saved=SessionStore::read_one_from_disk(&directory.path().join("sessions"),&session).unwrap().unwrap();
+        let contributions=saved.messages.iter().filter_map(|message|match message {
+            Message::GroupContribution{agent_id,message_id,..}=>Some((agent_id.clone(),message_id.clone())),_=>None}).collect::<Vec<_>>();
+        assert_eq!(contributions.len(),6,"leader + five members, nothing lost to concurrent writes");
+        assert_eq!(contributions[0].0,"phoenix","the leader's plan stays first");
+        for receipt in receipts { assert!(contributions.contains(&receipt[0])); }
+        let reply=AgentMessage::talk(group_participant_address(robin).unwrap(),AgentAddress::User,"Pitch","a different second answer",false);
+        persist_group_messages_with_events(directory.path(),&group,"mission-turn",&[reply]).unwrap();
+        let saved=SessionStore::read_one_from_disk(&directory.path().join("sessions"),&session).unwrap().unwrap();
+        assert_eq!(saved.messages.iter().filter(|m|matches!(m,Message::GroupContribution{..})).count(),6,"one top-level reply per member per turn");
+        assert_eq!(saved.messages.iter().filter(|m|matches!(m,Message::User{..})).count(),1);
     }
 
     #[test]

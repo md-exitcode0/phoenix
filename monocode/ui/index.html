@@ -25,6 +25,8 @@
   <link rel="stylesheet" href="screenshot-repairs.css">
   <link rel="stylesheet" href="room-polish.css">
   <link rel="stylesheet" href="passes.css?v=20261007a">
+  <link rel="preload" href="fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="soft-sky.css?v=20261008b">
 </head>
 <body>
   <div class="window-chrome" data-tauri-drag-region>
@@ -195,12 +197,11 @@
   <aside id="inspectionSidebar" class="inspection-sidebar" aria-label="Activity sidebar" aria-hidden="true">
     <header class="inspection-tabbar" aria-label="Workspace bar">
       <div id="inspectionTabStrip" class="inspection-tab-strip" role="tablist" aria-label="Workspace panels">
-        <button id="inspectionReviewTab" aria-controls="inspectionChangesPanel" type="button" role="tab" class="inspection-tab review-tab" data-inspection-tab="changes" aria-selected="true" tabindex="0"><span class="review-tab-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><rect x="3.5" y="3.5" width="13" height="13" rx="3.5"/><path d="M10 6.9v4.2M7.9 9h4.2M7.9 13.4h4.2"/></svg></span><span>Review</span><i id="inspectionChangesCount">0</i></button>
         <div id="inspectionBrowserTabs" class="inspection-browser-tabs">
           <button id="inspectionBrowserTab" type="button" role="tab" class="inspection-tab browser-page-tab" data-inspection-tab="browser" aria-selected="false" tabindex="-1" hidden><span class="browser-tab-fallback" aria-hidden="true"><img class="phoenix-raster-logo" data-phoenix-logo src="assets/phoenix_logo.svg" alt=""></span><strong id="browserTabTitle">New tab</strong><span class="browser-tab-close" aria-hidden="true">×</span></button>
         </div>
         <div id="inspectionImageTabs" class="inspection-image-tabs"></div>
-        <button id="inspectionDesktopTab" aria-controls="inspectionDesktopPanel" type="button" role="tab" class="inspection-tab" data-inspection-tab="desktop" aria-selected="false" tabindex="-1"><span>Desktop</span></button>
+        <button id="inspectionDesktopTab" aria-controls="inspectionDesktopPanel" type="button" role="tab" class="inspection-tab" data-inspection-tab="desktop" aria-selected="true" tabindex="0"><span>Desktop</span></button>
         <button id="inspectionSourcesTab" type="button" role="tab" class="inspection-tab sources-page-tab" data-inspection-tab="sources" aria-selected="false" tabindex="-1" hidden><span class="sources-tab-icon" aria-hidden="true"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5"/><path d="M10 3.5c-3.6 4.3-3.6 8.7 0 13M10 3.5c3.6 4.3 3.6 8.7 0 13M4 7.9h12M4 12.1h12"/></svg></span><span>Sources</span><i id="inspectionSourcesCount">0</i></button>
         <button id="browserNewTab" class="inspection-new-tab" type="button" aria-label="New browser tab" title="New tab"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 5.2v9.6M5.2 10h9.6"/></svg></button>
       </div>
@@ -209,15 +210,9 @@
       </div>
     </header>
     <div class="inspection-toolbar">
-      <div class="inspection-toolbar-view desktop-workspace-toolbar" data-inspection-toolbar="desktop" hidden>
+      <div class="inspection-toolbar-view desktop-workspace-toolbar" data-inspection-toolbar="desktop">
         <select id="desktopWorkspacePicker" aria-label="Agent desktop" disabled></select>
         <span id="desktopWorkspaceStatus" class="desktop-workspace-status" role="status"></span>
-      </div>
-      <div id="inspectionReviewToolbar" class="inspection-toolbar-view" data-inspection-toolbar="changes">
-        <button id="reviewTurnPicker" type="button"><strong>Agent edits</strong><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6.2 8.4 3.8 3.8 3.8-3.8"/></svg></button>
-        <span id="reviewDiffStats" class="review-diff-stats"><b>+0</b><i>−0</i></span>
-        <span class="inspection-toolbar-spacer"></span>
-        <span id="reviewWorkspaceLabel" class="review-workspace-label"></span>
       </div>
       <div id="inspectionBrowserToolbar" class="inspection-toolbar-view browser-side-toolbar" data-inspection-toolbar="browser" hidden>
         <button type="button" class="browser-nav-button" data-browser-action="back" aria-label="Back"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 10H4.9m0 0 4.4-4.4M4.9 10l4.4 4.4"/></svg></button>
@@ -242,16 +237,6 @@
       <section id="inspectionBrowserPanel" role="tabpanel" class="inspection-panel inspection-browser-panel" data-inspection-panel="browser" hidden>
         <div class="inspection-empty"><canvas class="matrix-orb" data-matrix-orb data-size="110" data-state="idle" aria-hidden="true"></canvas><strong>The private browser will appear here</strong><small>Open a login, teaching flow, or browser task to follow it without leaving the conversation.</small></div>
       </section>
-      <section id="inspectionChangesPanel" role="tabpanel" aria-labelledby="inspectionReviewTab" class="inspection-panel inspection-changes-panel" data-inspection-panel="changes">
-        <div class="review-layout">
-          <div id="inspectionChangesList" class="inspection-changes-list"></div>
-          <aside class="review-files-pane" aria-label="Workspace files">
-            <div class="review-resizer" role="separator" aria-orientation="vertical" aria-label="Resize file tree" tabindex="0"></div>
-            <label class="review-filter"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9.1" cy="9.1" r="4.6"/><path d="m12.5 12.5 3.1 3.1"/></svg><input id="reviewFilter" type="search" placeholder="Filter files…" aria-label="Filter workspace files"></label>
-            <div id="reviewFileTree" class="review-file-tree"></div>
-          </aside>
-        </div>
-      </section>
       <section id="inspectionImagePanel" role="tabpanel" class="inspection-panel inspection-image-panel" data-inspection-panel="image" hidden>
         <div id="inspectionImageEmpty" class="inspection-empty"><span class="inspection-empty-image"><i></i></span><strong>Open an image from the conversation</strong><small>Attached, downloaded, and generated images stay beside the thread for reference.</small></div>
         <figure id="inspectionImageFigure" hidden>
@@ -271,7 +256,7 @@
       <section id="inspectionSourcesPanel" role="tabpanel" class="inspection-panel inspection-sources-panel" data-inspection-panel="sources" hidden>
         <div id="inspectionSourcesGrid" class="inspection-sources-grid"></div>
       </section>
-      <section id="inspectionDesktopPanel" role="tabpanel" aria-labelledby="inspectionDesktopTab" class="inspection-panel inspection-desktop-panel" data-inspection-panel="desktop" hidden>
+      <section id="inspectionDesktopPanel" role="tabpanel" aria-labelledby="inspectionDesktopTab" class="inspection-panel inspection-desktop-panel" data-inspection-panel="desktop">
         <div id="desktopObservationStage" class="desktop-observation-stage"><img id="desktopObservationImage" alt="" hidden><p id="desktopObservationEmpty" class="desktop-observation-empty">An agent’s screen will appear here when it opens an app.</p><div id="desktopConnecting" class="desktop-connecting" hidden><svg class="desktop-connecting-ring" width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="12" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="2"/><circle cx="13" cy="13" r="12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-dasharray="21.1 54.3"/></svg><span>Connecting to agent’s screen</span></div><button id="desktopFullscreen" class="desktop-fullscreen-button" type="button" aria-label="Full screen" title="Full screen"><svg class="df-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg><svg class="df-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button><svg id="desktopCursor" class="desktop-cursor" width="30" height="30" viewBox="0 0 24 24" fill="#111318" stroke="#fff" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true" hidden><path d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z"/></svg></div>
         <footer id="desktopObservationCaption" class="desktop-observation-caption">Latest observation</footer>
       </section>
@@ -328,7 +313,7 @@
   <script src="fluffy-activity.js"></script>
   <script src="fluffy-native-player.js"></script>
   <script src="fluffy-view.js"></script>
-  <script src="sidebar.js?v=20260929a"></script>
+  <script src="sidebar.js?v=20261008-avatars"></script>
   <script src="provider-setup.js?v=20260917-provider-recovery-2"></script>
   <script src="desktop-viewer.js?v=20260926b"></script>
   <script src="passes-kit.js?v=20261007a"></script>
@@ -336,11 +321,12 @@
   <script src="channels.js?v=20260927e"></script>
   <script src="docs.js?v=20260928a"></script>
   <script src="review-settings.js"></script>
-  <script src="settings.js?v=20261007-passes"></script>
+  <script src="settings.js?v=20261008-avatars"></script>
   <script src="view.js?v=20260926a"></script>
   <script src="command-palette.js?v=20260904b"></script>
-  <script src="onboarding.js?v=20260927b"></script>
+  <script src="onboarding.js?v=20261008-avatars"></script>
   <script src="monocode.js"></script>
+  <script src="soft-sky.js?v=20261008a"></script>
   <script src="cursor-motion.js"></script>
   <script type="module" src="conversation-motion.mjs"></script>
 </body>

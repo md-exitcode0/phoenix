@@ -400,6 +400,17 @@ pub fn note_round_turn(connection: &Connection, group_id: &str, turn_id: &str, n
     Ok(())
 }
 
+/// A room turn that starts while a diverge round is open belongs to that
+/// round: a member's pitch in a mid-round turn (a follow-up the user sent to
+/// one member) stays blind to its peers too. Leader-only turns are harmless
+/// to bind (the leader is never hidden).
+pub fn bind_turn_to_open_round(store: &super::company::CompanyStore, group: &GroupTurnContext, turn_id: &str) -> Result<()> {
+    if group.leader_agent_id.is_none() {
+        return Ok(());
+    }
+    store.with_coordination(|connection| note_round_turn(connection, &group.group_id, turn_id, &Utc::now().to_rfc3339()))
+}
+
 /// Append-only board entry (`decision`, `result`, `escalation`).
 pub fn append_entry(
     connection: &Connection,
@@ -624,7 +635,12 @@ impl DivergeView {
     pub fn hides_contribution(&self, author_agent_id: &str, turn_id: &str) -> bool {
         author_agent_id != self.viewer_agent_id
             && author_agent_id != self.leader_agent_id
-            && self.turn_ids.iter().any(|turn| turn == turn_id)
+            && {
+                // A race-fallback turn (`<turn>.rf-<lane>`) belongs to its
+                // room message's turn.
+                let boundary = super::group_conversation::room_boundary_turn_id(turn_id);
+                self.turn_ids.iter().any(|turn| turn == turn_id || turn == boundary)
+            }
     }
 
     /// Board results logged by peers after the round opened are hidden too.
@@ -757,7 +773,7 @@ WORKFLOW — size the request first:\n\
 1. Record the brief (set_brief) and, for diverge/research/build, the plan (set_plan: items {{id,title,owner_agent_id,depends_on}}).\n\
 2. Dispatch with talk {{\"to\":\"<member or everyone>\",\"room_mode\":\"assign\"}} or `@id` assignment lines in your reply. Assignments are posted in the room under your name and wake those members; a member whose items still wait on unfinished depends_on stays asleep until they are done.\n\
 3. When dispatched members have reported you are woken again with their saved results. Compare, critique, record decisions (group_board decide), then move to the next phase or dispatch newly ready items. At most {cycles} convergence cycles per request.\n\
-4. Everyone in the room hears every user message. A message the user @mentions to specific members is THEIRS: they act on it directly, even mid-build. Do not take it over, redo it, or reassign it — only record it on the board (decision / plan item / claims) so claims do not collide. If the user @mentions only you, answer it yourself with no dispatch or fan-out. @everyone / @all: every member acts on it and you re-plan.\n\
+4. Everyone in the room hears every user message. A message the user @mentions to specific members is THEIRS: they act on it directly, even mid-build. Do not take it over, redo it, or reassign it — only record it on the board (decision / plan item / claims) so claims do not collide. If the user @mentions only you, answer it yourself with no dispatch or fan-out. @everyone / @all: you go FIRST — record the brief, pick the mode, set_plan with one owner per item and post the assignments; every member starts right after your reply with your plan on the board (members already working act on it in their own area while you re-plan).\n\
 5. The user may steer mid-build (\"make it dark mode\"): the members working on it adapt immediately; you update the brief/plan and claims to match instead of restarting the work.\n\
 6. Before you answer, run your own red-team pass: strongest objection, failure modes, unverified claims, missing pieces — fix or flag them.\n\
 7. Deliver ONE coherent answer in the room, in your voice — not a relay of member messages. Escalate to the user only with ask_user.",
@@ -783,7 +799,7 @@ pub fn member_block(group: &GroupTurnContext, me: &str, board: &MissionBoard) ->
         _ => "",
     };
     format!(
-        "GROUP MEMBER — {leader} leads this room. Mode: {mode}. Your assignment: {assignment}.{mode_rule} Answer your assignment in this room; log your result with group_board {{\"action\":\"result\"}} when it maps to a plan item. Need a decision or blocked? talk with room_mode \"escalate\" reaches the leader. Do not re-plan the whole request or answer for the group.",
+        "GROUP MEMBER — {leader} leads this room. Mode: {mode}. Your assignment: {assignment}.{mode_rule} Answer your assignment in this room; log your result with group_board {{\"action\":\"result\"}} when it maps to a plan item. Need a decision or blocked? talk with room_mode \"escalate\" reaches the leader. Do not re-plan the whole request or answer for the group. If the leader gave you nothing in the current phase, reply with one short line that you are standing by — do not start later-phase work early or repeat a teammate.",
         mode = board.mode.as_str(),
         assignment = if mine.is_empty() { "as stated in the leader's room message".to_string() } else { mine.join("; ") },
     )
@@ -1172,6 +1188,11 @@ pub fn leader_convergence_turn_id(canonical_session_id: &str, turn_id: &str) -> 
 /// have settled and at least one reported. `None` means "do not converge".
 pub fn convergence_inputs(ledger: &super::group_conversation::GroupTurnLedgerRecord, leader: &str) -> Option<Vec<String>> {
     use super::group_conversation::GroupMemberActivationState as State;
+    let waits_on_leader = |agent_id: &str| {
+        ledger.activation.as_ref()
+            .and_then(|plan| plan.execution_dependencies.as_ref())
+            .is_some_and(|edges| edges.iter().any(|edge| edge.prerequisite == leader && edge.dependent == agent_id))
+    };
     let leader_receipt = ledger
         .members
         .iter()
@@ -1181,7 +1202,11 @@ pub fn convergence_inputs(ledger: &super::group_conversation::GroupTurnLedgerRec
     let dispatched = ledger
         .members
         .iter()
-        .filter(|member| member.participant.agent_id != leader && member.source_receipt_id.as_deref() == Some(leader_receipt.as_str()))
+        .filter(|member| member.participant.agent_id != leader
+            && (member.source_receipt_id.as_deref() == Some(leader_receipt.as_str())
+                // `@everyone`: members start after the leader's plan in the
+                // same turn (a dependency on the leader, not a ping).
+                || waits_on_leader(&member.participant.agent_id)))
         .collect::<Vec<_>>();
     if dispatched.is_empty()
         || dispatched.iter().any(|member| matches!(member.state, State::Queued | State::Working | State::WaitingUser))

@@ -91,3 +91,5 @@
  #modalLayer .fluffy-preview-picture img,#modalLayer .fluffy-preview-picture canvas{width:110px;height:110px}
 }
 @media(prefers-reduced-motion:reduce){.fluffy-token,.fluffy-hero,.fluffy-live-preview{animation:none;transition:none}}
+/* A custom photo that is loading or missing shows a still Fluffy behind it. */
+.custom-avatar-shell>.custom-avatar-fallback{display:block;width:100%;height:100%;background:center/contain no-repeat}

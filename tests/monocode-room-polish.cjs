@@ -154,6 +154,22 @@ async function main() {
     })()`);
     console.log(JSON.stringify({passes},null,2));
     assert.ok(Object.values(passes).every(Boolean),'Passes forms validate, mask, and wipe secrets while keeping card fields out of public metadata');
+    const sky=await evaluate(`(async()=>{
+      const root=document.documentElement,theme=root.dataset.theme,s=window.PhoenixSky;if(!s)throw Error('Soft sky did not load');
+      const fonts=await document.fonts.load('15px Inter');
+      const assets=['sky-clouds-far.webp','sky-clouds-near.webp','sky-stars-a.png','sky-stars-b.png'];
+      await Promise.all(assets.map(name=>{const img=new Image();img.src='assets/'+name;return img.decode();}));
+      root.dataset.theme='dark';s.set('00:00');const night={phase:s.phase(),stars:root.dataset.skyStars,top:root.style.getPropertyValue('--sky-top')};
+      s.set('12:00');const day={phase:s.phase(),stars:root.dataset.skyStars,top:root.style.getPropertyValue('--sky-top')};
+      root.dataset.theme='light';s.set('12:00');const lightTop=root.style.getPropertyValue('--sky-top');
+      root.dataset.theme=theme;s.set(null);
+      return {layer:!!document.querySelector('#softSky[aria-hidden="true"]'),font:fonts.length>0,night:night.phase==='night'&&night.stars==='on',day:day.phase==='day'&&day.stars==='off',dayChangesPalette:night.top!==day.top,lightChangesPalette:lightTop!==day.top,assets:assets.length};
+    })()`);
+    console.log(JSON.stringify({sky},null,2));
+    assert.ok(sky.layer&&sky.font&&sky.night&&sky.day&&sky.dayChangesPalette&&sky.lightChangesPalette&&sky.assets===4,'Soft sky loads its media and follows time of day in both themes');
+    await evaluate(`(async()=>{const t=window.MonocodeRoomTest;await t.ui.selectItem({kind:'group',id:t.ui.state.view.directory.groups[0].group_id});t.syncGroupPals();})()`);
+    await sleep(200);
+    assert.ok(await evaluate("!!document.getElementById('groupPals')&&!document.getElementById('fluffyHero')"),'A room uses its group avatar cluster without a second standalone chat hero');
     if (process.env.PHOENIX_TEST_SCREENSHOT) {
       await evaluate(`(async()=>{const t=window.MonocodeRoomTest;await t.ui.selectItem({kind:'group',id:t.ui.state.view.directory.groups[0].group_id});t.syncGroupPals();})()`);
       const screenshot=await command("Page.captureScreenshot",{format:"png"});
@@ -161,9 +177,10 @@ async function main() {
       if (process.env.PHOENIX_TEST_NARROW_SCREENSHOT) {
         await command("Emulation.setDeviceMetricsOverride",{width:480,height:900,deviceScaleFactor:1,mobile:false});
         await sleep(350);
-        const narrow=await evaluate(`(()=>{const host=document.getElementById('groupPals'),stage=document.getElementById('conversationStage').getBoundingClientRect(),body=document.getElementById('conversationBody').getBoundingClientRect(),faces=[...host.querySelectorAll('.pal-seat')].map(n=>n.getBoundingClientRect());return {stage:host.dataset.stage,inside:faces.every(r=>r.left>=stage.left&&r.right<=stage.right),aboveMessages:faces.every(r=>r.bottom<=body.top),sizes:faces.map(r=>Math.round(r.width))};})()`);
-        assert.ok(narrow.inside&&narrow.aboveMessages,'Enlarged room avatars fit the narrow stage and stay above messages');
-        assert.ok(narrow.sizes.every(size=>size===66||size===115),'Narrow layout keeps the enlarged avatar sizes');
+        const narrow=await evaluate(`(()=>{const host=document.getElementById('groupPals'),stage=document.getElementById('conversationStage').getBoundingClientRect(),body=document.getElementById('conversationBody').getBoundingClientRect(),nodes=[...host.querySelectorAll('.pal-seat')],faces=nodes.map(n=>n.getBoundingClientRect());return {stage:host.dataset.stage,inside:faces.every(r=>r.left>=stage.left&&r.right<=stage.right),aboveMessages:faces.every(r=>r.bottom<=body.top),heroSize:parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mc-hero-diameter')),sizes:nodes.map(n=>parseFloat(getComputedStyle(n).width)),bounds:{stage:[stage.left,stage.right],bodyTop:body.top,faces:faces.map(r=>[r.left,r.right,r.bottom])}};})()`);
+        assert.ok(narrow.inside&&narrow.aboveMessages,'Enlarged room avatars fit the narrow stage and stay above messages: '+JSON.stringify(narrow));
+        assert.equal(narrow.sizes[0],narrow.heroSize,'Narrow room leader matches the responsive regular chat hero');
+        assert.ok(narrow.sizes.slice(1).every(size=>size===66),'Narrow room coworkers keep their enlarged size');
         console.log(JSON.stringify({narrow},null,2));
         const narrowShot=await command("Page.captureScreenshot",{format:"png"});
         fs.writeFileSync(process.env.PHOENIX_TEST_NARROW_SCREENSHOT,Buffer.from(narrowShot.data,"base64"));

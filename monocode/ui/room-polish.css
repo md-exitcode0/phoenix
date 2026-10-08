@@ -34,15 +34,6 @@
 .mention-picker .mention-everyone+button{margin-top:2px}
 
 /* Review: a calm empty state, centred in the pane. */
-#inspectionChangesList:has(> .review-empty){display:flex;align-items:center;justify-content:center}
-.inspection-empty.review-empty{display:flex;flex-direction:column;align-items:center;gap:0;padding:40px 32px}
-.review-empty-mark{width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:var(--surface);border:1px solid var(--line);color:var(--ink-faint)}
-.review-empty-mark svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
-.inspection-empty.review-empty strong{margin-top:14px;font-size:15px;font-weight:600}
-.inspection-empty.review-empty small{max-width:300px;margin-top:6px;font-size:12.5px}
-#reviewDiffStats[hidden]{display:none!important}
-.review-files-pane{border-left:1px solid var(--line)}
-.review-filter{height:34px;flex-basis:34px;border:1px solid var(--line);background:var(--bg)}
 
 /* Collapsed rail logo: smaller, inside the top band, centred in the rail,
    never sitting on the header's bottom border. */
@@ -64,8 +55,8 @@ body.sidebar-collapsed .sidebar-wake .phoenix-raster-logo{width:18px!important;h
 /* Room faces use the regular chat hero size, with coworkers at 3 × 22px. */
 :root[data-skin="monocode"] #groupPals{--leader:var(--mc-hero-diameter);--pal:66px;--pal-wide-space:422px;--pal-docked-space:286px;--pal-more-space:48px;top:calc(100% + 8px)}
 :root[data-skin="monocode"] #conversationStage:has(#groupPals) #conversationBody{margin-top:calc(var(--mc-hero-diameter) + 16px)}
-:root[data-skin="monocode"] #conversationStage:has(#groupPals[data-stage="2"]) #conversationBody{margin-top:calc(var(--mc-hero-diameter) + 70px)}
-:root[data-skin="monocode"] #conversationStage:has(#groupPals[data-stage="3"]) #conversationBody{margin-top:calc(var(--mc-hero-diameter) + 76px)}
+:root[data-skin="monocode"] #conversationStage:has(#groupPals[data-stage="2"]) #conversationBody{margin-top:max(calc(var(--mc-hero-diameter) + 16px),calc(var(--mc-hero-diameter) / 2 + 128px))}
+:root[data-skin="monocode"] #conversationStage:has(#groupPals[data-stage="3"]) #conversationBody{margin-top:max(calc(var(--mc-hero-diameter) + 16px),calc(var(--mc-hero-diameter) / 2 + 133px))}
 :root[data-skin="monocode"] #groupPals[data-stage="1"] [data-seat="inner-left"]{--x:-103px;--y:0px}
 :root[data-skin="monocode"] #groupPals[data-stage="1"] [data-seat="inner-right"]{--x:103px;--y:0px}
 :root[data-skin="monocode"] #groupPals[data-stage="1"] [data-seat="outer-left"]{--x:-178px;--y:0px}

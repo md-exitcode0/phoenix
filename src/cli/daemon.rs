@@ -4391,6 +4391,36 @@ fn settle_matching_outside_call_asks(record: Option<&crate::runtime::asks::AskRe
     }
 }
 
+/// `(agent, exact action fingerprint)` of a single-call tool permission card.
+fn tool_permission_scope(record: &crate::runtime::asks::AskRecord) -> Option<(String, String)> {
+    let approval = record.approval.as_ref().filter(|approval| approval.action == "tool_permission")?;
+    let fingerprint = approval.details.get("action_fingerprint")?.trim();
+    let agent = record.agent_id.clone().unwrap_or_else(|| record.agent.clone());
+    (!fingerprint.is_empty() && !agent.trim().is_empty()).then(|| (agent, fingerprint.to_string()))
+}
+
+/// Parallel instances of one coworker in a room can park on the very same
+/// exact action (same tool, same input). One decision answers every LIVE card
+/// for that exact action; a card whose turn ended keeps its own lifecycle
+/// (an exact-action approval is never replayed into a stale continuation).
+fn settle_matching_tool_permission_asks(record: Option<&crate::runtime::asks::AskRecord>, answer: &str) {
+    let Some(record) = record else { return };
+    let Some(scope) = tool_permission_scope(record) else { return };
+    let Ok(records) = crate::runtime::asks::conversation_records(&record.session_id) else { return };
+    for sibling in records {
+        if sibling.ask_id == record.ask_id
+            || sibling.status != "pending"
+            || sibling.resolved_at.is_some()
+            || tool_permission_scope(&sibling).as_ref() != Some(&scope)
+        {
+            continue;
+        }
+        if crate::runtime::asks::answer(&sibling.ask_id, answer.to_string()) {
+            glog(&format!("ask {}: settled by matching decision on {}", sibling.ask_id, record.ask_id));
+        }
+    }
+}
+
 /// The turn that raised an outside-group card has ended, so nothing else will
 /// save the grant. Save it here; the grant is idempotent per group+coworker.
 fn grant_detached_outside_call(record: &crate::runtime::asks::AskRecord, answer: &str) -> Result<()> {
@@ -5600,6 +5630,7 @@ async fn handle_connection(stream: UnixStream, turn_locks: TurnLocks) -> Result<
             if delivered {
                 glog(&format!("ask {ask_id}: user answer delivered"));
                 settle_matching_outside_call_asks(prior_record.as_ref(), &answer);
+                settle_matching_tool_permission_asks(prior_record.as_ref(), &answer);
                 send(
                     &mut write_half,
                     &WireResponse::AskAnswered {
@@ -9976,6 +10007,31 @@ mod ensure_gateway_tests {
         assert!(authorize_ask_request_owner_against_snapshot(
             &dismiss, Some("group-launch-room"), &snapshot,
         ).is_err(), "dismissal must obey the same explicit conversation boundary");
+    }
+
+    #[test]
+    fn one_tool_permission_decision_clears_identical_live_cards_only() {
+        let home = tempfile::tempdir().unwrap();
+        let _home = crate::config::test_env::PhoenixHomeGuard::set_private(home.path());
+        let session = "group-room-perm-test";
+        let card = |fingerprint: &str| crate::tools::ask_user::ApprovalRequest {
+            action: "tool_permission".into(), subject: "bash".into(), approved_option: "Allow once".into(),
+            details: [("action_fingerprint".to_string(), fingerprint.to_string()), ("tool_name".to_string(), "bash".to_string())].into_iter().collect(),
+        };
+        let questions = [crate::tools::ask_user::AskUserQuestion {
+            question: "Robin wants to use `bash` for npm install. Allow Full access for this call?".into(), header: Some("Permission".into()),
+            options: vec!["Allow once".into(), "Keep current access".into()], multi_select: false,
+        }];
+        let _first = crate::runtime::asks::register_with_payload("permission-aaaa0001", session, "coder", &questions, Some(&card("fp-npm")));
+        let mut twin = crate::runtime::asks::register_with_payload("permission-aaaa0002", session, "coder", &questions, Some(&card("fp-npm")));
+        let mut other = crate::runtime::asks::register_with_payload("permission-aaaa0003", session, "coder", &questions, Some(&card("fp-rm")));
+        let mut other_agent = crate::runtime::asks::register_with_payload("permission-aaaa0004", session, "frontend", &questions, Some(&card("fp-npm")));
+        let record = crate::runtime::asks::decision_record_for("permission-aaaa0001").unwrap();
+        assert!(crate::runtime::asks::answer("permission-aaaa0001", "Allow once".into()));
+        super::settle_matching_tool_permission_asks(record.as_ref(), "Allow once");
+        assert_eq!(twin.try_recv().unwrap(), "Allow once", "the identical exact action is cleared by one approval");
+        assert!(other.try_recv().is_err(), "a different action keeps its own card");
+        assert!(other_agent.try_recv().is_err(), "another coworker keeps its own card");
     }
 
     #[tokio::test]

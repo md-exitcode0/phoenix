@@ -78,8 +78,6 @@ export function installConversationPreviews({
   setInspectionTab,
   showInspectionSidebar,
   hideInspectionSidebar,
-  receiptReviewChanges,
-  renderInspectionChanges,
   renderInspectionSources,
   setImageCommentMode,
   renderImageCommentState,
@@ -507,7 +505,7 @@ export function installConversationPreviews({
       state.queue=[];state.previewQueues.set(state.sessionId,[]);state.queueBySession.set(state.sessionId,[]);renderQueue();setWorking(false);
       const tokenPriorItem=state.item;state.item={kind:"group",id:"launch-room"};state.mentions=[];state.groupEveryone=false;$("composerInput").value="Ask Iris to review ";normalizeComposerTokens(false);const inlineAgentToken=Boolean($("mentionTray").hidden&&$("composerInput").querySelector('[data-composer-agent="frontend"]')?.textContent.includes("Iris")&&composerText("request").includes("@frontend")&&!composerText("display").includes("@"));$("composerInput").value="Ask iris to review ";normalizeComposerTokens(false);const wrongCaseDoesNotPing=!$("composerInput").querySelector("[data-composer-agent]")&&state.mentions.length===0;state.item=tokenPriorItem;$("composerInput").value="";state.mentions=[];state.groupEveryone=false;renderMentionTray();
       $("composerInput").value="First line";$("composerInput").focus();setComposerCaretOffset(composerText().length);insertComposerLineBreak();const shiftedText=composerText(),shiftedCaret=composerCaretOffset(),selection=getSelection(),caretAnchoredOnNewLine=Boolean(selection?.rangeCount&&selection.getRangeAt(0).startContainer?.nodeType===Node.TEXT_NODE&&selection.getRangeAt(0).startContainer.data==="\u200B"&&selection.getRangeAt(0).startOffset===1);renderComposerText(`${shiftedText}Second line`,{allowEnd:true});const shiftEnterCreatesLineBreak=shiftedText==="First line\n"&&shiftedCaret===shiftedText.length&&caretAnchoredOnNewLine&&composerText()==="First line\nSecond line";$("composerInput").value="";
-      const reviewPrior={item:state.item,rows:state.displayRows,snapshot:state.reviewSnapshot,scope:state.reviewScope};state.item={kind:"agent",id:"coder"};state.reviewScope="agent";state.reviewSnapshot={files:["coder-owned.rs","other-agent.rs"],changes:[]};state.displayRows=[{source:"story",value:{kind:"tool",agent:"coder",tool:"write",target:"coder-owned.rs",ok:true,diff:"+owned"}},{source:"story",value:{kind:"tool",agent:"phoenix",tool:"write",target:"other-agent.rs",ok:true,diff:"+foreign"}}];const agentReviewRows=receiptReviewChanges(),reviewIsAgentScoped=agentReviewRows.length===1&&agentReviewRows[0].path==="coder-owned.rs";state.item=reviewPrior.item;state.displayRows=reviewPrior.rows;state.reviewSnapshot=reviewPrior.snapshot;state.reviewScope=reviewPrior.scope;
+
       const checks={
         workingButtonShowsStop,
         workingActionIsVisible,
@@ -607,7 +605,6 @@ export function installConversationPreviews({
         imageResultPreview:imagePreviewVisible,
         imageOpensReviewPane,
         reviewPaneIsRightSidebar,
-        reviewIsAgentScoped,
         compactionRunsInWave,
         compactionReceiptPersists,
         realWebMarks,
@@ -806,7 +803,7 @@ export function installConversationPreviews({
     renderStory({kind:"tool",agent:"phoenix",tool:"write",state:"success",label:"Added image relay",target:"canvas-app/ui/conversation.js",diff:"+ Open local images beside the conversation"});
     renderStory({kind:"context_compaction",agent:"phoenix",status:"completed",before_tokens:251904,after_tokens:93184,folded_messages:42,limit:262144});
     renderAnswer("The review surface is ready. Images, browser work, and code edits now stay visible beside the conversation.","phoenix",{created_at:new Date().toISOString(),elapsed_ms:487000});setWorking(false);
-    const tab=new URLSearchParams(location.search).get("tab")||"changes";
+    const tab=new URLSearchParams(location.search).get("tab")||"desktop";
     if(tab==="image")openImageInspector({path:"/tmp/phoenix-review-reference.png",name:"phoenix-review-reference.png"});
     else showInspectionSidebar(tab);
     document.title="Phoenix activity sidebar preview";
@@ -884,8 +881,34 @@ export function installConversationPreviews({
     const failures=Object.entries(checks).filter(([,passed])=>!passed).map(([name])=>name);document.documentElement.dataset.conversationPaging=failures.length?"fail":"pass";document.documentElement.dataset.conversationPagingChecks=JSON.stringify({...checks,initialMs,initialDomRows,fullRows,pagedPrompts});document.title=failures.length?`FAIL conversation paging: ${failures.join(", ")}`:"PASS conversation paging";
   }
 
-  function runEmptyReviewPreview(){
-    state.inspectionExpanded=false;clearFeed();replaceDisplayRows([],false);state.reviewSnapshot={workspace:state.workspace,additions:0,deletions:0,changes:[],files:["phoenix_agent/canvas-app/src/main.rs","phoenix_agent/canvas-app/ui/conversation.css","phoenix_agent/canvas-app/ui/conversation.js","README.md"],truncated:false};showInspectionSidebar("changes");renderInspectionChanges();document.title="Phoenix empty Review preview";
+  // Soft chat look: a realistic 1:1 thread and a group room, used to review
+  // bubbles, the quiet work trace and the composer. Preview only.
+  function runSoftChatPreview(){
+    state.inspectionExpanded=false;clearFeed();replaceDisplayRows([],false);state.activeTools.clear();state.toolRows=[];$("taskBlock").hidden=true;$("queueBlock").hidden=true;
+    const at=(m)=>new Date(Date.now()-m*60000).toISOString();
+    renderUser("The composer feels crowded. Can you calm it down without losing any of the options?");
+    const prompt=renderUser("And our messages should look like real chat bubbles, not a terminal.");
+    setWorking(true);beginTurnActivity(prompt);
+    renderStory({kind:"reasoning",agent:"phoenix",text:"Looking at how the composer and the feed are laid out today"});
+    renderStory({kind:"tool",agent:"phoenix",tool:"read_file",target:"monocode/ui/index.html",ok:true});
+    renderStory({kind:"tool",agent:"phoenix",tool:"apply_patch",target:"monocode/ui/soft-sky.css",ok:true,diff:"+ glass bubbles\n+ calmer composer row"});
+    renderAnswer("Done. Your messages now sit in soft bubbles on the right, and mine on the left with a little more room to breathe.\n\nThe composer keeps every option, just quieter:\n\n- **Team models**, **Context**, **Reasoning** and **Access** are matching pills\n- The text field is larger and sits on top\n- Attach, mic and send line up on one row\n\n```bash\ngit checkout ui-soft\nnpm run dev\n```\n\nWant me to tune the colours next?","phoenix",{created_at:at(2),elapsed_ms:42000});
+    setWorking(false);
+    renderUser("Looks great. Ship it tonight?");
+    renderAnswer("Yes. I’ll package it after one last pass on contrast, and you can try it before anything is applied.","phoenix",{created_at:at(1),elapsed_ms:6000});
+    document.title="Phoenix soft chat preview";
+  }
+  function runSoftGroupPreview(){
+    state.inspectionExpanded=false;clearFeed();replaceDisplayRows([],false);state.activeTools.clear();state.toolRows=[];$("taskBlock").hidden=true;$("queueBlock").hidden=true;
+    const prompt=renderUser("@everyone What should make the first public Linux build feel finished?");
+    setWorking(true);beginTurnActivity(prompt);
+    renderStory({kind:"reasoning",agent:"frontend",text:"Checking the shared room context"});
+    renderStory({kind:"tool",agent:"frontend",tool:"codebase_search",target:"composer and feed styles",ok:true});
+    renderStory({kind:"group_message",agent_id:"frontend",agent_name:"Leon Lin",markdown:"A calm shell. Soft surfaces, readable type, and a composer that never feels like a cockpit."});
+    renderStory({kind:"group_message",agent_id:"coder",agent_name:"Robin",markdown:"Fast and honest underneath:\n\n1. Canonical shared context for every member\n2. An embedded browser that never escapes the app\n3. Steering that lands mid-turn without restarting work"});
+    renderStory({kind:"group_message",agent_id:"marketing",agent_name:"June",markdown:"And one sentence anyone can repeat: *your company, already working.*"});
+    renderStory({kind:"reasoning",agent:"phoenix",text:"Pulling the three answers into one plan"});
+    document.title="Phoenix soft group preview";
   }
 
   function runMarkdownTableProofPreview(){
@@ -1235,9 +1258,7 @@ export function installConversationPreviews({
   if(preview&&new URLSearchParams(location.search).get("shot")==="image-comments-proof"){
     runPreviewWhenDirectoryReady(runImageCommentsProofPreview,420);
   }
-  if(preview&&new URLSearchParams(location.search).get("shot")==="review-empty"){
-    runPreviewWhenDirectoryReady(runEmptyReviewPreview,180);
-  }
+  if(preview&&(previewShot==="soft"||new URLSearchParams(location.search).get("scene")==="soft")){runPreviewWhenDirectoryReady(()=>setTimeout(()=>{(previewShot==="group"?runSoftGroupPreview:runSoftChatPreview)();setTimeout(()=>{$("taskBlock").hidden=true;},400);},1200),0);}
   if(preview&&previewShot==="compact-errors-proof"){runPreviewWhenDirectoryReady(runCompactErrorsProof,160);}
   if(preview&&previewShot==="agent-components"){runPreviewWhenDirectoryReady(runAgentComponentsProof,160);}
   if(preview&&previewShot==="worker-presence-proof"){runPreviewWhenDirectoryReady(runWorkerPresenceProof,160);}
