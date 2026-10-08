@@ -112,10 +112,10 @@ async function main() {
       t.clearFeed();t.state.item={kind:'agent',id:peer.agent_id};t.state.renderingTurnId='direct-fixture';
       const cluster=t.ensureWorkCluster(peer.agent_id);cluster.querySelector('.work-tools').insertAdjacentHTML('beforeend','<div class="work-tool">Read a project file</div>');cluster.classList.add('has-tools');
       t.renderAnswer('Direct answer',peer.agent_id);const button=feed.querySelector('.answer-work-toggle');
-      const folded=getComputedStyle(cluster).display==='none';button.click();
+      const activityVisible=getComputedStyle(cluster).display!=='none'&&getComputedStyle(cluster.querySelector('.work-trace')).display!=='none';button.click();
+      const workClosed=getComputedStyle(cluster).display==='none';button.click();
       const workOpened=getComputedStyle(cluster).display!=='none'&&getComputedStyle(cluster.querySelector('.work-trace')).display!=='none';button.click();
-      const workClosed=getComputedStyle(cluster).display==='none';
-      return {replies,ordering,foldedReceipts,browserOwner,expectedOwner:peer.display_name.split(/\\s+/)[0]+"'s browser",pickerHeader,logoSize,logoTop:logoRect.top,folded,workOpened,workClosed,skin:document.documentElement.dataset.skin};
+      return {replies,ordering,foldedReceipts,browserOwner,expectedOwner:peer.display_name.split(/\\s+/)[0]+"'s browser",pickerHeader,logoSize,logoTop:logoRect.top,activityVisible,workOpened,workClosed,skin:document.documentElement.dataset.skin};
     })()`);
     console.log(JSON.stringify(result,null,2));
     assert.equal(result.skin,"monocode");
@@ -126,7 +126,42 @@ async function main() {
     assert.equal(result.pickerHeader,"Bring someone in");
     assert.equal(result.logoSize,"18px");
     assert.ok(result.logoTop >= 0 && result.logoTop < 40,"Collapsed logo stays inside the top band");
-    assert.ok(result.folded&&result.workOpened&&result.workClosed,"Answer arrow opens and closes the real MonoCode work trace");
+    assert.ok(result.activityVisible&&result.workOpened&&result.workClosed,"Answer arrow opens and closes the real MonoCode work trace");
+    await evaluate(`(async()=>{
+      const t=window.MonocodeRoomTest,id=t.ui.state.view.directory.agents[0].agent_id;
+      await t.ui.selectItem({kind:'agent',id});t.ui.applyVisualPrefs({...t.ui.visualPrefs(),conversationView:'compact'});
+      t.clearFeed();t.state.activeTurnId='detail-toggle';t.state.renderingTurnId='detail-toggle';
+      t.renderUser('Show the recorded work');t.renderAgentUpdate(id,'I am checking the files.');
+      t.renderTool({kind:'tool',agent:id,tool:'read',target:'/fixture/readme',ok:true,detail:'Recorded file output'});
+      t.renderAnswer('The files look good.',id);
+      window.__toggleFirstTool=document.querySelector('#conversationFeed .work-tool');
+    })()`);
+    assert.ok(await evaluate(`window.__toggleFirstTool.getBoundingClientRect().height>0`),'Tool activity displays individual calls before the toggle');
+    await clickControl('conversationDetailToggle');
+    assert.ok(await evaluate(`(()=>{const feed=document.getElementById('conversationFeed');return document.documentElement.dataset.conversationView==='chat'&&document.getElementById('conversationDetailToggle').textContent==='Chat only'&&window.__toggleFirstTool.getBoundingClientRect().height===0&&feed.querySelector('.answer-work-toggle').getBoundingClientRect().height===0&&[...feed.querySelectorAll('.message-row')].every(row=>row.getBoundingClientRect().height>0);})()`),'Chat only removes tool calls and their disclosure buttons while retaining messages');
+    await evaluate(`(()=>{
+      const t=window.MonocodeRoomTest,id=t.state.item.id;
+      t.renderTool({kind:'tool_start',agent:id,tool:'bash',target:'fixture command'});
+      const cluster=window.__toggleFirstTool.closest('.work-cluster');cluster.classList.add('group-work-expanded');cluster.classList.remove('work-folded');
+      window.__toggleTools=[...document.querySelectorAll('#conversationFeed .work-tool')];
+    })()`);
+    assert.ok(await evaluate(`window.__toggleTools.length===2&&window.__toggleTools.every(row=>row.getBoundingClientRect().height===0)`),'Streaming calls stay hidden even when an old work disclosure is expanded');
+    await clickControl('conversationDetailToggle');
+    assert.ok(await evaluate(`window.__toggleTools.every(row=>row.isConnected&&row.getBoundingClientRect().height>0)&&document.getElementById('conversationDetailToggle').textContent==='Tool activity'&&[...document.querySelectorAll('#conversationFeed .trace-subgroup')].every(group=>group.open)`),'Turning activity back on restores the same recorded and streaming calls');
+    await evaluate(`(async()=>{
+      const t=window.MonocodeRoomTest,d=t.ui.state.view.directory,group=d.groups[0],ids=d.members.filter(m=>m.group_id===group.group_id).map(m=>m.agent_id);
+      await t.ui.selectItem({kind:'group',id:group.group_id});t.clearFeed();t.state.activeTurnId='room-detail-toggle';t.state.renderingTurnId='room-detail-toggle';
+      t.renderUser('Check the room work');
+      for(const [index,id] of ids.slice(0,2).entries()){
+        t.renderTool({kind:'tool',agent:id,tool:'read',target:'/fixture/member-'+index,ok:true,detail:'Room member output'});
+        t.renderGroupMessage({turn_id:t.state.activeTurnId,agent_id:id,agent_name:d.agents.find(a=>a.agent_id===id).display_name,markdown:'Room answer '+index,message_id:'room-toggle-'+index});
+      }
+      window.__toggleRoomTools=[...document.querySelectorAll('#conversationFeed .work-tool')];
+    })()`);
+    await clickControl('conversationDetailToggle');
+    assert.ok(await evaluate(`window.__toggleRoomTools.length===2&&window.__toggleRoomTools.every(row=>row.getBoundingClientRect().height===0)&&[...document.querySelectorAll('#conversationFeed .group-message')].every(row=>row.getBoundingClientRect().height>0)`),'Chat only hides room tools while preserving coworker answers');
+    await clickControl('conversationDetailToggle');
+    assert.ok(await evaluate(`window.__toggleRoomTools.every(row=>row.isConnected&&row.getBoundingClientRect().height>0)&&JSON.parse(localStorage.getItem('phoenix-visual')).conversationView==='compact'`),'Room activity returns immediately and the chosen mode persists');
     const motion = await evaluate(`(async () => {
       const t=window.MonocodeRoomTest,d=t.ui.state.view.directory,group=d.groups[0];
       const ids=d.members.filter(m=>m.group_id===group.group_id).map(m=>m.agent_id);

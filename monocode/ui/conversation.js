@@ -2046,10 +2046,11 @@
     const header=node.querySelector(".message-content > header");if(!header||header.querySelector(".answer-work-toggle"))return;
     const steps=[...cluster.querySelectorAll(".work-tool:not(.failed)")].reduce((sum,row)=>sum+(Number(row.dataset.repeatCount)||1),0);
     const button=document.createElement("button");button.type="button";button.className="answer-work-toggle";
-    button.setAttribute("aria-expanded","false");button.title="Show the work behind this answer";
+    const open=toolActivityView();
+    button.setAttribute("aria-expanded",String(open));button.title="Show or hide the work behind this answer";
     button.innerHTML=`<span>${steps?`${steps} step${steps===1?"":"s"}`:"Thinking"}</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6.5 8 3.5 3.5L13.5 8"/></svg>`;
-    header.append(button);cluster.classList.add("work-folded");
-    button.addEventListener("click",(event)=>{event.preventDefault();event.stopPropagation();const open=cluster.classList.toggle("work-folded")===false;cluster.classList.toggle("group-work-expanded",open);button.setAttribute("aria-expanded",String(open));});
+    header.append(button);cluster.classList.toggle("work-folded",!open);setWorkDisclosure(cluster,open);
+    button.addEventListener("click",(event)=>{event.preventDefault();event.stopPropagation();const open=cluster.classList.toggle("work-folded")===false;setWorkDisclosure(cluster,open);button.setAttribute("aria-expanded",String(open));});
   }
   function revealUnresolvedWork() {
     const cluster=precedingWorkCluster();
@@ -2664,7 +2665,7 @@
     if(!cluster.dataset.disclosureReady){
       const key=cluster.dataset.turnId?`${conversationKey()}:${cluster.dataset.turnId}:${agent}`:"";
       if(key)cluster.dataset.disclosureKey=key;
-      const saved=savedWorkDisclosure(key),expanded=saved??detailedConversationView();
+      const saved=savedWorkDisclosure(key),expanded=saved??toolActivityView();
       setWorkDisclosure(cluster,expanded);
       if(saved!==undefined)cluster.dataset.userDisclosure="true";
       cluster.dataset.disclosureReady="true";
@@ -2831,7 +2832,7 @@
     cluster.classList.remove("live", "turn-pending", "tools-running");
     cluster.classList.add("settled");
     delete cluster.dataset.latestProgress;syncWorkProgress(cluster);
-    if(cluster.dataset.userDisclosure!=="true")setWorkDisclosure(cluster,detailedConversationView());
+    if(cluster.dataset.userDisclosure!=="true")setWorkDisclosure(cluster,toolActivityView());
     // A terminal turn must not leave a row shimmering forever. Without the
     // matching completion receipt, however, stopping the animation is the
     // only fact we know; painting a green check would invent tool success.
@@ -2995,14 +2996,25 @@
     return`<span class="tool-status success">${icons.check}<span>Done</span></span>`;
   }
   function detailedConversationView() { return document.documentElement.dataset.conversationView==="detailed"; }
+  function toolActivityView() { return ["compact","detailed"].includes(document.documentElement.dataset.conversationView); }
+  let conversationDetailMode=null;
   function setToolRowDisclosure(row,open) {
     const summary=row?.querySelector(".work-tool-summary"),detail=row?.querySelector(".work-tool-detail"),hasDetail=Boolean(detail);
     const expanded=Boolean(open&&hasDetail);row?.classList.toggle("open",expanded);summary?.setAttribute("aria-expanded",String(expanded));if(detail)detail.hidden=!expanded;
   }
   function syncConversationDetail() {
-    const detailed=detailedConversationView();
-    $("conversationFeed")?.querySelectorAll(".trace-subgroup").forEach((group)=>{group.open=false;});
-    $("conversationFeed")?.querySelectorAll(".work-tool").forEach((row)=>setToolRowDisclosure(row,detailed));
+    const feed=$("conversationFeed"),mode=document.documentElement.dataset.conversationView;
+    if(mode!==conversationDetailMode){
+      conversationDetailMode=mode;const visible=toolActivityView();
+      feed?.querySelectorAll(".trace-subgroup").forEach((group)=>{group.open=visible;});
+      feed?.querySelectorAll(".work-cluster").forEach((cluster)=>{
+        if(visible)cluster.classList.remove("work-folded");
+        setWorkDisclosure(cluster,visible);
+        const tools=cluster.querySelector(".work-tools");if(tools&&visible)tools.hidden=false;
+      });
+      feed?.querySelectorAll(".answer-work-toggle").forEach((button)=>button.setAttribute("aria-expanded",String(visible)));
+    }
+    feed?.querySelectorAll(".work-tool").forEach((row)=>setToolRowDisclosure(row,detailedConversationView()));
   }
   // Tool rows follow beUI's ToolResult (and FileDiff for edits): a one-line
   // trigger — kind icon, title, mono tool/target, status, chevron — over a
@@ -3095,7 +3107,7 @@
     const last=list.lastElementChild;
     let group=last?.classList.contains("trace-subgroup")&&last.dataset.traceCategory===category?last:null;
     if(group)return group;
-    group=document.createElement("details");group.className=`trace-subgroup trace-${category}`;group.dataset.traceCategory=category;group.dataset.running="0";group.open=false;
+    group=document.createElement("details");group.className=`trace-subgroup trace-${category}`;group.dataset.traceCategory=category;group.dataset.running="0";group.open=toolActivityView();
     group.innerHTML=`<summary><span class="trace-subgroup-icon" aria-hidden="true"><span class="trace-subgroup-rest">${traceGroupIcon(category)}</span><span class="trace-subgroup-cursor">${loaderMarkup("dot-matrix",14)}</span></span><strong class="trace-subgroup-label">${category==="coding"?"Ran tools":"Working"}</strong><small class="trace-subgroup-count" hidden>0</small><svg class="trace-subgroup-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></summary><div class="trace-subgroup-body"></div>`;
     list.append(group);updateTraceSubgroup(group);return group;
   }

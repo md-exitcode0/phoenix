@@ -44,7 +44,7 @@ reduced.addEventListener('change',sync);document.addEventListener('visibilitycha
 const mode=document.createElement('button');
 mode.id='conversationDetailToggle';mode.type='button';
 header.querySelector('.header-spacer').before(mode);
-function syncMode(){const chat=root.dataset.conversationView==='chat';mode.textContent=chat?'Chat only':'Tool activity';mode.setAttribute('aria-pressed',String(!chat));mode.title=chat?'Show expandable tool calls':'Show messages without tool calls';mode.setAttribute('aria-label',chat?'Chat only. Show tool activity':'Tool activity. Switch to chat only');}
+function syncMode(){const chat=root.dataset.conversationView==='chat';mode.textContent=chat?'Chat only':'Tool activity';mode.setAttribute('aria-pressed',String(!chat));mode.title=chat?'Show tool calls':'Show messages without tool calls';mode.setAttribute('aria-label',chat?'Chat only. Show tool activity':'Tool activity. Switch to chat only');}
 mode.addEventListener('click',()=>{const ui=globalThis.PhoenixUI;ui.applyVisualPrefs({...ui.visualPrefs(),conversationView:root.dataset.conversationView==='chat'?'compact':'chat'});});
 addEventListener('phoenix:visual-prefs-changed',syncMode);syncMode();sync();
 addEventListener('pagehide',()=>{dead=true;stop();observer.disconnect();reduced.removeEventListener('change',sync);document.removeEventListener('visibilitychange',sync);removeEventListener('phoenix:visual-prefs-changed',syncMode);diagnostics.destroyed=true;},{once:true});
