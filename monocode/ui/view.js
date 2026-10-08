@@ -54,7 +54,7 @@
   function terminalLabel(tab) { const duplicates=terminalTabs(tab.conversationKey).filter((candidate)=>candidate.cwd===tab.cwd),index=duplicates.indexOf(tab);return `${workspaceName(tab.cwd)||"Terminal"}${index>0?` ${index+1}`:""}`; }
   function terminalColors() {
     const dark=document.documentElement.dataset.theme==="dark";
-    return dark?{
+    const colors=dark?{
       background:"#181818",foreground:"#d4d4d4",cursor:"#d7d7d7",cursorAccent:"#181818",selectionBackground:"rgba(255,255,255,.18)",
       black:"#181818",red:"#f14c4c",green:"#40c977",yellow:"#cca700",blue:"#339cff",magenta:"#c586c0",cyan:"#4ec9b0",white:"#d4d4d4",
       brightBlack:"#808080",brightRed:"#ff6b6b",brightGreen:"#40c977",brightYellow:"#dcdcaa",brightBlue:"#339cff",brightMagenta:"#d7a0d2",brightCyan:"#69d8c0",brightWhite:"#ffffff",
@@ -63,6 +63,9 @@
       black:"#242424",red:"#c42b1c",green:"#00a240",yellow:"#8a6d00",blue:"#339cff",magenta:"#8b3f9f",cyan:"#087f8c",white:"#e5e5e5",
       brightBlack:"#6e6e6e",brightRed:"#d73a2f",brightGreen:"#00a240",brightYellow:"#9a7700",brightBlue:"#339cff",brightMagenta:"#a454b3",brightCyan:"#0f919f",brightWhite:"#ffffff",
     };
+    if(document.documentElement.dataset.skin!=="monocode")return colors;
+    const ink=getComputedStyle($("termPanel")).color;
+    return {...colors,background:"rgba(0,0,0,0)",foreground:ink||colors.foreground,cursor:ink||colors.cursor};
   }
   function syncTerminalTheme(){const theme=terminalColors();state.tabs.forEach((tab)=>{if(tab.terminal)tab.terminal.options.theme=theme;});}
   function mountTerminal(tab) {
@@ -70,13 +73,14 @@
     const container=document.createElement("div");container.className="term-session";container.dataset.termSession=tab.key;host.append(container);tab.container=container;
     if(!terminalRuntime?.Terminal||!terminalRuntime?.FitAddon)return;
     const terminal=new terminalRuntime.Terminal({
-      allowTransparency:false,
+      allowTransparency:document.documentElement.dataset.skin==="monocode",
       cursorBlink:true,
       cursorStyle:"block",
       fontFamily:"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace",
       fontSize:12.5,
       lineHeight:1.18,
-      minimumContrastRatio:4.5,
+      // The glass beneath a transparent terminal supplies the contrast.
+      minimumContrastRatio:document.documentElement.dataset.skin==="monocode"?1:4.5,
       scrollback:6000,
       smoothScrollDuration:0,
       theme:terminalColors(),
@@ -181,7 +185,9 @@
     terminalView().open=Boolean(open);
     if (open) {
       if(!terminalTabs().length)await startShell();
-      focusTerminal();
+      // The first terminal can mount before the opening frame removes
+      // visibility:hidden. Focus it after that frame so typing reaches the PTY.
+      requestAnimationFrame(()=>{if(termOpen()&&terminalView().open)focusTerminal();});
     }
   }
 
@@ -319,6 +325,7 @@
     try { await ui.invoke("term_write", { id: tab.id, data }); } catch {}
   }
 
+  function terminalLayoutHeight(){const panel=$("termPanel");return panel.getBoundingClientRect().height+(parseFloat(getComputedStyle(panel).marginBottom)||0);}
   function bindResize() {
     const handle = $("termResize");
     if (!handle) return;
@@ -326,7 +333,7 @@
       if(event.button!==0)return;
       event.preventDefault();
       const startY = event.clientY;
-      const startH = $("termPanel").getBoundingClientRect().height;
+      const startH = terminalLayoutHeight();
       let latestY=startY,frame=0;
       handle.setPointerCapture(event.pointerId);
       handle.classList.add("dragging");
@@ -350,7 +357,7 @@
         handle.classList.remove("dragging");
         document.body.classList.remove("term-resizing");
         try{handle.releasePointerCapture(event.pointerId);}catch{}
-        localStorage.setItem("phoenix-terminal-height",String(Math.round($("termPanel").getBoundingClientRect().height)));
+        localStorage.setItem("phoenix-terminal-height",String(Math.round(terminalLayoutHeight())));
         await resizeShells();
       };
       handle.addEventListener("pointermove", move);

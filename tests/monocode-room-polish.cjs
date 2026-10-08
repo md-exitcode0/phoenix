@@ -47,6 +47,40 @@ async function main() {
     let ready = false;
     while (!ready && Date.now() < deadline + 15000) { ready = await evaluate("Boolean(window.MonocodeRoomTest?.ui.state.view)"); if (!ready) await sleep(100); }
     assert.ok(ready, "MonoCode renderer loaded");
+    // Use real pointer input: the controls move between the two panel headers.
+    const clickControl=async id=>{
+      const point=await evaluate(`(()=>{const n=document.getElementById('${id}'),r=n.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
+      await command('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...point});
+      await command('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...point});
+      await sleep(400);
+    };
+    await sleep(500);
+    await clickControl('terminalToggle');
+    assert.ok(await evaluate(`(()=>{const panel=document.getElementById('termPanel'),tab=window.MonocodeViewTest.state.tabs[0],css=getComputedStyle(panel),left=getComputedStyle(document.getElementById('companySidebar'));return document.body.classList.contains('term-open')&&!panel.hidden&&panel.getBoundingClientRect().height>120&&!!tab?.terminal&&tab.terminal.options.allowTransparency&&tab.terminal.options.theme.background==='rgba(0,0,0,0)'&&css.backgroundColor===left.backgroundColor&&css.borderRadius===left.borderRadius&&panel.getBoundingClientRect().bottom<=innerHeight-9&&getComputedStyle(panel.querySelector('.xterm-scrollable-element')).backgroundColor==='rgba(0, 0, 0, 0)';})()`),'Terminal button opens a working transparent terminal in the sidebar glass style');
+    await command('Input.insertText',{text:'panel-input-check'});await sleep(150);
+    assert.ok(await evaluate(`(()=>{const b=window.MonocodeViewTest.state.tabs[0].terminal.buffer.active;return Array.from({length:b.length},(_,i)=>b.getLine(i)?.translateToString()).some(line=>line.includes('panel-input-check'));})()`),'Terminal receives typed input');
+    await clickControl('stageSidebarButton');
+    assert.ok(await evaluate(`document.body.classList.contains('inspection-open')&&document.getElementById('terminalToggle').parentElement.id==='inspectionPanelControls'`),'Workspace button opens the pane and retains the mounted terminal control');
+    await clickControl('terminalToggle');
+    assert.ok(await evaluate(`!document.body.classList.contains('term-open')&&document.getElementById('termPanel').hidden`),'Moved terminal control closes the panel');
+    await clickControl('terminalToggle');
+    assert.ok(await evaluate(`document.body.classList.contains('term-open')&&window.MonocodeViewTest.state.tabs.length===1`),'Reopening preserves the existing terminal session');
+    const resizeStart=await evaluate(`(()=>{const p=document.getElementById('termPanel').getBoundingClientRect(),r=document.getElementById('termResize').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+4,height:p.height};})()`);
+    await command('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',buttons:1,clickCount:1,x:resizeStart.x,y:resizeStart.y});
+    await command('Input.dispatchMouseEvent',{type:'mouseMoved',button:'left',buttons:1,x:resizeStart.x,y:resizeStart.y-40});await sleep(100);
+    await command('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,x:resizeStart.x,y:resizeStart.y-40});await sleep(150);
+    const resized=await evaluate(`(()=>{const p=document.getElementById('termPanel').getBoundingClientRect(),pane=document.getElementById('inspectionSidebar').getBoundingClientRect();return {height:p.height,preserved:Number(localStorage.getItem('phoenix-terminal-height')),bottom:p.bottom,panesFit:document.body.classList.contains('inspection-stacked')||pane.bottom<=p.top-9};})()`);
+    assert.ok(Math.abs(resized.height-resizeStart.height-40)<2&&Math.abs(resized.preserved-resized.height-10)<2&&resized.bottom<=900-9&&resized.panesFit,'Resizing preserves the glass inset and keeps the workspace above the terminal: '+JSON.stringify(resized));
+    await clickControl('stageSidebarButton');
+    assert.ok(await evaluate(`!document.body.classList.contains('inspection-open')&&document.getElementById('terminalToggle').parentElement.id==='stagePanelToggles'`),'Workspace button closes and returns both controls to the chat header');
+    await clickControl('termClose');
+    if(process.env.PHOENIX_TEST_TERMINAL_SCREENSHOT){
+      await clickControl('terminalToggle');
+      await evaluate(`(()=>{document.documentElement.dataset.theme='light';window.PhoenixSky.set('12:00');dispatchEvent(new CustomEvent('phoenix:theme-changed'));})()`);
+      await sleep(250);
+      const shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.PHOENIX_TEST_TERMINAL_SCREENSHOT,Buffer.from(shot.data,'base64'));
+      await clickControl('termClose');
+    }
     const result = await evaluate(`(() => {
       const t=window.MonocodeRoomTest,d=t.ui.state.view.directory,group=d.groups[0];
       const ids=d.members.filter(m=>m.group_id===group.group_id).map(m=>m.agent_id);
@@ -177,7 +211,7 @@ async function main() {
       const css=node=>getComputedStyle(node),root=document.documentElement;
       const chrome=document.querySelector('.window-chrome'),header=document.getElementById('conversationHeader');
       const dragRegions=css(chrome).getPropertyValue('-webkit-app-region')==='drag'&&css(header).getPropertyValue('-webkit-app-region')==='drag';
-      const controlsClickable=css(document.getElementById('stageMore')).getPropertyValue('-webkit-app-region')==='no-drag'&&css(document.querySelector('.pal-seat')).getPropertyValue('-webkit-app-region')==='no-drag';
+      const controlsClickable=css(document.getElementById('stagePanelToggles')).getPropertyValue('-webkit-app-region')==='no-drag'&&css(document.getElementById('inspectionPanelControls')).getPropertyValue('-webkit-app-region')==='no-drag'&&css(document.getElementById('stageMore')).getPropertyValue('-webkit-app-region')==='no-drag'&&css(document.querySelector('.pal-seat')).getPropertyValue('-webkit-app-region')==='no-drag';
       const topStrip=css(chrome).display!=='none'&&chrome.getBoundingClientRect().height===10;
       const onlyTopFade=css(document.getElementById('conversationBody')).maskImage.includes('18px')&&!css(document.getElementById('conversationBody')).maskImage.includes('100%');
       const singleLeader=css(document.querySelector('.pal-seat[data-seat="leader"]>.pal-face')).visibility==='visible'&&!document.getElementById('fluffyHero');

@@ -831,3 +831,27 @@ html:root[data-skin="monocode"] .prompt-rail-card-body{box-sizing:border-box;max
 html:root[data-skin="monocode"] :is(.prompt-rail-card-title,.prompt-rail-card-desc){overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
 html:root[data-skin="monocode"] .prompt-rail-card-title{-webkit-line-clamp:2}
 html:root[data-skin="monocode"] .prompt-rail-card-desc{-webkit-line-clamp:3}
+
+/* Panel controls stay clickable across the frameless header and workspace bar. */
+html:root[data-skin="monocode"] :is(#stagePanelToggles,#inspectionPanelControls),
+html:root[data-skin="monocode"] :is(#stagePanelToggles,#inspectionPanelControls) *{-webkit-app-region:no-drag!important}
+
+/* Terminal shares the floating sidebars' surface; xterm paints transparently. */
+html:root[data-skin="monocode"] #termPanel{
+ --mc-button-radius:12px;--terminal-bg:transparent;--terminal-fg:var(--soft-ink);--terminal-muted:var(--soft-ink-2);--terminal-tab:var(--glass-3);--terminal-hover:var(--glass-hover);--terminal-pressed:var(--glass-hover);--terminal-line:var(--glass-line);--terminal-scrollbar:var(--soft-ink-3);grid-column:2;width:auto!important;margin:0 var(--pane-inset) var(--pane-inset);
+ background:var(--glass-1)!important;border:1px solid var(--glass-line)!important;border-radius:20px;
+ -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.15)!important;backdrop-filter:blur(var(--glass-blur)) saturate(1.15)!important;
+ box-shadow:var(--glass-shadow);color:var(--soft-ink);grid-template-rows:36px minmax(0,1fr)!important;
+}
+html:root[data-skin="monocode"] body.term-open #termPanel{height:calc(var(--term-current-h) - var(--pane-inset))!important;margin-right:var(--pane-inset)!important}
+html:root[data-skin="monocode"] #termPanel :is(.term-head,.term-screen,.term-session,.xterm,.xterm-viewport){background:transparent!important;color:var(--soft-ink)}
+html:root[data-skin="monocode"] #termPanel .term-head{height:36px;padding:0 12px 4px;border-bottom:1px solid var(--glass-line)!important}
+html:root[data-skin="monocode"] #termPanel :is(.term-tab,.term-head>button){height:30px;color:var(--soft-ink-2);font-family:var(--soft-font)}
+html:root[data-skin="monocode"] #termPanel :is(.term-tab,.term-head>button):hover{background:var(--glass-hover);color:var(--soft-ink)}
+html:root[data-skin="monocode"] #termPanel .term-tab[aria-selected="true"]{background:var(--glass-3);color:var(--soft-ink)}
+html:root[data-skin="monocode"] #termPanel .term-tab>i:hover{background:var(--glass-hover)}
+html:root[data-skin="monocode"] #termPanel .term-screen{min-height:0;padding:10px 14px}
+html:root[data-skin="monocode"] #termPanel .term-resize:hover::after{background:var(--soft-ink-3)}
+html:root[data-skin="monocode"] body.term-open .terminal-toggle{background:var(--glass-3)!important;color:var(--soft-ink)!important}
+html:root[data-skin="monocode"][data-theme="light"] #termPanel{border-color:rgb(255 255 255 / 55%)!important;box-shadow:0 14px 44px rgb(20 40 90 / 18%),inset 0 1px 0 rgb(255 255 255 / 60%)!important}
+html:root[data-skin="monocode"] body.term-open:not(.inspection-stacked) #inspectionSidebar{bottom:calc(var(--term-h,250px) + var(--pane-inset) * 2)!important}

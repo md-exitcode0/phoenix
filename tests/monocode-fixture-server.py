@@ -21,6 +21,13 @@ class Fixture(preview.Preview):
             self.send_preview_headers(200, "text/javascript", len(body))
             self.wfile.write(body)
             return
+        if self.path.split("?")[0] == "/view.js":
+            source = (ROOT / "ui/view.js").read_text()
+            source = source.replace("  window.PhoenixView =", "  window.MonocodeViewTest={state};\n  window.PhoenixView =", 1)
+            body = source.encode()
+            self.send_preview_headers(200, "text/javascript", len(body))
+            self.wfile.write(body)
+            return
         if self.path.split("?")[0] == "/settings.js":
             source = (ROOT / "ui/settings.js").read_text()
             source = source.replace("  window.PhoenixSettings=", "  window.MonocodeSettingsTest={state,renderModels,setRpc:fn=>{rpc=fn;}};\n  window.PhoenixSettings=", 1)
