@@ -896,6 +896,16 @@ async function runSelftest() {
   let closedTargetRejected = false;
   try { await browserInvoke("browser_surface_nav", { instance: "selftest", targetId: "closed-target", action: "navigate", url: navigationPage }); }
   catch { closedTargetRejected = tab.view.webContents.getURL() === page; }
+  const third = createSurfaceTab(entry, "data:text/html,<title>Third reload survivor</title>", false);
+  await third.view.webContents.loadURL("data:text/html,<title>Third reload survivor</title>");
+  const reloadIds = [...entry.tabs.keys()];
+  const reloaded = new Promise((resolve) => second.view.webContents.once("did-finish-load", resolve));
+  await browserInvoke("browser_surface_nav", { instance: "selftest", targetId: second.targetId, action: "reload" });
+  await reloaded;
+  const reloadPreservesTabs = JSON.stringify([...entry.tabs.keys()]) === JSON.stringify(reloadIds)
+    && entry.activeTargetId === firstTargetId && !tab.view.webContents.isDestroyed() && !third.view.webContents.isDestroyed()
+    && tab.view.webContents.getURL() === page;
+  closeSurfaceTab(entry, third.targetId);
   activateSurfaceTab(entry, second.targetId);
   // Let Chromium commit the activated widget before destroying it. Closing in
   // the same task is legal but makes Mojo report a rejected late Widget
@@ -955,7 +965,7 @@ async function runSelftest() {
   mountSurface(entry);
   const gpu = await gpuProbe();
   const result = {
-    ok: gpu.hardwareAcceleration && gpu.renderer.webgpu && Boolean(gpu.renderer.adapter) && tabLifecycle && selectedTabNavigation && capturedTabNavigation && closedTargetRejected && ipcRejectionRoundTrip && surfaceIsolation && tabStateIsolation && workerAuthInheritance && workerSurfaceCleanup
+    ok: gpu.hardwareAcceleration && gpu.renderer.webgpu && Boolean(gpu.renderer.adapter) && tabLifecycle && reloadPreservesTabs && selectedTabNavigation && capturedTabNavigation && closedTargetRejected && ipcRejectionRoundTrip && surfaceIsolation && tabStateIsolation && workerAuthInheritance && workerSurfaceCleanup
       && !(OZONE_PLATFORM === "wayland" && GPU_MODE === "vulkan"),
     engine: process.versions.chrome,
     electron: process.versions.electron,
@@ -967,6 +977,7 @@ async function runSelftest() {
     targetId: entry.activeTargetId,
     browserTitle: tab.view.webContents.getTitle(),
     tabLifecycle,
+    reloadPreservesTabs,
     selectedTabNavigation,
     selectedNavigationTitle,
     capturedTabNavigation,

@@ -93,6 +93,43 @@ async function main() {
       const shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(process.env.PHOENIX_TEST_TERMINAL_SCREENSHOT,Buffer.from(shot.data,'base64'));
       await clickControl('termClose');
     }
+    const browserReload=await evaluate(`(async()=>{
+      const t=window.MonocodeRoomTest,original=t.ui.invoke,flag=window.__PHOENIX_CHROMIUM_SHELL__,oldItem=t.state.item;
+      t.state.item=t.ui.state.selected;t.state.browserBoundKey=t.conversationKeyOf(t.state.item);t.state.browserOwnerId='fixture-browser';t.state.browserNative=false;
+      window.__PHOENIX_CHROMIUM_SHELL__={enabled:true};
+      document.body.classList.add('inspection-open','inspection-browser-active');document.getElementById('browserOverlay').hidden=false;
+      const tabs=[{id:'one',title:'First',url:'https://one.invalid',active:false},{id:'two',title:'Second',url:'https://two.invalid',active:true},{id:'three',title:'Third',url:'https://three.invalid',active:false}],calls=[];
+      let attachments=0;
+      t.ui.invoke=async(command,args)=>{
+        calls.push({command,args});
+        if(command==='browser_surface_attach'&&++attachments===1)throw Error('browser surface bounds are outside the Phoenix window');
+        return {supported:true,embedded:true,visible:true,tabs};
+      };
+      try{
+        t.renderInspectionBrowserTabs({tabs});
+        await t.runBrowserToolbarAction('reload');await t.refreshInspectionBrowserTabs();
+        const reload=calls.find(c=>c.command==='browser_surface_nav');
+        const targetedReload=reload?.args.action==='reload'&&reload.args.targetId==='two';
+        t.fallbackBrowserSurface('browser surface bounds are outside the Phoenix window',8);
+        await new Promise(r=>setTimeout(r,20));
+        const tabsRetained=t.state.browserTabs.map(t=>t.id).join(',')==='one,two,three';
+        const notDetached=!calls.some(c=>['browser_surface_hide','browser_surface_detach','backend_rpc'].includes(c.command));
+        const pane=document.getElementById('inspectionSidebar'),getPane=pane.getBoundingClientRect,viewport=document.getElementById('browserViewport'),getViewport=viewport.getBoundingClientRect;
+        pane.getBoundingClientRect=()=>({width:0,height:0,bottom:0});
+        viewport.getBoundingClientRect=()=>({left:400,top:100,right:900,bottom:600,width:500,height:500});
+        let hiddenPaneFits;
+        try{hiddenPaneFits=t.browserSurfaceRect().height===500;}finally{pane.getBoundingClientRect=getPane;viewport.getBoundingClientRect=getViewport;}
+        await t.attachDesktopBrowserSurface({pid:0,window_token:'fixture'},t.state.browserSurfaceGeneration,'fixture-browser');
+        const layoutRetried=attachments===2&&calls.filter(c=>c.command==='browser_surface_attach').every(c=>c.args.rect.width>=64&&c.args.rect.height>=64);
+        return {targetedReload,tabsRetained,notDetached,hiddenPaneFits,layoutRetried};
+      }finally{
+        clearInterval(t.state.browserSurfaceStatusTimer);t.state.browserSurfaceStatusTimer=null;clearTimeout(t.state.browserSurfaceRecoveryTimer);t.state.browserSurfaceRecoveryTimer=0;
+        t.ui.invoke=original;window.__PHOENIX_CHROMIUM_SHELL__=flag;t.state.browserOwnerId=null;t.state.browserBoundKey='';t.state.browserNative=false;t.state.item=oldItem;
+        document.getElementById('browserOverlay').hidden=true;document.body.classList.remove('inspection-open','inspection-browser-active');t.renderInspectionBrowserTabs({tabs:[]});
+      }
+    })()`);
+    assert.ok(Object.values(browserReload).every(Boolean),'Reload/recovery keeps every tab and retries invalid layout without detaching: '+JSON.stringify(browserReload));
+    console.log(JSON.stringify({browserReload}));
     const result = await evaluate(`(() => {
       const t=window.MonocodeRoomTest,d=t.ui.state.view.directory,group=d.groups[0];
       const ids=d.members.filter(m=>m.group_id===group.group_id).map(m=>m.agent_id);

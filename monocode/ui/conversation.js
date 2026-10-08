@@ -16,6 +16,7 @@
     browserSurfaceInfo: null,
     browserSurfaceGeneration: 0,
     browserSurfaceBoundsFrame: 0,
+    browserSurfaceRecoveryTimer: 0,
     browserSurfaceBoundsInFlight: false,
     browserSurfaceBoundsPending: null,
     browserSurfaceBoundsFailures: 0,
@@ -4494,7 +4495,8 @@
     }
     const active=tabs.find((tab)=>tab.active)||tabs[0],activeUrl=active?.url||surface?.url||"";if(activeUrl)syncBrowserAddress(activeUrl);rememberInspectionBrowser();revealSelectedInspectionTab();syncActivitySummary();
   }
-  async function refreshInspectionBrowserTabs(){const instance=state.browserOwnerId,generation=state.browserSurfaceGeneration,boundKey=state.browserBoundKey;if(!instance||boundKey!==conversationKeyOf(state.item))return null;const value=await rpc({BrowserSurface:{instance,action:"status"}},4000),surface=value.BrowserSurface;if(instance!==state.browserOwnerId||generation!==state.browserSurfaceGeneration||boundKey!==state.browserBoundKey||boundKey!==conversationKeyOf(state.item))return null;renderInspectionBrowserTabs(surface);return surface;}
+  async function inspectBrowserSurface(instance){if(window.__PHOENIX_CHROMIUM_SHELL__?.enabled===true)return ui.invoke("browser_surface_status",{instance});const value=await rpc({BrowserSurface:{instance,action:"status"}},4000);return value.BrowserSurface;}
+  async function refreshInspectionBrowserTabs(){const instance=state.browserOwnerId,generation=state.browserSurfaceGeneration,boundKey=state.browserBoundKey;if(!instance||boundKey!==conversationKeyOf(state.item))return null;const surface=await inspectBrowserSurface(instance);if(instance!==state.browserOwnerId||generation!==state.browserSurfaceGeneration||boundKey!==state.browserBoundKey||boundKey!==conversationKeyOf(state.item))return null;renderInspectionBrowserTabs(surface);return surface;}
   async function selectInspectionBrowserTab(tabId){if(!tabId)return;try{if(state.browserBoundKey!==conversationKeyOf(state.item))await resumeInspectionBrowser();if(tabId==="restore")return;if(state.browserBoundKey!==conversationKeyOf(state.item))throw new Error("This conversation has no open browser.");if(state.browserTabs.find((tab)=>tab.id===tabId)?.active)return;// The tabs live in the desktop's own browser surface, so switch them
 // there. Going through the gateway waited on the agent's browser lock and
 // refused the click whenever the agent was mid-action.
@@ -6071,16 +6073,20 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   }
   function browserSurfaceRect(){
     const rect=$("browserViewport").getBoundingClientRect(),shelf=$("browserDownloadShelf"),shelfSpace=shelf&&!shelf.hidden?76:0;
-    let top=rect.top,bottom=rect.bottom;
+    let top=Math.max(0,rect.top),bottom=Math.min(innerHeight,rect.bottom);
     const pane=$("inspectionSidebar").getBoundingClientRect();
-    bottom=Math.min(bottom,pane.bottom-11);
-    if(document.body.classList.contains("term-open"))bottom=Math.min(bottom,$("termPanel").getBoundingClientRect().top-10);
+    // Hidden or transitioning panels measure zero. They must not shrink a
+    // valid page to 1px and force the browser into a different rendering lane.
+    if(pane.width>0&&pane.height>0)bottom=Math.min(bottom,pane.bottom-11);
+    const terminal=$("termPanel").getBoundingClientRect();
+    if(document.body.classList.contains("term-open")&&terminal.height>0)bottom=Math.min(bottom,terminal.top-10);
     // Native browser views sit above DOM notifications. Reserve the occupied
     // notification area in the real native bounds rather than relying on CSS.
     for(const toast of document.querySelectorAll("#toastRegion .toast")){
       const r=toast.getBoundingClientRect();if(r.width&&r.height&&r.right>rect.left&&r.left<rect.right&&r.bottom>top&&r.top<rect.bottom)top=Math.min(rect.bottom-1,r.bottom+8);
     }
-    return{x:Math.round(rect.left),y:Math.round(top),width:Math.max(1,Math.round(rect.width)),height:Math.max(1,Math.round(bottom-top-shelfSpace))};
+    const left=Math.max(0,rect.left),right=Math.min(innerWidth,rect.right);
+    return{x:Math.round(left),y:Math.round(top),width:Math.max(1,Math.round(right-left)),height:Math.max(1,Math.round(bottom-top-shelfSpace))};
   }
   function queueBrowserSurfaceOperation(operation){
     const pending=state.browserSurfaceOperationChain.then(operation,operation);
@@ -6129,7 +6135,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   // something else resized it, so tiny sizes are never sent.
   function pushNativeBrowserBounds(){
     if(!state.browserNative||!state.browserOwnerId||$("browserOverlay").hidden)return;
-    const rect=browserSurfaceRect();if(rect.width<40||rect.height<40)return;
+    const rect=browserSurfaceRect();if(rect.width<64||rect.height<64)return;
     state.browserSurfaceBoundsPending=rect;flushNativeBrowserBounds();
   }
   async function flushNativeBrowserBounds(){
@@ -6179,14 +6185,16 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   }
   function startNativeBrowserStatus(){
     clearInterval(state.browserSurfaceStatusTimer);
-    const tick=async()=>{if(state.browserSurfaceStatusPending||!state.browserNative||!state.browserOwnerId||state.browserBoundKey!==conversationKeyOf(state.item)||$("browserOverlay").hidden)return;const instance=state.browserOwnerId,generation=state.browserSurfaceGeneration,boundKey=state.browserBoundKey,job={instance,generation,boundKey};state.browserSurfaceStatusPending=job;try{const value=await rpc({BrowserSurface:{instance,action:"status"}},3000),surface=value.BrowserSurface;if(state.browserOwnerId!==instance||state.browserSurfaceGeneration!==generation||state.browserBoundKey!==boundKey||boundKey!==conversationKeyOf(state.item)||!state.browserNative)return;renderInspectionBrowserTabs(surface);syncActivitySummary();if(state.browserMode==="teach")await inspectNativeTeaching(false);}catch{}finally{if(state.browserSurfaceStatusPending===job)state.browserSurfaceStatusPending=null;}};
+    const tick=async()=>{if(state.browserSurfaceStatusPending||(!state.browserNative&&window.__PHOENIX_CHROMIUM_SHELL__?.enabled!==true)||!state.browserOwnerId||state.browserBoundKey!==conversationKeyOf(state.item)||$("browserOverlay").hidden)return;const instance=state.browserOwnerId,generation=state.browserSurfaceGeneration,boundKey=state.browserBoundKey,job={instance,generation,boundKey};state.browserSurfaceStatusPending=job;try{const surface=await inspectBrowserSurface(instance);if(state.browserOwnerId!==instance||state.browserSurfaceGeneration!==generation||state.browserBoundKey!==boundKey||boundKey!==conversationKeyOf(state.item)||(!state.browserNative&&window.__PHOENIX_CHROMIUM_SHELL__?.enabled!==true))return;renderInspectionBrowserTabs(surface);syncActivitySummary();if(state.browserMode==="teach")await inspectNativeTeaching(false);}catch{}finally{if(state.browserSurfaceStatusPending===job)state.browserSurfaceStatusPending=null;}};
     state.browserSurfaceStatusTimer=setInterval(()=>{pushNativeBrowserBounds();tick();},1000);tick();
   }
   async function attachDesktopBrowserSurface(surface,generation,instance){
-    const deadline=performance.now()+2200,args={instance,pid:surface.pid,windowToken:surface.window_token,rect:browserSurfaceRect()};let lastError;
+    const deadline=performance.now()+2200;let lastError;
     while(performance.now()<deadline){
       if(generation!==state.browserSurfaceGeneration||state.browserOwnerId!==instance)throw new Error("native browser attachment was superseded");
-      try{return await ui.invoke("browser_surface_attach",args);}catch(error){lastError=error;if(!/visible Chromium window .* was not found/i.test(String(error)))throw error;await new Promise((resolve)=>setTimeout(resolve,90));}
+      const rect=browserSurfaceRect();
+      if(rect.width<64||rect.height<64){lastError=new Error("Browser layout is not ready");await new Promise(resolve=>setTimeout(resolve,90));continue;}
+      try{return await ui.invoke("browser_surface_attach",{instance,pid:surface.pid,windowToken:surface.window_token,rect});}catch(error){lastError=error;if(!/visible Chromium window .* was not found|browser surface bounds are outside|browser layout is not ready/i.test(String(error)))throw error;await new Promise((resolve)=>setTimeout(resolve,90));}
     }
     throw lastError||new Error("visible Chromium window did not appear in time");
   }
@@ -6197,13 +6205,15 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
       try{
         const value=await rpc({BrowserSurface:{instance,action:"open"}},20000),surface=value.BrowserSurface;
         if(generation!==state.browserSurfaceGeneration||state.browserOwnerId!==instance){await rpc({BrowserSurface:{instance,action:"close"}},3000).catch(()=>{});return;}
-        renderInspectionBrowserTabs(surface);
         const chromiumShell=window.__PHOENIX_CHROMIUM_SHELL__?.enabled===true;
+        if(!chromiumShell)renderInspectionBrowserTabs(surface);
         if(!surface?.supported||!surface.attached||(!chromiumShell&&!surface.pid)||!surface.window_token)throw new Error(surface?.reason||"native browser embedding is unavailable");
       state.browserSurfaceInfo=surface;
       const attached=await attachDesktopBrowserSurface(surface,generation,instance);
         if(generation!==state.browserSurfaceGeneration||state.browserOwnerId!==instance){await ui.invoke("browser_surface_hide",{instance}).catch(()=>{});await ui.invoke("browser_surface_detach",{instance}).catch(()=>{});await rpc({BrowserSurface:{instance,action:"close"}},3000).catch(()=>{});return;}
         if(!attached?.supported||attached?.embedded!==true||attached?.visible===false)throw new Error(attached?.reason||"Chromium did not embed inside Phoenix");
+        clearTimeout(state.browserSurfaceRecoveryTimer);state.browserSurfaceRecoveryTimer=0;
+        renderInspectionBrowserTabs(chromiumShell?attached:surface);
         state.browserSurfaceInfo={...surface,desktop:attached};state.browserNative=true;delete $("browserViewport").dataset.nativeError;$("browserViewport").classList.add("native-surface");$("browserCanvas").hidden=true;$("browserFrame").hidden=true;$("browserEmpty").hidden=true;startNativeBrowserStatus();scheduleNativeBrowserBounds();
         // Mutter/XWayland may accept the initial reparent and undo it a frame
         // later. Revalidate after the compositor has settled so a browser that
@@ -6218,12 +6228,27 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
           return;
         }
         if(generation===state.browserSurfaceGeneration&&state.browserOwnerId===instance){
-          fallbackBrowserSurface(String(error?.message||error));
+          fallbackBrowserSurface(String(error?.message||error),attempt);
         }else await rpc({BrowserSurface:{instance,action:"close"}},3000).catch(()=>{});
       }
     });
   }
-  function fallbackBrowserSurface(reason=""){
+  function fallbackBrowserSurface(reason="",attempt=0){
+    if(window.__PHOENIX_CHROMIUM_SHELL__?.enabled===true&&state.browserOwnerId){
+      // Electron still owns every tab during attachment/reload failures. Keep
+      // that browser and its tab inventory; a JPEG fallback reports only the
+      // gateway's current target and makes the other tabs disappear.
+      const instance=state.browserOwnerId,generation=state.browserSurfaceGeneration;
+      state.browserNative=false;clearTimeout(state.browserSurfaceBoundsFrame);state.browserSurfaceBoundsFrame=0;state.browserSurfaceBoundsPending=null;
+      $("browserViewport").dataset.nativeError=String(reason).slice(0,500);
+      const empty=$("browserEmpty");empty.hidden=false;empty.innerHTML='<div class="browser-native-error"><strong>Reconnecting browser view…</strong><span>Your tabs are still open.</span><button type="button">Try again</button></div>';
+      const retry=()=>{if(state.browserOwnerId===instance&&state.browserSurfaceGeneration===generation&&!$("browserOverlay").hidden)activateBrowserSurface(generation,instance,attempt+1);};
+      if(attempt>=8)empty.querySelector('strong').textContent='Browser view unavailable';
+      empty.querySelector("button").onclick=()=>activateBrowserSurface(generation,instance,0);
+      clearTimeout(state.browserSurfaceRecoveryTimer);
+      if(attempt<8)state.browserSurfaceRecoveryTimer=setTimeout(retry,Math.min(2000,250*(attempt+1)));
+      startNativeBrowserStatus();return;
+    }
     if(!state.browserOwnerId||(state.browserNative===false&&state.browserSocket))return;
     const instance=state.browserOwnerId,generation=state.browserSurfaceGeneration;state.browserNative=false;state.browserSurfaceInfo=null;state.browserSurfaceStatusPending=null;state.browserTeachingInspect=null;state.browserSurfaceBoundsFailures=0;$("browserViewport").dataset.nativeError=String(reason||"").slice(0,500);$("browserViewport").classList.remove("native-surface");clearInterval(state.browserSurfaceStatusTimer);state.browserSurfaceStatusTimer=null;clearTimeout(state.browserSurfaceBoundsFrame);state.browserSurfaceBoundsFrame=0;state.browserSurfaceBoundsPending=null;$("browserEmpty").hidden=false;$("browserEmpty").innerHTML='<div class="browser-native-error">'+loaderMarkup("comet",22)+'<strong>Opening the private browser here</strong><span>Phoenix is switching to its in-app browser surface.</span></div>';
     // Always park/detach the foreign X window before enabling the frame lane.
@@ -6235,6 +6260,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     if(reason)console.warn("Phoenix native browser:",reason);
   }
   function releaseBrowserSurface(instance){
+    clearTimeout(state.browserSurfaceRecoveryTimer);state.browserSurfaceRecoveryTimer=0;
     state.browserSurfaceGeneration+=1;state.browserNative=false;state.browserSurfaceInfo=null;state.browserSurfaceStatusPending=null;state.browserTeachingInspect=null;state.browserSurfaceBoundsFailures=0;$("browserViewport").classList.remove("native-surface");clearInterval(state.browserSurfaceStatusTimer);state.browserSurfaceStatusTimer=null;clearTimeout(state.browserSurfaceBoundsFrame);state.browserSurfaceBoundsFrame=0;state.browserSurfaceBoundsPending=null;if(!instance||preview)return Promise.resolve();return queueBrowserSurfaceOperation(async()=>{await ui.invoke("browser_surface_hide",{instance}).catch(()=>{});await ui.invoke("browser_surface_detach",{instance}).catch(()=>{});await rpc({BrowserSurface:{instance,action:"close"}},3000).catch(()=>{});});
   }
   // Keep one JPEG decode in flight and only the newest pending frame. Assigning
@@ -6466,7 +6492,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   async function navigateBrowser(url,newTab=false) {
     let value=String(url||"").trim();if(!value)return;
     if(!/^[a-z][a-z0-9+.-]*:(?!\d)/i.test(value))value=/\s/.test(value)||!/^(?:localhost|[^\s/]+\.[^\s/]+|\[[0-9a-f:]+\])(?::\d+)?(?:[/?#]|$)/i.test(value)?`https://www.google.com/search?q=${encodeURIComponent(value)}`:`${/^(?:localhost|127\.|\[)/i.test(value)?"http":"https"}://${value}`;
-    if(state.browserNative&&state.browserOwnerId){await navigateNativeBrowser("navigate",value,newTab);return;}
+    if((state.browserNative||window.__PHOENIX_CHROMIUM_SHELL__?.enabled===true)&&state.browserOwnerId){await navigateNativeBrowser("navigate",value,newTab);return;}
     const token=activeSelectionToken(),instance=state.browserOwnerId,generation=state.browserSurfaceGeneration;
     await flushBrowserTyping();
     if(!selectionIsCurrent(token)||instance!==state.browserOwnerId||generation!==state.browserSurfaceGeneration)return;
@@ -6475,7 +6501,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   }
   async function runBrowserToolbarAction(action) {
     try {
-      if(state.browserNative&&state.browserOwnerId){await navigateNativeBrowser(action);return;}
+      if((state.browserNative||window.__PHOENIX_CHROMIUM_SHELL__?.enabled===true)&&state.browserOwnerId){await navigateNativeBrowser(action);return;}
       await flushBrowserTyping();
       if(action==="back")await browserCommand({action:"go_back"});
       else await browserCommand({action:"send_keys",keys:action==="forward"?"Alt+ArrowRight":"Ctrl+R"});
