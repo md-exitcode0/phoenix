@@ -383,7 +383,7 @@
       "key": "appearance.conversation_view",
       "section": "Appearance",
       "label": "Conversation detail",
-      "description": "Compact keeps the thread scannable and folds code out of the way. Detailed shows the agent's edits inline as syntax-highlighted code.",
+      "description": "Chat only hides tool activity. Tool activity shows collapsed summaries; Detailed opens tool output inline.",
       "keywords": [
         "appearance",
         "conversation",
@@ -393,8 +393,12 @@
         "kind": "select",
         "options": [
           {
+            "value": "chat",
+            "label": "Chat only"
+          },
+          {
             "value": "compact",
-            "label": "Compact"
+            "label": "Tool activity"
           },
           {
             "value": "detailed",

@@ -12,81 +12,81 @@
 .toast details,.settings-error-details {font-size:11px;margin-top:6px}
 .toast details pre,.settings-error-details pre {white-space:pre-wrap;overflow-wrap:anywhere;max-height:150px;overflow:auto}
 /* Restore the existing inline controls, without changing their listeners. */
-:root[data-skin="monocode"] #composerOptions {display:contents}
-:root[data-skin="monocode"] #composerOptions > summary {display:none}
-:root[data-skin="monocode"] #composerOptionsPanel {display:contents!important}
-:root[data-skin="monocode"] #composerZone #jumpLatest {order:0;margin:4px auto}
-:root[data-skin="monocode"] .settings-theme {display:flex;width:fit-content;max-width:100%;align-items:center;justify-content:center;margin-inline:auto}
-:root[data-skin="monocode"] .settings-theme button {display:grid;place-items:center;flex:1;min-width:58px;text-align:center}
-:root[data-skin="monocode"] #conversationStage.mc-empty {justify-content:flex-start;gap:14px}
-:root[data-skin="monocode"] #conversationStage.mc-empty #fluffyHero {position:relative;top:auto;left:auto;transform:none;flex:0 0 auto;align-self:center;margin:auto 0 0}
-:root[data-skin="monocode"] #conversationStage.mc-empty #composerZone {margin-top:auto;margin-bottom:auto;transform:none;flex:0 1 auto}
-:root[data-skin="monocode"] #conversationStage.mc-empty.has-fluffy #composerZone {margin-top:0}
-:root[data-skin="monocode"] .pending-question-disclosure {max-height:min(40vh,330px);overflow:auto}
-:root[data-skin="monocode"] .group-work-agent {border-radius:12px;background:color-mix(in srgb,var(--mc-selection) 65%,transparent)}
-@media(max-height:700px){:root[data-skin="monocode"] #conversationStage.mc-empty #fluffyHero {--mc-hero-diameter:128px;width:128px;height:128px}}
+:root[data-skin="phoenix"] #composerOptions {display:contents}
+:root[data-skin="phoenix"] #composerOptions > summary {display:none}
+:root[data-skin="phoenix"] #composerOptionsPanel {display:contents!important}
+:root[data-skin="phoenix"] #composerZone #jumpLatest {order:0;margin:4px auto}
+:root[data-skin="phoenix"] .settings-theme {display:flex;width:fit-content;max-width:100%;align-items:center;justify-content:center;margin-inline:auto}
+:root[data-skin="phoenix"] .settings-theme button {display:grid;place-items:center;flex:1;min-width:58px;text-align:center}
+:root[data-skin="phoenix"] #conversationStage.mc-empty {justify-content:flex-start;gap:14px}
+:root[data-skin="phoenix"] #conversationStage.mc-empty #fluffyHero {position:relative;top:auto;left:auto;transform:none;flex:0 0 auto;align-self:center;margin:auto 0 0}
+:root[data-skin="phoenix"] #conversationStage.mc-empty #composerZone {margin-top:auto;margin-bottom:auto;transform:none;flex:0 1 auto}
+:root[data-skin="phoenix"] #conversationStage.mc-empty.has-fluffy #composerZone {margin-top:0}
+:root[data-skin="phoenix"] .pending-question-disclosure {max-height:min(40vh,330px);overflow:auto}
+:root[data-skin="phoenix"] .group-work-agent {border-radius:12px;background:color-mix(in srgb,var(--mc-selection) 65%,transparent)}
+@media(max-height:700px){:root[data-skin="phoenix"] #conversationStage.mc-empty #fluffyHero {--mc-hero-diameter:128px;width:128px;height:128px}}
 .saved-request-provenance {display:block;padding:8px 12px 0;color:var(--ink-soft);font-size:11px}
-:root[data-skin="monocode"][data-conversation-view="compact"] .work-cluster:has(.work-tool,.agent-update,.commentary-line,.context-compaction,.ask-history-row,.handoff-chain) {display:block}
-:root[data-skin="monocode"][data-conversation-view="compact"] .work-cluster > .group-work-agent {display:flex}
-:root[data-skin="monocode"][data-conversation-view="compact"] .work-cluster.group-work-expanded > .work-trace {display:block!important}
-:root[data-skin="monocode"] .work-cluster > .work-progress {display:block!important}
-:root[data-skin="monocode"] .work-cluster.group-work-expanded :is(.agent-update,.reasoning-subgroup,.reasoning-cluster) {display:block!important}
+:root[data-skin="phoenix"][data-conversation-view="compact"] .work-cluster:has(.work-tool,.agent-update,.commentary-line,.context-compaction,.ask-history-row,.handoff-chain) {display:block}
+:root[data-skin="phoenix"][data-conversation-view="compact"] .work-cluster > .group-work-agent {display:flex}
+:root[data-skin="phoenix"][data-conversation-view="compact"] .work-cluster.group-work-expanded > .work-trace {display:block!important}
+:root[data-skin="phoenix"] .work-cluster > .work-progress {display:block!important}
+:root[data-skin="phoenix"] .work-cluster.group-work-expanded :is(.agent-update,.reasoning-subgroup,.reasoning-cluster) {display:block!important}
 /* Keep the compact rail, header and chat visible beside a stacked workspace.
    MonoCode's full-height ID rule otherwise overrides the native stack layout. */
-:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar {left:var(--workspace-left)!important;right:0;top:34px;height:var(--inspection-stack-height)!important;width:auto!important}
-:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #conversationStage {margin-top:0!important;margin-right:0!important;height:100%;width:auto!important}
-:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #conversationStage::before {content:"";flex:0 0 var(--inspection-stack-height);order:0}
-:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #conversationHeader {order:-1}
-:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #fluffyHero {display:none}
-:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) .browser-overlay {left:var(--workspace-left)!important;right:0;width:auto!important;height:calc(var(--inspection-stack-height) - var(--inspection-browser-offset));bottom:auto}
+:root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar {left:var(--workspace-left)!important;right:0;top:34px;height:var(--inspection-stack-height)!important;width:auto!important}
+:root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) #conversationStage {margin-top:0!important;margin-right:0!important;height:100%;width:auto!important}
+:root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) #conversationStage::before {content:"";flex:0 0 var(--inspection-stack-height);order:0}
+:root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) #conversationHeader {order:-1}
+:root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) #fluffyHero {display:none}
+:root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) .browser-overlay {left:var(--workspace-left)!important;right:0;width:auto!important;height:calc(var(--inspection-stack-height) - var(--inspection-browser-offset));bottom:auto}
 /* Keep the disclosure beside the count rather than stretching the row. */
-:root[data-skin="monocode"] #conversationFeed .group-work-agent {width:max-content;max-width:100%;grid-template-columns:24px minmax(0,max-content) 12px;column-gap:8px}
+:root[data-skin="phoenix"] #conversationFeed .group-work-agent {width:max-content;max-width:100%;grid-template-columns:24px minmax(0,max-content) 12px;column-gap:8px}
 /* One shared header seam and a continuous boundary around the workspace. */
-:root[data-skin="monocode"] #inspectionSidebar {border-left:1px solid var(--mc-line);border-top:0;top:0;height:100%;grid-template-rows:34px auto minmax(0,1fr);transition:none!important}
-:root[data-skin="monocode"] body.inspection-open #inspectionSidebar {transform:none!important;opacity:1}
-:root[data-skin="monocode"] #conversationHeader {border-bottom:1px solid var(--mc-line);box-sizing:border-box}
-:root[data-skin="monocode"] .inspection-tabbar {height:34px;min-height:34px;border-bottom:1px solid var(--mc-line);box-sizing:border-box}
-:root[data-skin="monocode"] .browser-overlay {box-sizing:border-box;border-left:1px solid var(--mc-line)}
-:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar {top:34px;border-bottom:1px solid var(--mc-line)}
+:root[data-skin="phoenix"] #inspectionSidebar {border-left:1px solid var(--mc-line);border-top:0;top:0;height:100%;grid-template-rows:34px auto minmax(0,1fr);transition:none!important}
+:root[data-skin="phoenix"] body.inspection-open #inspectionSidebar {transform:none!important;opacity:1}
+:root[data-skin="phoenix"] #conversationHeader {border-bottom:1px solid var(--mc-line);box-sizing:border-box}
+:root[data-skin="phoenix"] .inspection-tabbar {height:34px;min-height:34px;border-bottom:1px solid var(--mc-line);box-sizing:border-box}
+:root[data-skin="phoenix"] .browser-overlay {box-sizing:border-box;border-left:1px solid var(--mc-line)}
+:root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar {top:34px;border-bottom:1px solid var(--mc-line)}
 /* The brand is a crisp mark, including while hovered in the compact rail. */
-:root[data-skin="monocode"] .phoenix-raster-logo {filter:none!important;transform:none!important}
+:root[data-skin="phoenix"] .phoenix-raster-logo {filter:none!important;transform:none!important}
 #conversationThinking {align-self:center;width:64px;height:64px;flex:none}
 #conversationThinking[hidden] {display:none!important}
 #conversationThinking canvas {display:block;width:64px;height:64px}
 #conversationDetailToggle {border:0;background:transparent;color:var(--ink-soft);font:inherit;font-size:11px;padding:4px 7px;border-radius:5px;white-space:nowrap;-webkit-app-region:no-drag}
 #conversationDetailToggle:hover {background:var(--mc-selection)}
 #conversationDetailToggle:focus-visible {outline:2px solid var(--accent);outline-offset:2px}
-:root[data-skin="monocode"][data-conversation-view="chat"] .work-cluster > :is(.group-work-agent,.work-trace) {display:none!important}
-:root[data-skin="monocode"][data-conversation-view="chat"] .work-cluster:not(:has(>.work-progress,>.work-attention)) {display:none!important}
-:root[data-skin="monocode"][data-conversation-view="chat"] .team-work-block > header {display:none!important}
-:root[data-skin="monocode"][data-conversation-view="chat"] .team-work-body {display:block!important}
-:root[data-skin="monocode"] #fluffyHero {--mc-hero-diameter:160px;height:160px;flex-basis:160px}
-:root[data-skin="monocode"] #fluffyHero :is(canvas,img) {width:160px;height:160px}
-:root[data-skin="monocode"] #conversationStage.mc-empty #fluffyHero {--mc-hero-diameter:192px;width:192px;height:192px}
-:root[data-skin="monocode"] #conversationStage.mc-empty #fluffyHero :is(canvas,img) {width:192px;height:192px}
-@media(max-height:700px){:root[data-skin="monocode"] #conversationStage.mc-empty #fluffyHero,:root[data-skin="monocode"] #conversationStage.mc-empty #fluffyHero :is(canvas,img) {width:128px;height:128px;flex-basis:128px}}
-:root[data-skin="monocode"][data-conversation-text="default"] #conversationFeed :is(.user-bubble,.agent-message>.message-content>.markdown,.work-progress) {font-size:16px}
-:root[data-skin="monocode"][data-conversation-text="default"] #composerInput {font-size:16px;line-height:24px}
+:root[data-skin="phoenix"][data-conversation-view="chat"] .work-cluster > :is(.group-work-agent,.work-trace) {display:none!important}
+:root[data-skin="phoenix"][data-conversation-view="chat"] .work-cluster:not(:has(>.work-progress,>.work-attention)) {display:none!important}
+:root[data-skin="phoenix"][data-conversation-view="chat"] .team-work-block > header {display:none!important}
+:root[data-skin="phoenix"][data-conversation-view="chat"] .team-work-body {display:block!important}
+:root[data-skin="phoenix"] #fluffyHero {--mc-hero-diameter:160px;height:160px;flex-basis:160px}
+:root[data-skin="phoenix"] #fluffyHero :is(canvas,img) {width:160px;height:160px}
+:root[data-skin="phoenix"] #conversationStage.mc-empty #fluffyHero {--mc-hero-diameter:192px;width:192px;height:192px}
+:root[data-skin="phoenix"] #conversationStage.mc-empty #fluffyHero :is(canvas,img) {width:192px;height:192px}
+@media(max-height:700px){:root[data-skin="phoenix"] #conversationStage.mc-empty #fluffyHero,:root[data-skin="phoenix"] #conversationStage.mc-empty #fluffyHero :is(canvas,img) {width:128px;height:128px;flex-basis:128px}}
+:root[data-skin="phoenix"][data-conversation-text="default"] #conversationFeed :is(.user-bubble,.agent-message>.message-content>.markdown,.work-progress) {font-size:16px}
+:root[data-skin="phoenix"][data-conversation-text="default"] #composerInput {font-size:16px;line-height:24px}
 
 /* Reserve the fixed native window buttons in the workspace header. */
-:root[data-skin="monocode"] .inspection-tabbar {padding-right:108px}
+:root[data-skin="phoenix"] .inspection-tabbar {padding-right:108px}
 
 /* Give navigation marks their own gutter, before the avatar column. */
-:root[data-skin="monocode"] #conversationPromptRail {left:4px;width:22px!important}
-:root[data-skin="monocode"] #conversationPromptRail button {width:22px!important}
-:root[data-skin="monocode"] #conversationPromptRail button>i {width:18px!important}
-:root[data-skin="monocode"] #conversationFeed {padding-left:38px!important}
-:root[data-skin="monocode"] .prompt-rail-card {left:30px}
+:root[data-skin="phoenix"] #conversationPromptRail {left:4px;width:22px!important}
+:root[data-skin="phoenix"] #conversationPromptRail button {width:22px!important}
+:root[data-skin="phoenix"] #conversationPromptRail button>i {width:18px!important}
+:root[data-skin="phoenix"] #conversationFeed {padding-left:38px!important}
+:root[data-skin="phoenix"] .prompt-rail-card {left:30px}
 /* The empty Desktop view uses the same surface as its pane. */
-:root[data-skin="monocode"] #desktopObservationStage.no-frame {background:var(--mc-bg)!important;color:var(--mc-muted)}
-:root[data-skin="monocode"] #inspectionSidebar #desktopObservationEmpty {background:transparent!important;max-width:320px;padding:24px;line-height:1.6;color:var(--mc-muted)}
-:root[data-skin="monocode"] #inspectionSidebar .desktop-observation-stage.no-frame .desktop-connecting {background:var(--mc-bg);color:var(--mc-muted)}
+:root[data-skin="phoenix"] #desktopObservationStage.no-frame {background:var(--mc-bg)!important;color:var(--mc-muted)}
+:root[data-skin="phoenix"] #inspectionSidebar #desktopObservationEmpty {background:transparent!important;max-width:320px;padding:24px;line-height:1.6;color:var(--mc-muted)}
+:root[data-skin="phoenix"] #inspectionSidebar .desktop-observation-stage.no-frame .desktop-connecting {background:var(--mc-bg);color:var(--mc-muted)}
 
 /* Activity is an optional disclosure; authored bubbles stay in both modes. */
-:root[data-skin="monocode"][data-conversation-view="chat"] #conversationFeed .work-cluster {display:none!important}
-:root[data-skin="monocode"][data-conversation-view="chat"] #conversationFeed .team-work-block>header {display:none!important}
-:root[data-skin="monocode"][data-conversation-view="chat"] #conversationFeed .team-work-body {display:block!important}
-:root[data-skin="monocode"][data-conversation-view="compact"] #conversationFeed .work-cluster:has(.work-tool,.reasoning-subgroup,.reasoning-cluster,.context-compaction,.ask-history-row,.handoff-chain) {display:block!important}
-:root[data-skin="monocode"][data-conversation-view="compact"] #conversationFeed .work-cluster>.group-work-agent {display:flex!important}
-:root[data-skin="monocode"] #conversationFeed .work-cluster.group-work-expanded :is(.reasoning-subgroup,.reasoning-cluster,.agent-update) {display:block!important}
-:root[data-skin="monocode"] #conversationFeed .commentary-message>.message-content>.markdown {display:block!important;font-size:16px}
+:root[data-skin="phoenix"][data-conversation-view="chat"] #conversationFeed .work-cluster {display:none!important}
+:root[data-skin="phoenix"][data-conversation-view="chat"] #conversationFeed .team-work-block>header {display:none!important}
+:root[data-skin="phoenix"][data-conversation-view="chat"] #conversationFeed .team-work-body {display:block!important}
+:root[data-skin="phoenix"][data-conversation-view="compact"] #conversationFeed .work-cluster:has(.work-tool,.reasoning-subgroup,.reasoning-cluster,.context-compaction,.ask-history-row,.handoff-chain) {display:block!important}
+:root[data-skin="phoenix"][data-conversation-view="compact"] #conversationFeed .work-cluster>.group-work-agent {display:flex!important}
+:root[data-skin="phoenix"] #conversationFeed .work-cluster.group-work-expanded :is(.reasoning-subgroup,.reasoning-cluster,.agent-update) {display:block!important}
+:root[data-skin="phoenix"] #conversationFeed .commentary-message>.message-content>.markdown {display:block!important;font-size:16px}

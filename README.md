@@ -2,9 +2,9 @@
   <img src="assets/logo.png" width="200" alt="Phoenix">
 </p>
 
-# Phoenix — MonoCode V4
+# Phoenix
 
-This work-in-progress checkout includes the MonoCode V4 desktop frontend and its native Phoenix runtime. The MonoCode launcher is the default app entry point.
+This work-in-progress checkout includes the Phoenix desktop frontend and its native Phoenix runtime. The Phoenix launcher is the default app entry point.
 
 Phoenix is a local-first whole-computer agent runtime written in Rust. You give it work in plain language and a persistent company of named coworkers operates across your repo, terminal, browser, desktop, connected apps, databases, and files.
 
@@ -35,10 +35,10 @@ cargo build --release --bin phoenix
 (cd canvas-app && cargo build --release)
 (cd canvas-app/chromium-shell && npm ci)
 ./target/release/phoenix onboard  # first-time provider/model setup
-./run.sh                       # open Phoenix MonoCode V4
+./run.sh                       # open Phoenix
 ```
 
-Debug builds work too. If you use a custom Cargo target directory, pass `./run.sh --gateway /path/to/phoenix --desktop /path/to/phoenix-desktop`. The launcher serves the bundled MonoCode frontend on loopback port 47845 and connects it to the native services. It reads your existing local Phoenix account; account state is not included in this repository.
+Debug builds work too. If you use a custom Cargo target directory, pass `./run.sh --gateway /path/to/phoenix --desktop /path/to/phoenix-desktop`. The launcher serves the bundled Phoenix frontend on loopback port 47845 and connects it to the native services. It reads your existing local Phoenix account; account state is not included in this repository.
 
 Room polish includes first-name mentions, coworker replies in the room transcript, an answer arrow that opens the work trace, a compact sidebar logo, and a browser ownership chip.
 
@@ -59,7 +59,7 @@ agent's latest observation.
 | `vendor/` | vendored memory, browser, and TasteCode design runtime dependencies |
 | `desktop/` | GNOME helpers (AT-SPI bridge, shell extension) |
 | `canvas-app/` | native desktop services and Chromium/Electron shell |
-| `monocode/` | MonoCode V4 frontend, pinned character assets, and source launcher |
+| `monocode/` | Phoenix frontend, pinned character assets, and source launcher |
 | `tests/` | integration tests |
 | `scripts/` | runtime helpers and verification scripts |
 | `examples/` | standalone runtime examples and diagnostics |
@@ -76,11 +76,11 @@ The desktop and daemon share `~/.phoenix/workspace` as their default working dir
 
 ## Desktop shell
 
-Run `./run.sh` from this checkout to open MonoCode V4. The native desktop host launches the Electron shell with the MonoCode frontend URL and the gateway binary built from this source. The bundled pinned character assets are served locally.
+Run `./run.sh` from this checkout to open Phoenix. The native desktop host launches the Electron shell with the Phoenix frontend URL and the gateway binary built from this source. The bundled pinned character assets are served locally.
 
 Iris's design package is vendored with its source, reference library, and integrity manifest; see [docs/iris-design.md](docs/iris-design.md) for installation and verification.
 
-MonoCode rooms include a configurable leader, coworker avatars, and messages delivered while work is running. All coworkers have the bundled motion graphics workflow; see [docs/motion-graphics.md](docs/motion-graphics.md) for its actions and media dependencies.
+Phoenix rooms include a configurable leader, coworker avatars, and messages delivered while work is running. All coworkers have the bundled motion graphics workflow; see [docs/motion-graphics.md](docs/motion-graphics.md) for its actions and media dependencies.
 
 Settings → Passes manages encrypted logins, cards, and keys. Coworkers can request and use passes through typed tools; see [docs/passes.md](docs/passes.md). Closing the desktop window hides Phoenix to the tray, where **Quit Phoenix** stops the runtime.
 
@@ -96,6 +96,6 @@ Linux is the current release target. The core runtime and Tauri UI are structure
 
 The test suite covers the gateway, mesh, company directory, canonical conversations, groups, tools, browser automation, memory, workflows, approvals, security, and compression. Run it with `cargo test`.
 
-The room routing regression tests run with `cargo test --lib authored_room`. The MonoCode browser regression test runs with `node tests/monocode-room-polish.cjs`; it uses an isolated headless Chrome profile and fixture state. Set `CHROME_BINARY` to your Chromium executable if it is not `google-chrome-stable`.
+The room routing regression tests run with `cargo test --lib authored_room`. The Phoenix browser regression test runs with `node tests/monocode-room-polish.cjs`; it uses an isolated headless Chrome profile and fixture state. Set `CHROME_BINARY` to your Chromium executable if it is not `google-chrome-stable`.
 
 This repository contains maintained source and reusable test inputs. Coworker conversations, credentials, browser profiles, generated reports, and personal deliverables belong in local runtime/workspace storage.

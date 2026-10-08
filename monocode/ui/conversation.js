@@ -3006,7 +3006,7 @@
     const feed=$("conversationFeed"),mode=document.documentElement.dataset.conversationView;
     if(mode!==conversationDetailMode){
       conversationDetailMode=mode;const visible=toolActivityView();
-      feed?.querySelectorAll(".trace-subgroup").forEach((group)=>{group.open=visible;});
+      feed?.querySelectorAll(".trace-subgroup").forEach((group)=>{group.open=detailedConversationView();});
       feed?.querySelectorAll(".work-cluster").forEach((cluster)=>{
         if(visible)cluster.classList.remove("work-folded");
         setWorkDisclosure(cluster,visible);
@@ -3107,7 +3107,7 @@
     const last=list.lastElementChild;
     let group=last?.classList.contains("trace-subgroup")&&last.dataset.traceCategory===category?last:null;
     if(group)return group;
-    group=document.createElement("details");group.className=`trace-subgroup trace-${category}`;group.dataset.traceCategory=category;group.dataset.running="0";group.open=toolActivityView();
+    group=document.createElement("details");group.className=`trace-subgroup trace-${category}`;group.dataset.traceCategory=category;group.dataset.running="0";group.open=detailedConversationView();
     group.innerHTML=`<summary><span class="trace-subgroup-icon" aria-hidden="true"><span class="trace-subgroup-rest">${traceGroupIcon(category)}</span><span class="trace-subgroup-cursor">${loaderMarkup("dot-matrix",14)}</span></span><strong class="trace-subgroup-label">${category==="coding"?"Ran tools":"Working"}</strong><small class="trace-subgroup-count" hidden>0</small><svg class="trace-subgroup-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></summary><div class="trace-subgroup-body"></div>`;
     list.append(group);updateTraceSubgroup(group);return group;
   }
@@ -4191,7 +4191,7 @@
     if(state.browserNative){const instance=state.browserOwnerId,generation=state.browserSurfaceGeneration;queueBrowserSurfaceOperation(async()=>{if(!state.browserNative||state.browserOwnerId!==instance||state.browserSurfaceGeneration!==generation)return;await ui.invoke(visible?"browser_surface_show":"browser_surface_hide",{instance});}).catch(()=>{});if(visible)scheduleNativeBrowserBounds();}
   }
 
-  const INSPECTION_TABS=new Set(["browser","image","sources","desktop",...(document.documentElement.dataset.skin==="monocode"?["agents"]:[])]),EDIT_TOOLS=new Set(["write","str_replace","apply_patch"]);
+  const INSPECTION_TABS=new Set(["browser","image","sources","desktop",...(document.documentElement.dataset.skin==="phoenix"?["agents"]:[])]),EDIT_TOOLS=new Set(["write","str_replace","apply_patch"]);
   // The right panel's tabs overflow sideways; a normal (vertical) wheel
   // scrolls them, and a trackpad's sideways swipe keeps working.
   $("inspectionTabStrip")?.addEventListener("wheel",(event)=>{
@@ -4217,7 +4217,7 @@
     return width;
   }
   function syncWorkspaceLeft(){
-    const collapsed=document.body.classList.contains("sidebar-collapsed"),sidebar=document.querySelector(".company-sidebar"),sidebarRight=Math.max(0,Math.round(sidebar?.getBoundingClientRect().right||0)),left=document.documentElement.dataset.skin==="monocode"?sidebarRight:collapsed||innerWidth<=760?0:sidebarRight;
+    const collapsed=document.body.classList.contains("sidebar-collapsed"),sidebar=document.querySelector(".company-sidebar"),sidebarRight=Math.max(0,Math.round(sidebar?.getBoundingClientRect().right||0)),left=document.documentElement.dataset.skin==="phoenix"?sidebarRight:collapsed||innerWidth<=760?0:sidebarRight;
     document.documentElement.style.setProperty("--workspace-left",`${left}px`);
     const stacked=state.inspectionOpen&&!state.inspectionExpanded&&(innerWidth<=840||innerWidth-left<680);
     if(document.body.classList.contains("inspection-stacked")!==stacked)document.body.classList.toggle("inspection-stacked",stacked);
@@ -6071,13 +6071,16 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   }
   function browserSurfaceRect(){
     const rect=$("browserViewport").getBoundingClientRect(),shelf=$("browserDownloadShelf"),shelfSpace=shelf&&!shelf.hidden?76:0;
-    let top=rect.top;
+    let top=rect.top,bottom=rect.bottom;
+    const pane=$("inspectionSidebar").getBoundingClientRect();
+    bottom=Math.min(bottom,pane.bottom-11);
+    if(document.body.classList.contains("term-open"))bottom=Math.min(bottom,$("termPanel").getBoundingClientRect().top-10);
     // Native browser views sit above DOM notifications. Reserve the occupied
     // notification area in the real native bounds rather than relying on CSS.
     for(const toast of document.querySelectorAll("#toastRegion .toast")){
       const r=toast.getBoundingClientRect();if(r.width&&r.height&&r.right>rect.left&&r.left<rect.right&&r.bottom>top&&r.top<rect.bottom)top=Math.min(rect.bottom-1,r.bottom+8);
     }
-    return{x:Math.round(rect.left),y:Math.round(top),width:Math.max(1,Math.round(rect.width)),height:Math.max(1,Math.round(rect.bottom-top-shelfSpace))};
+    return{x:Math.round(rect.left),y:Math.round(top),width:Math.max(1,Math.round(rect.width)),height:Math.max(1,Math.round(bottom-top-shelfSpace))};
   }
   function queueBrowserSurfaceOperation(operation){
     const pending=state.browserSurfaceOperationChain.then(operation,operation);
@@ -6119,7 +6122,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   }
   function scheduleNativeBrowserBounds(){
     if(!state.browserNative||!state.browserOwnerId||$("browserOverlay").hidden||state.browserSurfaceBoundsFrame)return;
-    state.browserSurfaceBoundsFrame=requestAnimationFrame(()=>{state.browserSurfaceBoundsFrame=0;pushNativeBrowserBounds();});
+    state.browserSurfaceBoundsFrame=setTimeout(()=>{state.browserSurfaceBoundsFrame=0;pushNativeBrowserBounds();},16);
   }
   // Send the page's real size to the shell. A panel that is hidden or still
   // laying out measures ~0; sending that parked the page at 1×1 (blank) until
@@ -6222,7 +6225,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   }
   function fallbackBrowserSurface(reason=""){
     if(!state.browserOwnerId||(state.browserNative===false&&state.browserSocket))return;
-    const instance=state.browserOwnerId,generation=state.browserSurfaceGeneration;state.browserNative=false;state.browserSurfaceInfo=null;state.browserSurfaceStatusPending=null;state.browserTeachingInspect=null;state.browserSurfaceBoundsFailures=0;$("browserViewport").dataset.nativeError=String(reason||"").slice(0,500);$("browserViewport").classList.remove("native-surface");clearInterval(state.browserSurfaceStatusTimer);state.browserSurfaceStatusTimer=null;cancelAnimationFrame(state.browserSurfaceBoundsFrame);state.browserSurfaceBoundsFrame=0;state.browserSurfaceBoundsPending=null;$("browserEmpty").hidden=false;$("browserEmpty").innerHTML='<div class="browser-native-error">'+loaderMarkup("comet",22)+'<strong>Opening the private browser here</strong><span>Phoenix is switching to its in-app browser surface.</span></div>';
+    const instance=state.browserOwnerId,generation=state.browserSurfaceGeneration;state.browserNative=false;state.browserSurfaceInfo=null;state.browserSurfaceStatusPending=null;state.browserTeachingInspect=null;state.browserSurfaceBoundsFailures=0;$("browserViewport").dataset.nativeError=String(reason||"").slice(0,500);$("browserViewport").classList.remove("native-surface");clearInterval(state.browserSurfaceStatusTimer);state.browserSurfaceStatusTimer=null;clearTimeout(state.browserSurfaceBoundsFrame);state.browserSurfaceBoundsFrame=0;state.browserSurfaceBoundsPending=null;$("browserEmpty").hidden=false;$("browserEmpty").innerHTML='<div class="browser-native-error">'+loaderMarkup("comet",22)+'<strong>Opening the private browser here</strong><span>Phoenix is switching to its in-app browser surface.</span></div>';
     // Always park/detach the foreign X window before enabling the frame lane.
     // Login and teaching remain usable through the same direct CDP controls;
     // they no longer fail into a loose operating-system Chromium window.
@@ -6232,7 +6235,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     if(reason)console.warn("Phoenix native browser:",reason);
   }
   function releaseBrowserSurface(instance){
-    state.browserSurfaceGeneration+=1;state.browserNative=false;state.browserSurfaceInfo=null;state.browserSurfaceStatusPending=null;state.browserTeachingInspect=null;state.browserSurfaceBoundsFailures=0;$("browserViewport").classList.remove("native-surface");clearInterval(state.browserSurfaceStatusTimer);state.browserSurfaceStatusTimer=null;cancelAnimationFrame(state.browserSurfaceBoundsFrame);state.browserSurfaceBoundsFrame=0;state.browserSurfaceBoundsPending=null;if(!instance||preview)return Promise.resolve();return queueBrowserSurfaceOperation(async()=>{await ui.invoke("browser_surface_hide",{instance}).catch(()=>{});await ui.invoke("browser_surface_detach",{instance}).catch(()=>{});await rpc({BrowserSurface:{instance,action:"close"}},3000).catch(()=>{});});
+    state.browserSurfaceGeneration+=1;state.browserNative=false;state.browserSurfaceInfo=null;state.browserSurfaceStatusPending=null;state.browserTeachingInspect=null;state.browserSurfaceBoundsFailures=0;$("browserViewport").classList.remove("native-surface");clearInterval(state.browserSurfaceStatusTimer);state.browserSurfaceStatusTimer=null;clearTimeout(state.browserSurfaceBoundsFrame);state.browserSurfaceBoundsFrame=0;state.browserSurfaceBoundsPending=null;if(!instance||preview)return Promise.resolve();return queueBrowserSurfaceOperation(async()=>{await ui.invoke("browser_surface_hide",{instance}).catch(()=>{});await ui.invoke("browser_surface_detach",{instance}).catch(()=>{});await rpc({BrowserSurface:{instance,action:"close"}},3000).catch(()=>{});});
   }
   // Keep one JPEG decode in flight and only the newest pending frame. Assigning
   // every incoming data URL made WebKit decode old screenshots for seconds
@@ -6754,7 +6757,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
       new ResizeObserver(()=>{if(state.activeInspectionImageId)renderImageCommentState();}).observe($("inspectionImageCanvas"));
       new ResizeObserver(()=>{syncWorkspaceLeft();if(state.inspectionOpen&&state.inspectionExpanded)scheduleNativeBrowserBounds();}).observe($("companySidebar"));
     } else addEventListener("resize", () => { syncComposerDensity(); syncComposerEnd(); applyInspectionWidth(); });
-    new MutationObserver(()=>{syncWorkspaceLeft();if(document.documentElement.classList.contains("sidebar-transitioning"))return;if(state.inspectionOpen&&state.inspectionExpanded)scheduleNativeBrowserBounds();}).observe(document.body,{attributes:true,attributeFilter:["class"]});
+    new MutationObserver(()=>{syncWorkspaceLeft();if(document.documentElement.classList.contains("sidebar-transitioning"))return;if(state.inspectionOpen)scheduleNativeBrowserBounds();}).observe(document.body,{attributes:true,attributeFilter:["class"]});
     addEventListener("phoenix:sidebar-transition-end",()=>{syncWorkspaceLeft();syncComposerDensity();if(state.inspectionOpen)scheduleNativeBrowserBounds();});
     addEventListener("resize",()=>{if(state.inspectionOpen&&innerWidth<=760&&!document.body.classList.contains("sidebar-collapsed")){state.inspectionRestoreSidebar=true;$("sidebarToggle")?.click();}applyInspectionWidth();syncWorkspaceLeft();positionComposerCommentPopover();});
     syncPanelControlLocation();applyInspectionExpanded(state.inspectionExpanded,false);applyInspectionWidth();toggleActivitySummary(state.summaryOpen,false);syncActivitySummary();

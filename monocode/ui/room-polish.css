@@ -43,32 +43,32 @@ body.sidebar-collapsed .sidebar-wake .phoenix-raster-logo{width:18px!important;h
 .inspection-browser-tabs .browser-owner-chip svg{width:18px;height:18px;flex:0 0 18px;stroke:none}
 
 /* Keep the answer's explicit work toggle authoritative in all MonoCode views. */
-:root[data-skin="monocode"][data-conversation-view] body #conversationFeed .work-cluster.work-folded{display:none!important}
-:root[data-skin="monocode"][data-conversation-view] body #conversationFeed .work-cluster.group-work-expanded:not(.work-folded){display:block!important}
-:root[data-skin="monocode"][data-conversation-view] body #conversationFeed .work-cluster.group-work-expanded:not(.work-folded)>.work-trace{display:block!important}
-:root[data-skin="monocode"][data-conversation-view] body #conversationFeed .work-cluster:not(.team-work-row)>.group-work-agent{display:none!important}
+:root[data-skin="phoenix"][data-conversation-view] body #conversationFeed .work-cluster.work-folded{display:none!important}
+:root[data-skin="phoenix"][data-conversation-view] body #conversationFeed .work-cluster.group-work-expanded:not(.work-folded){display:block!important}
+:root[data-skin="phoenix"][data-conversation-view] body #conversationFeed .work-cluster.group-work-expanded:not(.work-folded)>.work-trace{display:block!important}
+:root[data-skin="phoenix"][data-conversation-view] body #conversationFeed .work-cluster:not(.team-work-row)>.group-work-agent{display:none!important}
 
 /* Motion patch: anchor the retained MonoCode control above all composer cards. */
-:root[data-skin="monocode"] #composerZone #jumpLatest{position:absolute;z-index:40;left:50%;right:auto;top:auto;bottom:calc(100% + 10px);margin:0;transform:translateX(-50%);pointer-events:auto}
-:root[data-skin="monocode"] #conversationHeader.has-group-pals{z-index:3;overflow:visible}
+:root[data-skin="phoenix"] #composerZone #jumpLatest{position:absolute;z-index:40;left:50%;right:auto;top:auto;bottom:calc(100% + 10px);margin:0;transform:translateX(-50%);pointer-events:auto}
+:root[data-skin="phoenix"] #conversationHeader.has-group-pals{z-index:3;overflow:visible}
 
 /* Room faces use the regular chat hero size, with coworkers at 3 × 22px. */
-:root[data-skin="monocode"] #groupPals{--leader:var(--mc-hero-diameter);--pal:66px;--pal-wide-space:422px;--pal-docked-space:286px;--pal-more-space:48px;top:calc(100% + 8px)}
-:root[data-skin="monocode"] #conversationStage:has(#groupPals) #conversationBody{margin-top:calc(var(--mc-hero-diameter) + 16px)}
-:root[data-skin="monocode"] #conversationStage:has(#groupPals[data-stage="2"]) #conversationBody{margin-top:max(calc(var(--mc-hero-diameter) + 16px),calc(var(--mc-hero-diameter) / 2 + 128px))}
-:root[data-skin="monocode"] #conversationStage:has(#groupPals[data-stage="3"]) #conversationBody{margin-top:max(calc(var(--mc-hero-diameter) + 16px),calc(var(--mc-hero-diameter) / 2 + 133px))}
-:root[data-skin="monocode"] #groupPals[data-stage="1"] [data-seat="inner-left"]{--x:-103px;--y:0px}
-:root[data-skin="monocode"] #groupPals[data-stage="1"] [data-seat="inner-right"]{--x:103px;--y:0px}
-:root[data-skin="monocode"] #groupPals[data-stage="1"] [data-seat="outer-left"]{--x:-178px;--y:0px}
-:root[data-skin="monocode"] #groupPals[data-stage="1"] [data-seat="outer-right"]{--x:178px;--y:0px}
-:root[data-skin="monocode"] #groupPals[data-stage="1"] .pal-more{--x:238px;--y:0px}
-:root[data-skin="monocode"] #groupPals[data-stage="2"] [data-seat="inner-left"]{--x:-45px;--y:75px}
-:root[data-skin="monocode"] #groupPals[data-stage="2"] [data-seat="inner-right"]{--x:45px;--y:75px}
-:root[data-skin="monocode"] #groupPals[data-stage="2"] [data-seat="outer-left"]{--x:-110px;--y:0px}
-:root[data-skin="monocode"] #groupPals[data-stage="2"] [data-seat="outer-right"]{--x:110px;--y:0px}
-:root[data-skin="monocode"] #groupPals[data-stage="2"] .pal-more{--x:64px;--y:-35px}
-:root[data-skin="monocode"] #groupPals[data-stage="3"] [data-seat="inner-left"]{--x:-38px;--y:82px}
-:root[data-skin="monocode"] #groupPals[data-stage="3"] [data-seat="inner-right"]{--x:38px;--y:82px}
-:root[data-skin="monocode"] #groupPals[data-stage="3"] [data-seat="outer-left"]{--x:-86px;--y:24px}
-:root[data-skin="monocode"] #groupPals[data-stage="3"] [data-seat="outer-right"]{--x:86px;--y:24px}
-:root[data-skin="monocode"] #groupPals[data-stage="3"] .pal-more{--x:64px;--y:-35px}
+:root[data-skin="phoenix"] #groupPals{--leader:var(--mc-hero-diameter);--pal:66px;--pal-wide-space:422px;--pal-docked-space:286px;--pal-more-space:48px;top:calc(100% + 8px)}
+:root[data-skin="phoenix"] #conversationStage:has(#groupPals) #conversationBody{margin-top:calc(var(--mc-hero-diameter) + 16px)}
+:root[data-skin="phoenix"] #conversationStage:has(#groupPals[data-stage="2"]) #conversationBody{margin-top:max(calc(var(--mc-hero-diameter) + 16px),calc(var(--mc-hero-diameter) / 2 + 128px))}
+:root[data-skin="phoenix"] #conversationStage:has(#groupPals[data-stage="3"]) #conversationBody{margin-top:max(calc(var(--mc-hero-diameter) + 16px),calc(var(--mc-hero-diameter) / 2 + 133px))}
+:root[data-skin="phoenix"] #groupPals[data-stage="1"] [data-seat="inner-left"]{--x:-103px;--y:0px}
+:root[data-skin="phoenix"] #groupPals[data-stage="1"] [data-seat="inner-right"]{--x:103px;--y:0px}
+:root[data-skin="phoenix"] #groupPals[data-stage="1"] [data-seat="outer-left"]{--x:-178px;--y:0px}
+:root[data-skin="phoenix"] #groupPals[data-stage="1"] [data-seat="outer-right"]{--x:178px;--y:0px}
+:root[data-skin="phoenix"] #groupPals[data-stage="1"] .pal-more{--x:238px;--y:0px}
+:root[data-skin="phoenix"] #groupPals[data-stage="2"] [data-seat="inner-left"]{--x:-45px;--y:75px}
+:root[data-skin="phoenix"] #groupPals[data-stage="2"] [data-seat="inner-right"]{--x:45px;--y:75px}
+:root[data-skin="phoenix"] #groupPals[data-stage="2"] [data-seat="outer-left"]{--x:-110px;--y:0px}
+:root[data-skin="phoenix"] #groupPals[data-stage="2"] [data-seat="outer-right"]{--x:110px;--y:0px}
+:root[data-skin="phoenix"] #groupPals[data-stage="2"] .pal-more{--x:64px;--y:-35px}
+:root[data-skin="phoenix"] #groupPals[data-stage="3"] [data-seat="inner-left"]{--x:-38px;--y:82px}
+:root[data-skin="phoenix"] #groupPals[data-stage="3"] [data-seat="inner-right"]{--x:38px;--y:82px}
+:root[data-skin="phoenix"] #groupPals[data-stage="3"] [data-seat="outer-left"]{--x:-86px;--y:24px}
+:root[data-skin="phoenix"] #groupPals[data-stage="3"] [data-seat="outer-right"]{--x:86px;--y:24px}
+:root[data-skin="phoenix"] #groupPals[data-stage="3"] .pal-more{--x:64px;--y:-35px}

@@ -63,7 +63,7 @@
       black:"#242424",red:"#c42b1c",green:"#00a240",yellow:"#8a6d00",blue:"#339cff",magenta:"#8b3f9f",cyan:"#087f8c",white:"#e5e5e5",
       brightBlack:"#6e6e6e",brightRed:"#d73a2f",brightGreen:"#00a240",brightYellow:"#9a7700",brightBlue:"#339cff",brightMagenta:"#a454b3",brightCyan:"#0f919f",brightWhite:"#ffffff",
     };
-    if(document.documentElement.dataset.skin!=="monocode")return colors;
+    if(document.documentElement.dataset.skin!=="phoenix")return colors;
     const ink=getComputedStyle($("termPanel")).color;
     return {...colors,background:"rgba(0,0,0,0)",foreground:ink||colors.foreground,cursor:ink||colors.cursor};
   }
@@ -73,14 +73,14 @@
     const container=document.createElement("div");container.className="term-session";container.dataset.termSession=tab.key;host.append(container);tab.container=container;
     if(!terminalRuntime?.Terminal||!terminalRuntime?.FitAddon)return;
     const terminal=new terminalRuntime.Terminal({
-      allowTransparency:document.documentElement.dataset.skin==="monocode",
+      allowTransparency:document.documentElement.dataset.skin==="phoenix",
       cursorBlink:true,
       cursorStyle:"block",
       fontFamily:"ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace",
       fontSize:12.5,
       lineHeight:1.18,
       // The glass beneath a transparent terminal supplies the contrast.
-      minimumContrastRatio:document.documentElement.dataset.skin==="monocode"?1:4.5,
+      minimumContrastRatio:document.documentElement.dataset.skin==="phoenix"?1:4.5,
       scrollback:6000,
       smoothScrollDuration:0,
       theme:terminalColors(),
@@ -183,6 +183,8 @@
     }
     $("terminalToggle")?.setAttribute("aria-expanded",String(open));
     terminalView().open=Boolean(open);
+    window.PhoenixConversation?.refreshPanelBounds?.();
+    setTimeout(()=>window.PhoenixConversation?.refreshPanelBounds?.(),360);
     if (open) {
       if(!terminalTabs().length)await startShell();
       // Opening is synchronous so a delayed animation frame cannot leave

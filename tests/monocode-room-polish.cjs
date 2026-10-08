@@ -43,7 +43,7 @@ async function main() {
       return reply.result.value;
     };
     await command("Emulation.setDeviceMetricsOverride",{width:1280,height:900,deviceScaleFactor:1,mobile:false});
-    await command("Page.navigate", {url:`http://127.0.0.1:${port}/?skin=monocode`});
+    await command("Page.navigate", {url:`http://127.0.0.1:${port}/?skin=phoenix`});
     let ready = false;
     while (!ready && Date.now() < deadline + 15000) { ready = await evaluate("Boolean(window.MonocodeRoomTest?.ui.state.view)"); if (!ready) await sleep(100); }
     assert.ok(ready, "MonoCode renderer loaded");
@@ -61,6 +61,8 @@ async function main() {
     assert.ok(await evaluate(`(()=>{const b=window.MonocodeViewTest.state.tabs[0].terminal.buffer.active;return Array.from({length:b.length},(_,i)=>b.getLine(i)?.translateToString()).some(line=>line.includes('panel-input-check'));})()`),'Terminal receives typed input');
     await clickControl('stageSidebarButton');
     assert.ok(await evaluate(`document.body.classList.contains('inspection-open')&&document.getElementById('terminalToggle').parentElement.id==='inspectionPanelControls'`),'Workspace button opens the pane and retains the mounted terminal control');
+    const paneGrip=await evaluate(`(()=>{const p=document.getElementById('inspectionSidebar').getBoundingClientRect(),r=document.getElementById('inspectionResize').getBoundingClientRect();return {border:p.left,centre:r.x+r.width/2,hit:document.elementFromPoint(p.left,p.top+100)?.id};})()`);
+    assert.ok(Math.abs(paneGrip.border-paneGrip.centre)<1&&paneGrip.hit==='inspectionResize','The workspace resizes at its visible border: '+JSON.stringify(paneGrip));
     await clickControl('terminalToggle');
     assert.ok(await evaluate(`!document.body.classList.contains('term-open')&&document.getElementById('termPanel').hidden`),'Moved terminal control closes the panel');
     await clickControl('terminalToggle');
@@ -71,6 +73,14 @@ async function main() {
     await command('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,x:resizeStart.x,y:resizeStart.y-40});await sleep(150);
     const resized=await evaluate(`(()=>{const p=document.getElementById('termPanel').getBoundingClientRect(),pane=document.getElementById('inspectionSidebar').getBoundingClientRect();return {height:p.height,preserved:Number(localStorage.getItem('phoenix-terminal-height')),bottom:p.bottom,panesFit:document.body.classList.contains('inspection-stacked')||pane.bottom<=p.top-9};})()`);
     assert.ok(Math.abs(resized.height-resizeStart.height-40)<2&&Math.abs(resized.preserved-resized.height-10)<2&&resized.bottom<=900-9&&resized.panesFit,'Resizing preserves the glass inset and keeps the workspace above the terminal: '+JSON.stringify(resized));
+    const browserFits=await evaluate(`(()=>{
+      const overlay=document.getElementById('browserOverlay');overlay.hidden=false;
+      document.body.classList.add('inspection-browser-active');
+      const pane=document.getElementById('inspectionSidebar').getBoundingClientRect(),viewport=document.getElementById('browserViewport').getBoundingClientRect(),term=document.getElementById('termPanel').getBoundingClientRect(),native=window.MonocodeRoomTest.browserSurfaceRect();
+      overlay.hidden=true;document.body.classList.remove('inspection-browser-active');
+      return {fits:viewport.bottom<=term.top-9,nativeFits:native.y+native.height<=term.top-9,paneFits:pane.bottom<=term.top-9};
+    })()`);
+    assert.ok(Object.values(browserFits).every(Boolean),'DOM and native browser bounds stay above the terminal: '+JSON.stringify(browserFits));
     await clickControl('stageSidebarButton');
     assert.ok(await evaluate(`!document.body.classList.contains('inspection-open')&&document.getElementById('terminalToggle').parentElement.id==='stagePanelToggles'`),'Workspace button closes and returns both controls to the chat header');
     await clickControl('termClose');
@@ -118,7 +128,7 @@ async function main() {
       return {replies,ordering,foldedReceipts,browserOwner,expectedOwner:peer.display_name.split(/\\s+/)[0]+"'s browser",pickerHeader,logoSize,logoTop:logoRect.top,activityVisible,workOpened,workClosed,skin:document.documentElement.dataset.skin};
     })()`);
     console.log(JSON.stringify(result,null,2));
-    assert.equal(result.skin,"monocode");
+    assert.equal(result.skin,"phoenix");
     assert.equal(result.replies,1,"Peer replay keeps one room message");
     assert.equal(result.foldedReceipts,0,"Room reply is not folded into a return receipt");
     assert.equal(result.ordering.length,2,"Owner and member both speak");
@@ -136,7 +146,9 @@ async function main() {
       t.renderAnswer('The files look good.',id);
       window.__toggleFirstTool=document.querySelector('#conversationFeed .work-tool');
     })()`);
-    assert.ok(await evaluate(`window.__toggleFirstTool.getBoundingClientRect().height>0`),'Tool activity displays individual calls before the toggle');
+    assert.ok(await evaluate(`window.__toggleFirstTool.getBoundingClientRect().height===0&&!window.__toggleFirstTool.closest('.trace-subgroup').open&&window.__toggleFirstTool.closest('.trace-subgroup').getBoundingClientRect().height>0`),'Tool activity initially shows a collapsed group summary');
+    await evaluate(`window.__toggleFirstTool.closest('.trace-subgroup').open=true`);
+    assert.ok(await evaluate(`window.__toggleFirstTool.getBoundingClientRect().height>0`),'Expanding the group reveals the recorded call');
     await clickControl('conversationDetailToggle');
     assert.ok(await evaluate(`(()=>{const feed=document.getElementById('conversationFeed');return document.documentElement.dataset.conversationView==='chat'&&document.getElementById('conversationDetailToggle').textContent==='Chat only'&&window.__toggleFirstTool.getBoundingClientRect().height===0&&feed.querySelector('.answer-work-toggle').getBoundingClientRect().height===0&&[...feed.querySelectorAll('.message-row')].every(row=>row.getBoundingClientRect().height>0);})()`),'Chat only removes tool calls and their disclosure buttons while retaining messages');
     await evaluate(`(()=>{
@@ -147,7 +159,7 @@ async function main() {
     })()`);
     assert.ok(await evaluate(`window.__toggleTools.length===2&&window.__toggleTools.every(row=>row.getBoundingClientRect().height===0)`),'Streaming calls stay hidden even when an old work disclosure is expanded');
     await clickControl('conversationDetailToggle');
-    assert.ok(await evaluate(`window.__toggleTools.every(row=>row.isConnected&&row.getBoundingClientRect().height>0)&&document.getElementById('conversationDetailToggle').textContent==='Tool activity'&&[...document.querySelectorAll('#conversationFeed .trace-subgroup')].every(group=>group.open)`),'Turning activity back on restores the same recorded and streaming calls');
+    assert.ok(await evaluate(`window.__toggleTools.every(row=>row.isConnected&&row.getBoundingClientRect().height===0)&&document.getElementById('conversationDetailToggle').textContent==='Tool activity'&&[...document.querySelectorAll('#conversationFeed .trace-subgroup')].every(group=>!group.open&&group.getBoundingClientRect().height>0)`),'Turning activity back on restores collapsed summaries and preserves recorded and streaming calls');
     await evaluate(`(async()=>{
       const t=window.MonocodeRoomTest,d=t.ui.state.view.directory,group=d.groups[0],ids=d.members.filter(m=>m.group_id===group.group_id).map(m=>m.agent_id);
       await t.ui.selectItem({kind:'group',id:group.group_id});t.clearFeed();t.state.activeTurnId='room-detail-toggle';t.state.renderingTurnId='room-detail-toggle';
@@ -161,7 +173,16 @@ async function main() {
     await clickControl('conversationDetailToggle');
     assert.ok(await evaluate(`window.__toggleRoomTools.length===2&&window.__toggleRoomTools.every(row=>row.getBoundingClientRect().height===0)&&[...document.querySelectorAll('#conversationFeed .group-message')].every(row=>row.getBoundingClientRect().height>0)`),'Chat only hides room tools while preserving coworker answers');
     await clickControl('conversationDetailToggle');
-    assert.ok(await evaluate(`window.__toggleRoomTools.every(row=>row.isConnected&&row.getBoundingClientRect().height>0)&&JSON.parse(localStorage.getItem('phoenix-visual')).conversationView==='compact'`),'Room activity returns immediately and the chosen mode persists');
+    assert.ok(await evaluate(`window.__toggleRoomTools.every(row=>row.isConnected&&row.getBoundingClientRect().height===0&&row.closest('.trace-subgroup').getBoundingClientRect().height>0)&&JSON.parse(localStorage.getItem('phoenix-visual')).conversationView==='compact'`),'Room activity returns immediately and the chosen mode persists');
+    const savedMode=await evaluate(`(async()=>{
+      await window.PhoenixSettings.setConversationView('chat');
+      await window.PhoenixSettings.setGlobalSetting('appearance.theme','light');
+      await new Promise(resolve=>setTimeout(resolve,2000));
+      const snapshot=await window.PhoenixReviewSettings.snapshot();
+      return {mode:document.documentElement.dataset.conversationView,saved:snapshot.settings.find(r=>r.definition.key==='appearance.conversation_view').value,theme:document.documentElement.dataset.theme};
+    })()`);
+    assert.deepEqual(savedMode,{mode:'chat',saved:'chat',theme:'light'},'Saving a theme preserves the conversation mode in both runtime and local preferences');
+    await evaluate(`window.PhoenixSettings.setConversationView('compact')`);
     const motion = await evaluate(`(async () => {
       const t=window.MonocodeRoomTest,d=t.ui.state.view.directory,group=d.groups[0];
       const ids=d.members.filter(m=>m.group_id===group.group_id).map(m=>m.agent_id);

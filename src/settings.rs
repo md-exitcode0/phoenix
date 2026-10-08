@@ -561,9 +561,13 @@ fn catalog() -> Vec<SettingDefinition> {
             "appearance.conversation_view",
             "Appearance",
             "Conversation detail",
-            "Compact keeps the thread scannable and folds code out of the way. Detailed shows the agent's edits inline as syntax-highlighted code.",
+            "Chat only hides tool activity. Tool activity shows collapsed summaries; Detailed opens tool output inline.",
             SettingControl::Select {
-                options: vec![opt("compact", "Compact"), opt("detailed", "Detailed")],
+                options: vec![
+                    opt("chat", "Chat only"),
+                    opt("compact", "Tool activity"),
+                    opt("detailed", "Detailed"),
+                ],
             },
             json!("compact"),
         ),
@@ -2793,6 +2797,41 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let guard = crate::config::test_env::PhoenixHomeGuard::set_private(dir.path());
         (dir, guard)
+    }
+
+    #[test]
+    fn chat_only_survives_theme_changes_and_is_inherited_by_conversations() {
+        let (_dir, _guard) = private_temp_home();
+        for (key, value) in [
+            ("appearance.conversation_view", "chat"),
+            ("appearance.theme", "light"),
+        ] {
+            execute(SettingsCommand::Set {
+                key: key.into(),
+                value: json!(value),
+                scope: SettingsScope::Global,
+                expected_revision: None,
+            })
+            .unwrap();
+        }
+        let reply = execute(SettingsCommand::Snapshot {
+            scope: SettingsScope::Agent {
+                id: "phoenix".into(),
+            },
+        })
+        .unwrap();
+        let SettingsReply::Snapshot { snapshot } = reply else {
+            unreachable!()
+        };
+        assert_eq!(
+            snapshot
+                .settings
+                .iter()
+                .find(|row| row.definition.key == "appearance.conversation_view")
+                .unwrap()
+                .value,
+            json!("chat")
+        );
     }
 
     #[test]

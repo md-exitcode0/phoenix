@@ -99,7 +99,7 @@ class RuntimePackageTests(unittest.TestCase):
             run.assert_not_called()
 
     def test_exact_existing_native_frontend_does_not_restart(self):
-        url='http://127.0.0.1:47845/?skin=monocode&chromium=1'
+        url='http://127.0.0.1:47845/?skin=phoenix&chromium=1'
         with patch.object(runtime,'targets',return_value=[{'type':'page','url':url}]),patch.object(runtime.subprocess,'run') as run:
             self.assertEqual(runtime.ensure(self.root,self.pack,conversation_url=url),{'servicesOnly':False,'started':False})
             run.assert_not_called()

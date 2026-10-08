@@ -10,7 +10,7 @@ import re
 import time
 
 ORIGIN = 'http://127.0.0.1:47845'
-URL = ORIGIN + '/?skin=monocode&chromium=1'
+URL = ORIGIN + '/?skin=phoenix&chromium=1'
 # The native gateway_status command supplies the user's configured port.
 # Keep sockets on IPv4 loopback without assuming the default gateway port.
 CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' http: https: data: blob:; font-src 'self' data:; connect-src 'self' ws://127.0.0.1:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"

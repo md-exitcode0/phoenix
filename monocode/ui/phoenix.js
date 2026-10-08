@@ -1,7 +1,7 @@
 /* Presentation adapter on the copied Phoenix UI, derived from pinned MonoCode v0.3.0.
    Uses existing controls, never replaces controller/command implementations. */
 (function(root){
- 'use strict';const $=id=>document.getElementById(id),mono=document.documentElement.dataset.skin==='monocode';
+ 'use strict';const $=id=>document.getElementById(id),mono=document.documentElement.dataset.skin==='phoenix';
  function ready(){return Boolean(root.PhoenixUI?.state.view&&root.PhoenixConversation)}
  function init(){
   const ui=PhoenixUI,stage=$('conversationStage'),feed=$('conversationFeed'),zone=$('composerZone'),composer=$('composer');
@@ -62,7 +62,7 @@
   let layoutQueued=false,layoutActive=true;
   const observer=new MutationObserver(()=>{if(layoutQueued)return;layoutQueued=true;queueMicrotask(()=>{layoutQueued=false;if(!layoutActive)return;projectCommentary();layout()})});observer.observe(feed,{childList:true,subtree:true});observer.observe($('composerContext'),{childList:true,subtree:true});observer.observe($('contextPercent'),{childList:true,subtree:true});projectCommentary();layout();
   // The original shell measures its toolbar below separate window chrome.
-  // MonoCode puts that chrome in a 34px header. Measure the actual bottom,
+  // Phoenix puts that chrome in a 34px header. Measure the actual bottom,
   // rather than reusing a hard-coded row count that lets a native page cover it.
   let boundsFrame=0;
   function alignBrowser(){boundsFrame=0;const toolbar=document.querySelector('#inspectionSidebar .inspection-toolbar'),bar=document.querySelector('#inspectionSidebar .inspection-tabbar');if(!toolbar||!bar)return;const bottom=Math.max(bar.getBoundingClientRect().bottom,toolbar.getBoundingClientRect().bottom),next=Math.round(bottom)+'px';if(bottom>0&&document.documentElement.style.getPropertyValue('--mc-browser-top')!==next){document.documentElement.style.setProperty('--mc-browser-top',next);PhoenixConversation.refreshPanelBounds()}}
@@ -70,7 +70,7 @@
   for(const node of document.querySelectorAll('#inspectionSidebar,.inspection-toolbar,.inspection-tabbar,#teachingTopbar'))boundsObserver.observe(node);
   addEventListener('phoenix:inspection-tab',queueBounds);addEventListener('resize',queueBounds);queueBounds();
   addEventListener('pagehide',()=>{boundsObserver.disconnect();cancelAnimationFrame(boundsFrame);removeEventListener('resize',queueBounds);removeEventListener('phoenix:inspection-tab',queueBounds)},{once:true});
-  addEventListener('pagehide',()=>{layoutActive=false;observer.disconnect();animation?.cancel()},{once:true});void restoreLocalForms();document.documentElement.dataset.reviewReady='true';document.title=root.__PHOENIX_ISOLATED_BACKEND__?.enabled?'Phoenix | MonoCode isolated backend':'Phoenix | MonoCode V4';
+  addEventListener('pagehide',()=>{layoutActive=false;observer.disconnect();animation?.cancel()},{once:true});void restoreLocalForms();document.documentElement.dataset.reviewReady='true';document.title=root.__PHOENIX_ISOLATED_BACKEND__?.enabled?'Phoenix':'Phoenix';
  }
  if(ready())init();else{const timer=setInterval(()=>{if(ready()){clearInterval(timer);init()}},50);addEventListener('pagehide',()=>clearInterval(timer),{once:true})}
 })(globalThis);

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Run the MonoCode V4 frontend with this checkout's native Phoenix services."""
+"""Run the Phoenix frontend with this checkout's native Phoenix services."""
 import argparse
+import errno
+import json
 import importlib.util
 import os
 from pathlib import Path
@@ -8,6 +10,7 @@ import signal
 import subprocess
 import threading
 from http.server import ThreadingHTTPServer
+from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parent
@@ -30,7 +33,7 @@ def binary(name, directory, override):
         path = directory / "target" / profile / name
         if path.is_file():
             return path
-    raise RuntimeError(f"Build {name} in {directory} before starting MonoCode.")
+    raise RuntimeError(f"Build {name} in {directory} before starting Phoenix.")
 
 
 def main():
@@ -41,10 +44,24 @@ def main():
     gateway = binary("phoenix", REPO, args.gateway)
     desktop = binary("phoenix-desktop", REPO / "canvas-app", args.desktop)
     if not (REPO / "canvas-app/chromium-shell/node_modules/electron/dist/electron").is_file():
-        raise RuntimeError("Run npm ci in canvas-app/chromium-shell before starting MonoCode.")
+        raise RuntimeError("Run npm ci in canvas-app/chromium-shell before starting Phoenix.")
     preview = load("phoenix_monocode_assets", ROOT / "preview.py")
     frontend = load("phoenix_monocode_frontend", ROOT / "native-conversation-server.py")
-    server = ThreadingHTTPServer(("127.0.0.1", 47845), frontend.handler(preview))
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", 47845), frontend.handler(preview))
+    except OSError as error:
+        if error.errno != errno.EADDRINUSE:
+            raise
+        # Reuse Electron's single-instance handoff when the owned frontend is
+        # already running, including when its window has been hidden to tray.
+        with urlopen(frontend.ORIGIN + "/frontend-state", timeout=2) as response:
+            active = json.load(response)
+        if active.get("service") != "phoenix-native-conversation-v1":
+            raise RuntimeError("Another application is using Phoenix's frontend port.") from error
+        env = dict(os.environ, PHOENIX_CHROMIUM_CONVERSATION_URL=frontend.URL)
+        electron = REPO / "canvas-app/chromium-shell/node_modules/electron/dist/electron"
+        return subprocess.call([str(electron), str(REPO / "canvas-app/chromium-shell/main.cjs")], env=env)
+
     server.daemon_threads = True
     server.asset_root = ROOT / "native"
     server.presentation_handoff = frontend.load_handoff(os.environ.get("PHOENIX_UI_HANDOFF"))
@@ -63,7 +80,7 @@ def main():
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
-    print(f"Phoenix MonoCode V4: {frontend.URL}", flush=True)
+    print(f"Phoenix: {frontend.URL}", flush=True)
     try:
         return child.wait()
     finally:

@@ -1,4 +1,4 @@
-/* Phoenix "soft sky": a living, time-of-day sky behind the MonoCode skin.
+/* Phoenix "soft sky": a living, time-of-day sky behind Phoenix.
  *
  * Colours follow the local clock (night → pre-dawn → dawn → day → golden
  * hour → dusk → night), interpolated continuously and written as CSS
@@ -108,7 +108,7 @@
 
   let last = null;
   function paint(smooth) {
-    if (root.dataset.skin !== "monocode") return;
+    if (root.dataset.skin !== "phoenix") return;
     ensureLayer();
     const minute = forced ?? clockMinute(), theme = root.dataset.theme === "dark" ? "dark" : "light";
     const s = sample(theme === "dark" ? DARK : LIGHT, minute), key = JSON.stringify(s) + theme;

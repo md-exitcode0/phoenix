@@ -992,7 +992,7 @@ async function runSelftest() {
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     title: "Phoenix",
-    icon: path.join(__dirname, "..", "icons", "phoenix-512.png"),
+    icon: path.join(__dirname, "..", "icons", "fluffy-butter-surprised.png"),
     width: 1440,
     height: 900,
     minWidth: 680,
@@ -1160,7 +1160,7 @@ function refreshTrayMenu() {
 function createTray() {
   if (!CLOSE_TO_TRAY || SERVICES_ONLY || tray) return;
   try {
-    const iconPath = [path.join(__dirname, "..", "icons", "icon.png"), path.join(__dirname, "..", "icons", "phoenix-512.png")].find((file) => fs.existsSync(file));
+    const iconPath = [path.join(__dirname, "..", "icons", "fluffy-butter-surprised.png")].find((file) => fs.existsSync(file));
     let image = iconPath ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
     if (!image.isEmpty()) image = image.resize({ width: process.platform === "darwin" ? 18 : 22, height: process.platform === "darwin" ? 18 : 22, quality: "best" });
     tray = new Tray(image);

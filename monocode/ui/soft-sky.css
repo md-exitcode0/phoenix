@@ -7,7 +7,7 @@
 @font-face{font-family:"Inter";src:url("fonts/inter-var.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}
 @font-face{font-family:"Inter";src:url("fonts/inter-italic-var.woff2") format("woff2");font-weight:100 900;font-style:italic;font-display:swap}
 
-html:root[data-skin="monocode"]{
+html:root[data-skin="phoenix"]{
   /* Sky: soft-sky.js rewrites these from the local time once a minute;
      these are the dusk values it starts from. */
   --sky-top:#1d1f48;--sky-mid:#383368;--sky-low:#6a4a7e;--sky-glow:rgb(214 124 176 / 28%);
@@ -49,7 +49,7 @@ html:root[data-skin="monocode"]{
   --menu-shadow:0 18px 50px rgb(6 8 20 / 42%),0 2px 8px rgb(6 8 20 / 24%);
   color-scheme:dark;
 }
-html:root[data-skin="monocode"][data-theme="light"]{
+html:root[data-skin="phoenix"][data-theme="light"]{
   --sky-top:#2c6cb3;--sky-mid:#6aa0d5;--sky-low:#c3dbef;--sky-glow:rgb(255 255 255 / 40%);
   --sky-cloud:#fff;--sky-cloud-far:.72;--sky-cloud-near:.58;--sky-stars:0;
   /* White frosted glass over a scenic sky: opaque enough for dark ink. */
@@ -80,8 +80,8 @@ html:root[data-skin="monocode"][data-theme="light"]{
 @property --sky-mid{syntax:"<color>";inherits:true;initial-value:#383368}
 @property --sky-low{syntax:"<color>";inherits:true;initial-value:#6a4a7e}
 @property --sky-glow{syntax:"<color>";inherits:true;initial-value:transparent}
-html:root[data-skin="monocode"],
-html:root[data-skin="monocode"][data-mc-glass="true"]{
+html:root[data-skin="phoenix"],
+html:root[data-skin="phoenix"][data-mc-glass="true"]{
   --sky-layers:radial-gradient(70% 55% at var(--sky-sun-x,80%) 108%,var(--sky-glow),transparent 70%),linear-gradient(180deg,var(--sky-top),var(--sky-mid) 58%,var(--sky-low));
   background:var(--sky-layers)!important;
   background-attachment:fixed!important;
@@ -92,8 +92,8 @@ html:root[data-skin="monocode"][data-mc-glass="true"]{
 /* The living layer sits under everything (z-index -1 in the root context)
    and never takes input. Each moving part is its own composited layer that
    only animates transform or opacity, so no layout or paint runs per frame. */
-html:root[data-skin="monocode"] #softSky{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none;contain:strict}
-html:root:not([data-skin="monocode"]) #softSky{display:none}
+html:root[data-skin="phoenix"] #softSky{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none;contain:strict}
+html:root:not([data-skin="phoenix"]) #softSky{display:none}
 #softSky>i,#softSky>span,#softSky .sky-stars>i{position:absolute;display:block;pointer-events:none}
 #softSky .sky-base{inset:0;background:var(--sky-layers)}
 html:root[data-sky-ease="true"] #softSky .sky-base{transition:--sky-top 1.5s ease,--sky-mid 1.5s ease,--sky-low 1.5s ease,--sky-glow 1.5s ease}
@@ -126,80 +126,80 @@ html:root[data-sky-paused="true"] #softSky *{animation-play-state:paused!importa
 html:root[data-motion="reduced"] #softSky :is(.sky-stars-b,.sky-stars-c){animation:sky-star-drift 360s linear infinite}
 html:root[data-motion="minimal"] #softSky *{animation:none!important}
 @media (prefers-reduced-motion:reduce){html:root #softSky *{animation:none!important}}
-html:root[data-skin="monocode"] body,
-html:root[data-skin="monocode"] #appShell{background:transparent!important}
-html:root[data-skin="monocode"] body{color:var(--soft-ink);font-family:var(--soft-font)!important}
-html:root[data-skin="monocode"] :is(button,input,textarea,select){font-family:inherit}
+html:root[data-skin="phoenix"] body,
+html:root[data-skin="phoenix"] #appShell{background:transparent!important}
+html:root[data-skin="phoenix"] body{color:var(--soft-ink);font-family:var(--soft-font)!important}
+html:root[data-skin="phoenix"] :is(button,input,textarea,select){font-family:inherit}
 
 /* ── Floating glass sidebar ──────────────────────────────────────────── */
-html:root[data-skin="monocode"] #companySidebar{
+html:root[data-skin="phoenix"] #companySidebar{
   margin:10px 0 10px 10px;height:calc(100% - 20px);
   background:var(--glass-1)!important;
   -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.15)!important;backdrop-filter:blur(var(--glass-blur)) saturate(1.15)!important;
   border:1px solid var(--glass-line)!important;border-radius:20px;overflow:hidden;box-shadow:var(--glass-shadow);
 }
-html:root[data-skin="monocode"] #sidebarList,
-html:root[data-skin="monocode"] .sidebar-footer{background:transparent!important}
-html:root[data-skin="monocode"] .sidebar-header{border-bottom:0!important;height:48px;min-height:48px;padding:0 14px}
-html:root[data-skin="monocode"] .phoenix-brand{height:47px}
-html:root[data-skin="monocode"] .brand-copy strong{font:600 14px/1.3 var(--soft-font);letter-spacing:-.01em;color:var(--soft-ink)}
-html:root[data-skin="monocode"] .sidebar-tools{padding:2px 10px 6px}
-html:root[data-skin="monocode"] .search-box{height:34px;border-radius:12px!important;background:var(--glass-hover)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important}
-html:root[data-skin="monocode"] .search-box input{font:400 13px var(--soft-font);color:var(--soft-ink)}
-html:root[data-skin="monocode"] .search-box kbd{font:500 10.5px var(--soft-font);color:var(--soft-ink-3);background:transparent;border:0}
-html:root[data-skin="monocode"] .sidebar-actions{padding:2px 10px 10px}
-html:root[data-skin="monocode"] .sidebar-actions button{min-height:32px;border-radius:10px!important;font:450 13px var(--soft-font);color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] .sidebar-actions button:hover{background:var(--glass-hover);color:var(--soft-ink)}
-html:root[data-skin="monocode"] .sidebar-list{padding:0 8px}
-html:root[data-skin="monocode"] .company-section>header{padding:10px 8px 4px;font:600 11px/1.3 var(--soft-font);letter-spacing:.02em;color:var(--soft-ink-3)}
-html:root[data-skin="monocode"] .company-row{border-radius:14px!important;min-height:54px;padding:7px 9px;margin:1px 0;transition:background-color .18s var(--soft-ease)}
-html:root[data-skin="monocode"] .company-row:hover{background:var(--glass-hover)!important}
-html:root[data-skin="monocode"] .company-row.selected{background:var(--glass-3)!important;box-shadow:inset 0 0 0 1px var(--glass-line)!important}
-html:root[data-skin="monocode"] .company-row .row-name{font:550 13.5px/1.3 var(--soft-font);letter-spacing:-.005em;color:var(--soft-ink)}
-html:root[data-skin="monocode"] .company-row .row-role{font:400 12px/1.35 var(--soft-font);color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] .company-row :is(.row-time,time,.row-meta){font:400 11px var(--soft-font);color:var(--soft-ink-3)}
-html:root[data-skin="monocode"] .sidebar-footer{border-top:1px solid var(--glass-line)!important;padding:8px 10px;min-height:50px}
-html:root[data-skin="monocode"] .settings-button{border-radius:10px!important;font:500 13px var(--soft-font);color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] .settings-button:hover{background:var(--glass-hover);color:var(--soft-ink)}
-html:root[data-skin="monocode"] #sidebarResize{right:-6px}
+html:root[data-skin="phoenix"] #sidebarList,
+html:root[data-skin="phoenix"] .sidebar-footer{background:transparent!important}
+html:root[data-skin="phoenix"] .sidebar-header{border-bottom:0!important;height:48px;min-height:48px;padding:0 14px}
+html:root[data-skin="phoenix"] .phoenix-brand{height:47px}
+html:root[data-skin="phoenix"] .brand-copy strong{font:600 14px/1.3 var(--soft-font);letter-spacing:-.01em;color:var(--soft-ink)}
+html:root[data-skin="phoenix"] .sidebar-tools{padding:2px 10px 6px}
+html:root[data-skin="phoenix"] .search-box{height:34px;border-radius:12px!important;background:var(--glass-hover)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important}
+html:root[data-skin="phoenix"] .search-box input{font:400 13px var(--soft-font);color:var(--soft-ink)}
+html:root[data-skin="phoenix"] .search-box kbd{font:500 10.5px var(--soft-font);color:var(--soft-ink-3);background:transparent;border:0}
+html:root[data-skin="phoenix"] .sidebar-actions{padding:2px 10px 10px}
+html:root[data-skin="phoenix"] .sidebar-actions button{min-height:32px;border-radius:10px!important;font:450 13px var(--soft-font);color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] .sidebar-actions button:hover{background:var(--glass-hover);color:var(--soft-ink)}
+html:root[data-skin="phoenix"] .sidebar-list{padding:0 8px}
+html:root[data-skin="phoenix"] .company-section>header{padding:10px 8px 4px;font:600 11px/1.3 var(--soft-font);letter-spacing:.02em;color:var(--soft-ink-3)}
+html:root[data-skin="phoenix"] .company-row{border-radius:14px!important;min-height:54px;padding:7px 9px;margin:1px 0;transition:background-color .18s var(--soft-ease)}
+html:root[data-skin="phoenix"] .company-row:hover{background:var(--glass-hover)!important}
+html:root[data-skin="phoenix"] .company-row.selected{background:var(--glass-3)!important;box-shadow:inset 0 0 0 1px var(--glass-line)!important}
+html:root[data-skin="phoenix"] .company-row .row-name{font:550 13.5px/1.3 var(--soft-font);letter-spacing:-.005em;color:var(--soft-ink)}
+html:root[data-skin="phoenix"] .company-row .row-role{font:400 12px/1.35 var(--soft-font);color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] .company-row :is(.row-time,time,.row-meta){font:400 11px var(--soft-font);color:var(--soft-ink-3)}
+html:root[data-skin="phoenix"] .sidebar-footer{border-top:1px solid var(--glass-line)!important;padding:8px 10px;min-height:50px}
+html:root[data-skin="phoenix"] .settings-button{border-radius:10px!important;font:500 13px var(--soft-font);color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] .settings-button:hover{background:var(--glass-hover);color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #sidebarResize{right:-6px}
 
 /* ── Stage and header ────────────────────────────────────────────────── */
-html:root[data-skin="monocode"] #conversationStage{background:transparent!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+html:root[data-skin="phoenix"] #conversationStage{background:transparent!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;
   --chat-user:var(--glass-3);--chat-user-ink:var(--soft-ink);--chat-reply:var(--glass-2);--chat-composer:var(--glass-2);--chat-control:var(--glass-line)}
-html:root[data-skin="monocode"] #conversationHeader{--mc-button-radius:999px;border-bottom:0!important;background:transparent!important;height:52px;min-height:52px;flex-basis:52px;padding:0 128px 0 18px;gap:8px}
-html:root[data-skin="monocode"] #stageName{font:600 14px/1.3 var(--soft-font);letter-spacing:-.01em;color:var(--soft-ink)}
-html:root[data-skin="monocode"] #conversationHeader :is(button,.stage-panel-button){border-radius:999px!important}
-html:root[data-skin="monocode"] #conversationHeader .stage-panel-button{width:32px;height:32px;min-height:32px;color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] #conversationHeader .stage-panel-button:hover{background:var(--glass-hover);color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #conversationHeader{--mc-button-radius:999px;border-bottom:0!important;background:transparent!important;height:52px;min-height:52px;flex-basis:52px;padding:0 128px 0 18px;gap:8px}
+html:root[data-skin="phoenix"] #stageName{font:600 14px/1.3 var(--soft-font);letter-spacing:-.01em;color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #conversationHeader :is(button,.stage-panel-button){border-radius:999px!important}
+html:root[data-skin="phoenix"] #conversationHeader .stage-panel-button{width:32px;height:32px;min-height:32px;color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] #conversationHeader .stage-panel-button:hover{background:var(--glass-hover);color:var(--soft-ink)}
 /* Header pills share one shape: 30px glass capsule, content centred. */
-html:root[data-skin="monocode"] #conversationHeader :is(#conversationDetailToggle,.group-roster-trigger){
+html:root[data-skin="phoenix"] #conversationHeader :is(#conversationDetailToggle,.group-roster-trigger){
   display:inline-flex!important;align-items:center;justify-content:center;flex:0 0 auto;box-sizing:border-box;
   width:auto!important;min-width:0;height:30px!important;min-height:30px;margin:0!important;line-height:1;white-space:nowrap;
   border-radius:999px!important;background:var(--glass-1)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important;
   -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
 }
-html:root[data-skin="monocode"] #conversationDetailToggle{padding:0 13px!important;font:500 12px/1 var(--soft-font)!important;color:var(--soft-ink-2)!important}
-html:root[data-skin="monocode"] #conversationHeader .group-roster-trigger{padding:0 10px 0 5px!important;gap:6px}
-html:root[data-skin="monocode"] #conversationHeader .group-roster-trigger>small{font:500 11.5px/1 var(--soft-font);color:var(--soft-ink-3);font-variant-numeric:tabular-nums}
-html:root[data-skin="monocode"] #conversationHeader .group-roster-trigger:hover{background:var(--glass-hover)!important;border-color:var(--glass-line-strong)!important}
-html:root[data-skin="monocode"] #conversationHeader #stageMore{display:grid;place-items:center;width:30px!important;height:30px!important;min-height:30px;padding:0!important;margin:0!important;border-radius:999px!important;background:transparent;border:0;color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] #conversationHeader #stageMore svg{width:16px;height:16px;fill:currentColor}
-html:root[data-skin="monocode"] #conversationHeader #stageMore:hover{background:var(--glass-hover);color:var(--soft-ink)}
-html:root[data-skin="monocode"] #conversationDetailToggle:hover{background:var(--glass-hover)!important;color:var(--soft-ink)!important;border-color:var(--glass-line-strong)!important}
-html:root[data-skin="monocode"] .mc-window-controls{height:44px;top:6px;right:8px}
-html:root[data-skin="monocode"] .mc-window-controls button{width:36px;height:32px;border-radius:999px!important;color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] .mc-window-controls button:hover{background:var(--glass-hover)}
-html:root[data-skin="monocode"] .mc-window-controls button:last-child:hover{background:rgb(225 80 96 / 85%);color:#fff}
+html:root[data-skin="phoenix"] #conversationDetailToggle{padding:0 13px!important;font:500 12px/1 var(--soft-font)!important;color:var(--soft-ink-2)!important}
+html:root[data-skin="phoenix"] #conversationHeader .group-roster-trigger{padding:0 10px 0 5px!important;gap:6px}
+html:root[data-skin="phoenix"] #conversationHeader .group-roster-trigger>small{font:500 11.5px/1 var(--soft-font);color:var(--soft-ink-3);font-variant-numeric:tabular-nums}
+html:root[data-skin="phoenix"] #conversationHeader .group-roster-trigger:hover{background:var(--glass-hover)!important;border-color:var(--glass-line-strong)!important}
+html:root[data-skin="phoenix"] #conversationHeader #stageMore{display:grid;place-items:center;width:30px!important;height:30px!important;min-height:30px;padding:0!important;margin:0!important;border-radius:999px!important;background:transparent;border:0;color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] #conversationHeader #stageMore svg{width:16px;height:16px;fill:currentColor}
+html:root[data-skin="phoenix"] #conversationHeader #stageMore:hover{background:var(--glass-hover);color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #conversationDetailToggle:hover{background:var(--glass-hover)!important;color:var(--soft-ink)!important;border-color:var(--glass-line-strong)!important}
+html:root[data-skin="phoenix"] .mc-window-controls{height:44px;top:6px;right:8px}
+html:root[data-skin="phoenix"] .mc-window-controls button{width:36px;height:32px;border-radius:999px!important;color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] .mc-window-controls button:hover{background:var(--glass-hover)}
+html:root[data-skin="phoenix"] .mc-window-controls button:last-child:hover{background:rgb(225 80 96 / 85%);color:#fff}
 
 /* ── Feed column ─────────────────────────────────────────────────────── */
-html:root[data-skin="monocode"] #conversationFeed{max-width:calc(var(--soft-column) + 76px)!important;margin:0 auto;padding:20px 38px 28px!important;font-family:var(--soft-font)}
-html:root[data-skin="monocode"] #conversationFeed .message-row{margin-bottom:18px}
-html:root[data-skin="monocode"] #conversationFeed .message-row.message-group-start{margin-bottom:6px}
+html:root[data-skin="phoenix"] #conversationFeed{max-width:calc(var(--soft-column) + 76px)!important;margin:0 auto;padding:20px 38px 28px!important;font-family:var(--soft-font)}
+html:root[data-skin="phoenix"] #conversationFeed .message-row{margin-bottom:18px}
+html:root[data-skin="phoenix"] #conversationFeed .message-row.message-group-start{margin-bottom:6px}
 
 /* User bubble: right, light glass. */
-html:root[data-skin="monocode"] #conversationFeed .user-message{display:flex;justify-content:flex-end}
-html:root[data-skin="monocode"] #conversationFeed .user-message>.message-content{display:flex;justify-content:flex-end;align-items:center;gap:6px;width:100%;max-width:100%;margin-left:auto}
-html:root[data-skin="monocode"] #conversationFeed .user-bubble{
+html:root[data-skin="phoenix"] #conversationFeed .user-message{display:flex;justify-content:flex-end}
+html:root[data-skin="phoenix"] #conversationFeed .user-message>.message-content{display:flex;justify-content:flex-end;align-items:center;gap:6px;width:100%;max-width:100%;margin-left:auto}
+html:root[data-skin="phoenix"] #conversationFeed .user-bubble{
   --mc-button-radius:var(--soft-radius);
   max-width:var(--soft-bubble)!important;padding:11px 16px!important;
   border-radius:var(--soft-radius) var(--soft-radius) var(--soft-tail) var(--soft-radius)!important;
@@ -207,108 +207,108 @@ html:root[data-skin="monocode"] #conversationFeed .user-bubble{
   -webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur));
   font:400 var(--soft-text)/var(--soft-leading) var(--soft-font)!important;letter-spacing:-.003em;
 }
-html:root[data-skin="monocode"] #conversationFeed .user-bubble :is(p,.markdown,a,code){color:var(--soft-ink)}
-html:root[data-skin="monocode"] #conversationFeed .user-bubble p{margin:0}
-html:root[data-skin="monocode"] #conversationFeed .user-message .turn-delete-button{opacity:0!important;transition:opacity .18s}
-html:root[data-skin="monocode"] #conversationFeed .user-message:hover .turn-delete-button,
-html:root[data-skin="monocode"] #conversationFeed .user-message .turn-delete-button:focus-visible{opacity:.7!important}
+html:root[data-skin="phoenix"] #conversationFeed .user-bubble :is(p,.markdown,a,code){color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #conversationFeed .user-bubble p{margin:0}
+html:root[data-skin="phoenix"] #conversationFeed .user-message .turn-delete-button{opacity:0!important;transition:opacity .18s}
+html:root[data-skin="phoenix"] #conversationFeed .user-message:hover .turn-delete-button,
+html:root[data-skin="phoenix"] #conversationFeed .user-message .turn-delete-button:focus-visible{opacity:.7!important}
 
 /* Agent bubble: left, dark glass; avatar beside it. */
-html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message,.commentary-message){display:grid;grid-template-columns:32px minmax(0,1fr);column-gap:10px;align-items:start}
-html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message)>.message-avatar{width:32px;height:32px;margin-top:2px}
-html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message)>.message-avatar :is(svg,img,canvas,.fluffy-token,.agent-avatar,.avatar-custom){width:32px!important;height:32px!important}
-html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message)>.message-content{min-width:0}
-html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message) .message-content>header{min-height:22px;margin:0 0 5px 4px!important;gap:8px}
-html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message) .message-content>header strong{font:550 12.5px/1.3 var(--soft-font)!important;letter-spacing:0;color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] #conversationFeed .member-message .message-content>header strong{color:color-mix(in srgb,var(--speaker,var(--soft-ink-2)) 45%,var(--soft-ink-2))!important}
-html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message) .message-content>header small{font:400 11.5px var(--soft-font);color:var(--soft-ink-3)}
+html:root[data-skin="phoenix"] #conversationFeed :is(.agent-message,.group-message,.commentary-message){display:grid;grid-template-columns:32px minmax(0,1fr);column-gap:10px;align-items:start}
+html:root[data-skin="phoenix"] #conversationFeed :is(.agent-message,.group-message)>.message-avatar{width:32px;height:32px;margin-top:2px}
+html:root[data-skin="phoenix"] #conversationFeed :is(.agent-message,.group-message)>.message-avatar :is(svg,img,canvas,.fluffy-token,.agent-avatar,.avatar-custom){width:32px!important;height:32px!important}
+html:root[data-skin="phoenix"] #conversationFeed :is(.agent-message,.group-message)>.message-content{min-width:0}
+html:root[data-skin="phoenix"] #conversationFeed :is(.agent-message,.group-message) .message-content>header{min-height:22px;margin:0 0 5px 4px!important;gap:8px}
+html:root[data-skin="phoenix"] #conversationFeed :is(.agent-message,.group-message) .message-content>header strong{font:550 12.5px/1.3 var(--soft-font)!important;letter-spacing:0;color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] #conversationFeed .member-message .message-content>header strong{color:color-mix(in srgb,var(--speaker,var(--soft-ink-2)) 45%,var(--soft-ink-2))!important}
+html:root[data-skin="phoenix"] #conversationFeed :is(.agent-message,.group-message) .message-content>header small{font:400 11.5px var(--soft-font);color:var(--soft-ink-3)}
 /* In a 1:1 chat the avatar says who it is; the name stays for rooms. */
-html:root[data-skin="monocode"] #conversationFeed .agent-message .message-content>header strong{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-html:root[data-skin="monocode"] #conversationFeed .agent-message .message-content>header:not(:has(.answer-work-toggle)){display:none}
-html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message,.commentary-message)>.message-content>.markdown{
+html:root[data-skin="phoenix"] #conversationFeed .agent-message .message-content>header strong{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+html:root[data-skin="phoenix"] #conversationFeed .agent-message .message-content>header:not(:has(.answer-work-toggle)){display:none}
+html:root[data-skin="phoenix"] #conversationFeed :is(.agent-message,.group-message,.commentary-message)>.message-content>.markdown{
   width:fit-content;max-width:var(--soft-bubble)!important;padding:12px 16px!important;
   border-radius:var(--soft-radius) var(--soft-radius) var(--soft-radius) var(--soft-tail)!important;
   background:var(--glass-2)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important;
   -webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur));
   color:var(--soft-ink);font:400 var(--soft-text)/var(--soft-leading) var(--soft-font)!important;letter-spacing:-.003em;
 }
-html:root[data-skin="monocode"] #conversationFeed .message-continuation>.message-content>.markdown{border-top-left-radius:var(--soft-tail)!important}
-html:root[data-skin="monocode"][data-conversation-text="small"] #conversationFeed :is(.user-bubble,.message-content>.markdown){--soft-text:14px}
-html:root[data-skin="monocode"][data-conversation-text="smaller"] #conversationFeed :is(.user-bubble,.message-content>.markdown){--soft-text:13px}
+html:root[data-skin="phoenix"] #conversationFeed .message-continuation>.message-content>.markdown{border-top-left-radius:var(--soft-tail)!important}
+html:root[data-skin="phoenix"][data-conversation-text="small"] #conversationFeed :is(.user-bubble,.message-content>.markdown){--soft-text:14px}
+html:root[data-skin="phoenix"][data-conversation-text="smaller"] #conversationFeed :is(.user-bubble,.message-content>.markdown){--soft-text:13px}
 
 /* Markdown inside bubbles */
-html:root[data-skin="monocode"] #conversationFeed .markdown :is(p,ul,ol,blockquote,pre,.markdown-table-wrap){margin:0 0 10px}
-html:root[data-skin="monocode"] #conversationFeed .markdown>:last-child{margin-bottom:0}
-html:root[data-skin="monocode"] #conversationFeed .markdown :is(ul,ol){padding-left:20px}
-html:root[data-skin="monocode"] #conversationFeed .markdown li{margin:3px 0}
-html:root[data-skin="monocode"] #conversationFeed .markdown li::marker{color:var(--soft-ink-3)}
-html:root[data-skin="monocode"] #conversationFeed .markdown strong{font-weight:600;color:var(--soft-ink)}
-html:root[data-skin="monocode"] #conversationFeed .markdown :is(h1,h2,h3,h4){font-family:var(--soft-font);color:var(--soft-ink);letter-spacing:-.012em;margin:4px 0 8px;line-height:1.3}
-html:root[data-skin="monocode"] #conversationFeed .markdown h1{font-size:19px;font-weight:600}
-html:root[data-skin="monocode"] #conversationFeed .markdown h2{font-size:17px;font-weight:600}
-html:root[data-skin="monocode"] #conversationFeed .markdown :is(h3,h4){font-size:15.5px;font-weight:600}
-html:root[data-skin="monocode"] #conversationFeed .markdown a{color:var(--soft-accent);text-decoration-color:color-mix(in srgb,var(--soft-accent) 40%,transparent);text-underline-offset:3px}
-html:root[data-skin="monocode"] #conversationFeed .markdown :not(pre)>code{font:500 .88em var(--soft-mono);padding:.12em .42em;border-radius:7px!important;background:rgb(255 255 255 / 8%);border:1px solid var(--glass-line);color:var(--soft-ink)}
-html:root[data-skin="monocode"][data-theme="light"] #conversationFeed .markdown :not(pre)>code{background:rgb(40 46 90 / 6%)}
-html:root[data-skin="monocode"] #conversationFeed .markdown :is(pre,.code-block){--mc-button-radius:14px;border-radius:14px!important;background:rgb(6 8 18 / 34%)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important;overflow:hidden}
-html:root[data-skin="monocode"][data-theme="light"] #conversationFeed .markdown :is(pre,.code-block){background:rgb(255 255 255 / 55%)!important}
-html:root[data-skin="monocode"] #conversationFeed .markdown pre code,
-html:root[data-skin="monocode"] #conversationFeed .markdown .code-block code{font:400 13px/1.6 var(--soft-mono);background:transparent!important;border:0!important;padding:0}
-html:root[data-skin="monocode"] #conversationFeed .markdown pre{padding:12px 14px}
-html:root[data-skin="monocode"] #conversationFeed .markdown .code-block pre{margin:0;border:0!important;border-radius:0!important;background:transparent!important}
-html:root[data-skin="monocode"] #conversationFeed .markdown .code-block :is(header,.code-block-header,.code-head){background:rgb(255 255 255 / 3%);border-bottom:1px solid var(--glass-line);font:500 11.5px var(--soft-font);color:var(--soft-ink-3)}
-html:root[data-skin="monocode"] #conversationFeed .markdown blockquote{padding:2px 0 2px 12px;border-left:2px solid var(--glass-line-strong);color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] #conversationFeed .markdown .markdown-table-wrap{border-radius:12px;border:1px solid var(--glass-line);overflow:auto}
-html:root[data-skin="monocode"] #conversationFeed .markdown table{font-size:13.5px;border-collapse:collapse;width:100%}
-html:root[data-skin="monocode"] #conversationFeed .markdown :is(th,td){padding:7px 11px;border-bottom:1px solid var(--glass-line);border-left:0;border-right:0}
-html:root[data-skin="monocode"] #conversationFeed .markdown th{font-weight:600;color:var(--soft-ink-2);background:rgb(255 255 255 / 3%)}
-html:root[data-skin="monocode"] #conversationFeed .markdown tr:last-child td{border-bottom:0}
+html:root[data-skin="phoenix"] #conversationFeed .markdown :is(p,ul,ol,blockquote,pre,.markdown-table-wrap){margin:0 0 10px}
+html:root[data-skin="phoenix"] #conversationFeed .markdown>:last-child{margin-bottom:0}
+html:root[data-skin="phoenix"] #conversationFeed .markdown :is(ul,ol){padding-left:20px}
+html:root[data-skin="phoenix"] #conversationFeed .markdown li{margin:3px 0}
+html:root[data-skin="phoenix"] #conversationFeed .markdown li::marker{color:var(--soft-ink-3)}
+html:root[data-skin="phoenix"] #conversationFeed .markdown strong{font-weight:600;color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #conversationFeed .markdown :is(h1,h2,h3,h4){font-family:var(--soft-font);color:var(--soft-ink);letter-spacing:-.012em;margin:4px 0 8px;line-height:1.3}
+html:root[data-skin="phoenix"] #conversationFeed .markdown h1{font-size:19px;font-weight:600}
+html:root[data-skin="phoenix"] #conversationFeed .markdown h2{font-size:17px;font-weight:600}
+html:root[data-skin="phoenix"] #conversationFeed .markdown :is(h3,h4){font-size:15.5px;font-weight:600}
+html:root[data-skin="phoenix"] #conversationFeed .markdown a{color:var(--soft-accent);text-decoration-color:color-mix(in srgb,var(--soft-accent) 40%,transparent);text-underline-offset:3px}
+html:root[data-skin="phoenix"] #conversationFeed .markdown :not(pre)>code{font:500 .88em var(--soft-mono);padding:.12em .42em;border-radius:7px!important;background:rgb(255 255 255 / 8%);border:1px solid var(--glass-line);color:var(--soft-ink)}
+html:root[data-skin="phoenix"][data-theme="light"] #conversationFeed .markdown :not(pre)>code{background:rgb(40 46 90 / 6%)}
+html:root[data-skin="phoenix"] #conversationFeed .markdown :is(pre,.code-block){--mc-button-radius:14px;border-radius:14px!important;background:rgb(6 8 18 / 34%)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important;overflow:hidden}
+html:root[data-skin="phoenix"][data-theme="light"] #conversationFeed .markdown :is(pre,.code-block){background:rgb(255 255 255 / 55%)!important}
+html:root[data-skin="phoenix"] #conversationFeed .markdown pre code,
+html:root[data-skin="phoenix"] #conversationFeed .markdown .code-block code{font:400 13px/1.6 var(--soft-mono);background:transparent!important;border:0!important;padding:0}
+html:root[data-skin="phoenix"] #conversationFeed .markdown pre{padding:12px 14px}
+html:root[data-skin="phoenix"] #conversationFeed .markdown .code-block pre{margin:0;border:0!important;border-radius:0!important;background:transparent!important}
+html:root[data-skin="phoenix"] #conversationFeed .markdown .code-block :is(header,.code-block-header,.code-head){background:rgb(255 255 255 / 3%);border-bottom:1px solid var(--glass-line);font:500 11.5px var(--soft-font);color:var(--soft-ink-3)}
+html:root[data-skin="phoenix"] #conversationFeed .markdown blockquote{padding:2px 0 2px 12px;border-left:2px solid var(--glass-line-strong);color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] #conversationFeed .markdown .markdown-table-wrap{border-radius:12px;border:1px solid var(--glass-line);overflow:auto}
+html:root[data-skin="phoenix"] #conversationFeed .markdown table{font-size:13.5px;border-collapse:collapse;width:100%}
+html:root[data-skin="phoenix"] #conversationFeed .markdown :is(th,td){padding:7px 11px;border-bottom:1px solid var(--glass-line);border-left:0;border-right:0}
+html:root[data-skin="phoenix"] #conversationFeed .markdown th{font-weight:600;color:var(--soft-ink-2);background:rgb(255 255 255 / 3%)}
+html:root[data-skin="phoenix"] #conversationFeed .markdown tr:last-child td{border-bottom:0}
 
 /* Quiet footer under answers: time and copy, louder on hover. */
-html:root[data-skin="monocode"] #conversationFeed .answer-footer{margin:4px 0 0 6px;gap:2px;opacity:.55;transition:opacity .2s}
-html:root[data-skin="monocode"] #conversationFeed :is(.agent-message,.group-message):hover .answer-footer,
-html:root[data-skin="monocode"] #conversationFeed .answer-footer:focus-within{opacity:1}
-html:root[data-skin="monocode"] #conversationFeed .answer-footer button{width:26px;height:26px;border-radius:999px!important;color:var(--soft-ink-3)}
-html:root[data-skin="monocode"] #conversationFeed .answer-footer button:hover{background:var(--glass-hover);color:var(--soft-ink)}
-html:root[data-skin="monocode"] #conversationFeed .completion-meta{font:400 11.5px var(--soft-font);color:var(--soft-ink-3)}
+html:root[data-skin="phoenix"] #conversationFeed .answer-footer{margin:4px 0 0 6px;gap:2px;opacity:.55;transition:opacity .2s}
+html:root[data-skin="phoenix"] #conversationFeed :is(.agent-message,.group-message):hover .answer-footer,
+html:root[data-skin="phoenix"] #conversationFeed .answer-footer:focus-within{opacity:1}
+html:root[data-skin="phoenix"] #conversationFeed .answer-footer button{width:26px;height:26px;border-radius:999px!important;color:var(--soft-ink-3)}
+html:root[data-skin="phoenix"] #conversationFeed .answer-footer button:hover{background:var(--glass-hover);color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #conversationFeed .completion-meta{font:400 11.5px var(--soft-font);color:var(--soft-ink-3)}
 
 /* Edited-files card stays a calm glass panel. */
-html:root[data-skin="monocode"] #conversationFeed .turn-edit-summary{--mc-button-radius:14px;max-width:var(--soft-bubble);margin-top:8px;border-radius:16px!important;background:var(--glass-1)!important;border:1px solid var(--glass-line)!important;font-family:var(--soft-font)}
-html:root[data-skin="monocode"] #conversationFeed .turn-edit-summary header strong{font:500 12.5px var(--soft-font);color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] #conversationFeed .turn-edit-file{font:400 12px var(--soft-mono);color:var(--soft-ink-2);border-color:var(--glass-line)}
+html:root[data-skin="phoenix"] #conversationFeed .turn-edit-summary{--mc-button-radius:14px;max-width:var(--soft-bubble);margin-top:8px;border-radius:16px!important;background:var(--glass-1)!important;border:1px solid var(--glass-line)!important;font-family:var(--soft-font)}
+html:root[data-skin="phoenix"] #conversationFeed .turn-edit-summary header strong{font:500 12.5px var(--soft-font);color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] #conversationFeed .turn-edit-file{font:400 12px var(--soft-mono);color:var(--soft-ink-2);border-color:var(--glass-line)}
 
 /* ── Work activity: quiet, collapsible, never a wall ──────────────────── */
-html:root[data-skin="monocode"] #conversationFeed :is(.work-cluster,.team-work-block,.team-work-row){background:transparent!important;border:0!important;box-shadow:none!important;font-family:var(--soft-font)}
-html:root[data-skin="monocode"] #conversationFeed .work-cluster{margin:2px 0 10px 42px;max-width:var(--soft-bubble)}
-html:root[data-skin="monocode"] #conversationFeed .team-work-block{margin:0 0 12px}
-html:root[data-skin="monocode"] #conversationFeed .team-work-block .work-cluster{margin-left:0}
-html:root[data-skin="monocode"] #conversationFeed .group-work-agent{--mc-button-radius:999px;min-height:30px!important;padding:3px 12px 3px 4px!important;border-radius:999px!important;background:var(--glass-1)!important;border:1px solid var(--glass-line)!important;font:500 12.5px var(--soft-font)!important;color:var(--soft-ink-2);gap:8px;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
-html:root[data-skin="monocode"] #conversationFeed .group-work-agent:hover{background:var(--glass-hover)!important;color:var(--soft-ink)}
-html:root[data-skin="monocode"] #conversationFeed .group-work-agent strong{font-weight:550;color:var(--soft-ink)}
-html:root[data-skin="monocode"] #conversationFeed .group-work-agent small{font:400 12px var(--soft-font);color:var(--soft-ink-3)}
-html:root[data-skin="monocode"] #conversationFeed .group-work-avatar{width:22px;height:22px}
-html:root[data-skin="monocode"] #conversationFeed .group-work-avatar :is(svg,img,canvas){width:22px!important;height:22px!important}
-html:root[data-skin="monocode"] #conversationFeed .work-trace{margin-top:4px;padding-left:12px}
-html:root[data-skin="monocode"] #conversationFeed .work-trace-line{background:var(--glass-line)!important}
-html:root[data-skin="monocode"] #conversationFeed :is(.work-tool-summary,.trace-subgroup>summary,.reasoning-subgroup>summary,.work-row,.tool-row){min-height:26px!important;padding:3px 8px!important;border-radius:10px!important;background:transparent!important;font:400 12.5px/1.4 var(--soft-font)!important;color:var(--soft-ink-3)!important}
-html:root[data-skin="monocode"] #conversationFeed :is(.work-tool-summary,.trace-subgroup>summary,.reasoning-subgroup>summary):hover{background:var(--glass-hover)!important;color:var(--soft-ink-2)!important}
-html:root[data-skin="monocode"] #conversationFeed :is(.work-tool-summary .tr-title,.reasoning-subgroup-label){font:450 12.5px/1.4 var(--soft-font)!important;color:inherit!important}
-html:root[data-skin="monocode"] #conversationFeed :is(.work-tool,.work-tool-detail,.tr-well,.trace-subgroup,.trace-subgroup-body){background:transparent!important;border-color:var(--glass-line)!important;box-shadow:none!important}
-html:root[data-skin="monocode"] #conversationFeed :is(.work-tool-detail,.tr-well,.tr-output) pre{font:400 12px/1.55 var(--soft-mono);border-radius:12px!important;background:rgb(6 8 18 / 30%)!important;border:1px solid var(--glass-line)!important}
-html:root[data-skin="monocode"] #conversationFeed .answer-work-toggle{height:22px;padding:0 8px;border-radius:999px!important;font:500 11.5px var(--soft-font);color:var(--soft-ink-3)}
-html:root[data-skin="monocode"] #conversationFeed .answer-work-toggle:hover{background:var(--glass-hover);color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] #conversationFeed :is(.work-progress,.mc-commentary,.commentary-line){font:400 13.5px/1.5 var(--soft-font)!important;color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] #conversationFeed .context-compaction{font-family:var(--soft-font);color:var(--soft-ink-3)}
-html:root[data-skin="monocode"] #conversationFeed .context-compaction strong{font-weight:500;font-size:12.5px;color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] #conversationFeed .context-compaction small{font-size:11.5px;color:var(--soft-ink-3)}
+html:root[data-skin="phoenix"] #conversationFeed :is(.work-cluster,.team-work-block,.team-work-row){background:transparent!important;border:0!important;box-shadow:none!important;font-family:var(--soft-font)}
+html:root[data-skin="phoenix"] #conversationFeed .work-cluster{margin:2px 0 10px 42px;max-width:var(--soft-bubble)}
+html:root[data-skin="phoenix"] #conversationFeed .team-work-block{margin:0 0 12px}
+html:root[data-skin="phoenix"] #conversationFeed .team-work-block .work-cluster{margin-left:0}
+html:root[data-skin="phoenix"] #conversationFeed .group-work-agent{--mc-button-radius:999px;min-height:30px!important;padding:3px 12px 3px 4px!important;border-radius:999px!important;background:var(--glass-1)!important;border:1px solid var(--glass-line)!important;font:500 12.5px var(--soft-font)!important;color:var(--soft-ink-2);gap:8px;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+html:root[data-skin="phoenix"] #conversationFeed .group-work-agent:hover{background:var(--glass-hover)!important;color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #conversationFeed .group-work-agent strong{font-weight:550;color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #conversationFeed .group-work-agent small{font:400 12px var(--soft-font);color:var(--soft-ink-3)}
+html:root[data-skin="phoenix"] #conversationFeed .group-work-avatar{width:22px;height:22px}
+html:root[data-skin="phoenix"] #conversationFeed .group-work-avatar :is(svg,img,canvas){width:22px!important;height:22px!important}
+html:root[data-skin="phoenix"] #conversationFeed .work-trace{margin-top:4px;padding-left:12px}
+html:root[data-skin="phoenix"] #conversationFeed .work-trace-line{background:var(--glass-line)!important}
+html:root[data-skin="phoenix"] #conversationFeed :is(.work-tool-summary,.trace-subgroup>summary,.reasoning-subgroup>summary,.work-row,.tool-row){min-height:26px!important;padding:3px 8px!important;border-radius:10px!important;background:transparent!important;font:400 12.5px/1.4 var(--soft-font)!important;color:var(--soft-ink-3)!important}
+html:root[data-skin="phoenix"] #conversationFeed :is(.work-tool-summary,.trace-subgroup>summary,.reasoning-subgroup>summary):hover{background:var(--glass-hover)!important;color:var(--soft-ink-2)!important}
+html:root[data-skin="phoenix"] #conversationFeed :is(.work-tool-summary .tr-title,.reasoning-subgroup-label){font:450 12.5px/1.4 var(--soft-font)!important;color:inherit!important}
+html:root[data-skin="phoenix"] #conversationFeed :is(.work-tool,.work-tool-detail,.tr-well,.trace-subgroup,.trace-subgroup-body){background:transparent!important;border-color:var(--glass-line)!important;box-shadow:none!important}
+html:root[data-skin="phoenix"] #conversationFeed :is(.work-tool-detail,.tr-well,.tr-output) pre{font:400 12px/1.55 var(--soft-mono);border-radius:12px!important;background:rgb(6 8 18 / 30%)!important;border:1px solid var(--glass-line)!important}
+html:root[data-skin="phoenix"] #conversationFeed .answer-work-toggle{height:22px;padding:0 8px;border-radius:999px!important;font:500 11.5px var(--soft-font);color:var(--soft-ink-3)}
+html:root[data-skin="phoenix"] #conversationFeed .answer-work-toggle:hover{background:var(--glass-hover);color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] #conversationFeed :is(.work-progress,.mc-commentary,.commentary-line){font:400 13.5px/1.5 var(--soft-font)!important;color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] #conversationFeed .context-compaction{font-family:var(--soft-font);color:var(--soft-ink-3)}
+html:root[data-skin="phoenix"] #conversationFeed .context-compaction strong{font-weight:500;font-size:12.5px;color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] #conversationFeed .context-compaction small{font-size:11.5px;color:var(--soft-ink-3)}
 
 /* Prompt rail and jump control */
-html:root[data-skin="monocode"] #jumpLatest{height:30px;padding:0 14px;border-radius:999px!important;background:var(--glass-pop)!important;border:1px solid var(--glass-line)!important;font:500 12px var(--soft-font);color:var(--soft-ink-2);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:var(--glass-shadow)}
+html:root[data-skin="phoenix"] #jumpLatest{height:30px;padding:0 14px;border-radius:999px!important;background:var(--glass-pop)!important;border:1px solid var(--glass-line)!important;font:500 12px var(--soft-font);color:var(--soft-ink-2);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:var(--glass-shadow)}
 
 /* ── Composer ────────────────────────────────────────────────────────── */
-html:root[data-skin="monocode"] #composerZone{background:transparent!important;width:calc(100% - 48px)!important;max-width:var(--soft-column)!important;margin:0 auto 34px!important;gap:10px!important}
-html:root[data-skin="monocode"] #composerZone::before{content:none!important}
-html:root[data-skin="monocode"] #composerZone #composer{
+html:root[data-skin="phoenix"] #composerZone{background:transparent!important;width:calc(100% - 48px)!important;max-width:var(--soft-column)!important;margin:0 auto 34px!important;gap:10px!important}
+html:root[data-skin="phoenix"] #composerZone::before{content:none!important}
+html:root[data-skin="phoenix"] #composerZone #composer{
   /* Radii here go through --mc-button-radius: the skin's layered !important
      radius rule reads it, so it is the only lever that wins. */
   --mc-button-radius:var(--composer-r);
@@ -324,34 +324,34 @@ html:root[data-skin="monocode"] #composerZone #composer{
   box-shadow:0 14px 44px rgb(6 8 22 / 30%),inset 0 1px 0 rgb(255 255 255 / 5%)!important;
   transition:border-color .25s var(--soft-ease),box-shadow .35s var(--soft-ease),background-color .25s;
 }
-html:root[data-skin="monocode"][data-theme="light"] #composerZone #composer{box-shadow:0 14px 44px rgb(60 66 120 / 14%),inset 0 1px 0 rgb(255 255 255 / 60%)!important}
-html:root[data-skin="monocode"] #composerZone #composer:focus-within{
+html:root[data-skin="phoenix"][data-theme="light"] #composerZone #composer{box-shadow:0 14px 44px rgb(60 66 120 / 14%),inset 0 1px 0 rgb(255 255 255 / 60%)!important}
+html:root[data-skin="phoenix"] #composerZone #composer:focus-within{
   border-color:rgb(220 222 255 / 24%)!important;
   box-shadow:0 0 0 4px rgb(190 190 255 / 7%),0 18px 54px rgb(6 8 22 / 34%),inset 0 1px 0 rgb(255 255 255 / 6%)!important;
 }
-html:root[data-skin="monocode"][data-theme="light"] #composerZone #composer:focus-within{border-color:rgb(80 80 170 / 26%)!important;box-shadow:0 0 0 4px rgb(90 90 200 / 8%),0 18px 54px rgb(60 66 120 / 16%)!important}
-html:root[data-skin="monocode"] #composer :is(button,[role="button"],summary){--mc-button-radius:999px}
-html:root[data-skin="monocode"] #composerInput{
+html:root[data-skin="phoenix"][data-theme="light"] #composerZone #composer:focus-within{border-color:rgb(80 80 170 / 26%)!important;box-shadow:0 0 0 4px rgb(90 90 200 / 8%),0 18px 54px rgb(60 66 120 / 16%)!important}
+html:root[data-skin="phoenix"] #composer :is(button,[role="button"],summary){--mc-button-radius:999px}
+html:root[data-skin="phoenix"] #composerInput{
   order:1;min-height:28px!important;max-height:40vh;padding:2px 12px 6px 7px!important;margin:0;
   font:400 15.5px/24px var(--soft-font)!important;letter-spacing:-.005em;color:var(--soft-ink)!important;caret-color:var(--soft-ink);
 }
-html:root[data-skin="monocode"] #composerInput:empty::before{color:var(--soft-ink-3)!important;font-weight:400}
-html:root[data-skin="monocode"] #composer :is(#attachmentTray,#mentionTray,#composerCommentPopover){order:0}
+html:root[data-skin="phoenix"] #composerInput:empty::before{color:var(--soft-ink-3)!important;font-weight:400}
+html:root[data-skin="phoenix"] #composer :is(#attachmentTray,#mentionTray,#composerCommentPopover){order:0}
 /* Project label whispers under the composer instead of crowding it. */
-html:root[data-skin="monocode"] #composer .mc-composer-head{
+html:root[data-skin="phoenix"] #composer .mc-composer-head{
   position:absolute;left:19px;right:20px;bottom:-25px;height:18px!important;padding:0!important;
   font:450 11.5px/18px var(--soft-font)!important;color:var(--soft-ink-2)!important;pointer-events:none;
   /* It sits on the brightest band of the sky (dawn, golden hour): a soft
      halo keeps it legible without a chip behind it. */
   text-shadow:0 0 8px rgb(10 12 30 / 55%),0 1px 2px rgb(10 12 30 / 35%);
 }
-html:root[data-skin="monocode"][data-theme="light"] #composer .mc-composer-head{text-shadow:0 0 8px rgb(255 255 255 / 70%)}
-html:root[data-skin="monocode"] #composer .mc-composer-head svg{width:12px;height:12px;opacity:.8}
-html:root[data-skin="monocode"] #composer .mc-composer-head .mc-context{font:450 11.5px var(--soft-font)!important;font-variant-numeric:tabular-nums}
+html:root[data-skin="phoenix"][data-theme="light"] #composer .mc-composer-head{text-shadow:0 0 8px rgb(255 255 255 / 70%)}
+html:root[data-skin="phoenix"] #composer .mc-composer-head svg{width:12px;height:12px;opacity:.8}
+html:root[data-skin="phoenix"] #composer .mc-composer-head .mc-context{font:450 11.5px var(--soft-font)!important;font-variant-numeric:tabular-nums}
 
 /* One calm row: + · model · context · reasoning · access … mic · send */
-html:root[data-skin="monocode"] #composer .composer-toolbar{order:2;display:flex;align-items:center;flex-wrap:wrap;gap:6px!important;min-height:36px!important;height:auto;padding:4px 0 0 0!important;margin:0!important}
-html:root[data-skin="monocode"] #composer :is(#modelButton,#contextControl,#reasoningControl,#permissionButton){
+html:root[data-skin="phoenix"] #composer .composer-toolbar{order:2;display:flex;align-items:center;flex-wrap:wrap;gap:6px!important;min-height:36px!important;height:auto;padding:4px 0 0 0!important;margin:0!important}
+html:root[data-skin="phoenix"] #composer :is(#modelButton,#contextControl,#reasoningControl,#permissionButton){
   height:30px!important;min-height:30px!important;padding:0 12px!important;gap:6px!important;
   display:inline-flex!important;align-items:center;flex:0 0 auto;width:auto!important;min-width:0!important;max-width:220px;
   border-radius:999px!important;border:1px solid var(--glass-line)!important;
@@ -359,244 +359,244 @@ html:root[data-skin="monocode"] #composer :is(#modelButton,#contextControl,#reas
   font:500 12.5px/1 var(--soft-font)!important;letter-spacing:0;white-space:nowrap;
   transition:background-color .18s,color .18s,border-color .18s;
 }
-html:root[data-skin="monocode"][data-theme="light"] #composer :is(#modelButton,#contextControl,#reasoningControl,#permissionButton){background:rgb(255 255 255 / 45%)!important}
-html:root[data-skin="monocode"] #composer :is(#modelButton,#contextControl,#reasoningControl,#permissionButton):hover{background:var(--glass-press)!important;color:var(--soft-ink)!important;border-color:var(--glass-line-strong)!important}
-html:root[data-skin="monocode"] #composer :is(#modelButton,#contextControl,#reasoningControl,#permissionButton) :is(strong,small,span,em){font:inherit!important;line-height:1!important;letter-spacing:0;margin:0}
-html:root[data-skin="monocode"] #composer :is(#modelButton,#permissionButton) strong,
-html:root[data-skin="monocode"] #composer .composer-liquid-copy strong{color:var(--soft-ink)!important;font-weight:500!important;overflow:hidden;text-overflow:ellipsis}
-html:root[data-skin="monocode"] #composer .composer-liquid-copy{display:inline-flex!important;align-items:center;gap:5px;flex-direction:row!important}
-html:root[data-skin="monocode"] #composer .composer-liquid-copy small{color:var(--soft-ink-3)!important;font-weight:450!important;text-transform:none!important}
-html:root[data-skin="monocode"] #composer :is(#contextControl,#reasoningControl) :is(.composer-liquid-track,.composer-liquid-detail){display:none!important}
-html:root[data-skin="monocode"] #composer :is(#contextControl,#reasoningControl) input[type="range"]{position:absolute;inset:0;opacity:0;pointer-events:none}
-html:root[data-skin="monocode"] #composer :is(#contextControl,#reasoningControl){position:relative;cursor:pointer}
-html:root[data-skin="monocode"] #composer :is(#modelButton,#permissionButton) svg{width:14px!important;height:14px!important;flex:0 0 14px;opacity:.8}
-html:root[data-skin="monocode"] #composer :is(#modelButton,#permissionButton) svg:last-child{width:12px!important;height:12px!important;flex-basis:12px;opacity:.55;margin-right:-3px}
-html:root[data-skin="monocode"] #composer #composerProviderIcon{display:inline-flex;align-items:center}
-html:root[data-skin="monocode"] #composer #composerProviderIcon :is(.provider-chip,svg,img){width:14px!important;height:14px!important;min-width:0;padding:0;border:0;background:transparent;box-shadow:none}
-html:root[data-skin="monocode"] #composer #attachButton,
-html:root[data-skin="monocode"] #composer #voiceButton,
-html:root[data-skin="monocode"] #composer #stashButton{
+html:root[data-skin="phoenix"][data-theme="light"] #composer :is(#modelButton,#contextControl,#reasoningControl,#permissionButton){background:rgb(255 255 255 / 45%)!important}
+html:root[data-skin="phoenix"] #composer :is(#modelButton,#contextControl,#reasoningControl,#permissionButton):hover{background:var(--glass-press)!important;color:var(--soft-ink)!important;border-color:var(--glass-line-strong)!important}
+html:root[data-skin="phoenix"] #composer :is(#modelButton,#contextControl,#reasoningControl,#permissionButton) :is(strong,small,span,em){font:inherit!important;line-height:1!important;letter-spacing:0;margin:0}
+html:root[data-skin="phoenix"] #composer :is(#modelButton,#permissionButton) strong,
+html:root[data-skin="phoenix"] #composer .composer-liquid-copy strong{color:var(--soft-ink)!important;font-weight:500!important;overflow:hidden;text-overflow:ellipsis}
+html:root[data-skin="phoenix"] #composer .composer-liquid-copy{display:inline-flex!important;align-items:center;gap:5px;flex-direction:row!important}
+html:root[data-skin="phoenix"] #composer .composer-liquid-copy small{color:var(--soft-ink-3)!important;font-weight:450!important;text-transform:none!important}
+html:root[data-skin="phoenix"] #composer :is(#contextControl,#reasoningControl) :is(.composer-liquid-track,.composer-liquid-detail){display:none!important}
+html:root[data-skin="phoenix"] #composer :is(#contextControl,#reasoningControl) input[type="range"]{position:absolute;inset:0;opacity:0;pointer-events:none}
+html:root[data-skin="phoenix"] #composer :is(#contextControl,#reasoningControl){position:relative;cursor:pointer}
+html:root[data-skin="phoenix"] #composer :is(#modelButton,#permissionButton) svg{width:14px!important;height:14px!important;flex:0 0 14px;opacity:.8}
+html:root[data-skin="phoenix"] #composer :is(#modelButton,#permissionButton) svg:last-child{width:12px!important;height:12px!important;flex-basis:12px;opacity:.55;margin-right:-3px}
+html:root[data-skin="phoenix"] #composer #composerProviderIcon{display:inline-flex;align-items:center}
+html:root[data-skin="phoenix"] #composer #composerProviderIcon :is(.provider-chip,svg,img){width:14px!important;height:14px!important;min-width:0;padding:0;border:0;background:transparent;box-shadow:none}
+html:root[data-skin="phoenix"] #composer #attachButton,
+html:root[data-skin="phoenix"] #composer #voiceButton,
+html:root[data-skin="phoenix"] #composer #stashButton{
   width:32px!important;min-width:32px!important;height:32px!important;min-height:32px!important;padding:0!important;margin:0!important;display:grid;place-items:center;flex:0 0 32px;
   border-radius:999px!important;border:0!important;background:transparent!important;color:var(--soft-ink-2)!important;box-shadow:none!important;
 }
-html:root[data-skin="monocode"] #composer :is(#attachButton,#voiceButton,#stashButton):hover{background:var(--glass-hover)!important;color:var(--soft-ink)!important}
-html:root[data-skin="monocode"] #composer :is(#attachButton,#voiceButton,#stashButton) svg{width:18px!important;height:18px!important}
-html:root[data-skin="monocode"] #composer #attachButton svg{width:20px!important;height:20px!important;stroke-width:1.6}
-html:root[data-skin="monocode"] #composer .mc-composer-actions{display:flex;align-items:center;gap:6px;margin-left:auto;height:36px}
-html:root[data-skin="monocode"] #composer #attachmentMenu{flex:0 0 auto;display:flex;align-items:center;margin:0 2px 0 0}
-html:root[data-skin="monocode"] #composer .composer-toolbar>.toolbar-spacer{flex:1 1 0;min-width:0;height:0}
-html:root[data-skin="monocode"] #composer #sendButton{
+html:root[data-skin="phoenix"] #composer :is(#attachButton,#voiceButton,#stashButton):hover{background:var(--glass-hover)!important;color:var(--soft-ink)!important}
+html:root[data-skin="phoenix"] #composer :is(#attachButton,#voiceButton,#stashButton) svg{width:18px!important;height:18px!important}
+html:root[data-skin="phoenix"] #composer #attachButton svg{width:20px!important;height:20px!important;stroke-width:1.6}
+html:root[data-skin="phoenix"] #composer .mc-composer-actions{display:flex;align-items:center;gap:6px;margin-left:auto;height:36px}
+html:root[data-skin="phoenix"] #composer #attachmentMenu{flex:0 0 auto;display:flex;align-items:center;margin:0 2px 0 0}
+html:root[data-skin="phoenix"] #composer .composer-toolbar>.toolbar-spacer{flex:1 1 0;min-width:0;height:0}
+html:root[data-skin="phoenix"] #composer #sendButton{
   width:36px!important;height:36px!important;min-height:36px!important;min-width:36px;padding:0!important;margin:0!important;flex:0 0 36px;display:grid!important;place-items:center;
   border-radius:999px!important;border:0!important;background:#f4f4fb!important;color:#1b1d2e!important;
   box-shadow:0 4px 14px rgb(0 0 0 / 22%)!important;transition:transform .18s var(--soft-ease),opacity .18s,background-color .18s;
 }
-html:root[data-skin="monocode"][data-theme="light"] #composer #sendButton{background:#22243a!important;color:#fff!important}
-html:root[data-skin="monocode"] #composer #sendButton:hover{transform:scale(1.05)}
-html:root[data-skin="monocode"] #composer #sendButton:active{transform:scale(.96)}
-html:root[data-skin="monocode"] #composer #sendButton:disabled{opacity:.45;transform:none}
-html:root[data-skin="monocode"] #composer #sendButton svg{width:18px;height:18px;stroke-width:2}
-html:root[data-skin="monocode"] #composerZone.working #composer #sendButton{background:#f4f4fb!important}
+html:root[data-skin="phoenix"][data-theme="light"] #composer #sendButton{background:#22243a!important;color:#fff!important}
+html:root[data-skin="phoenix"] #composer #sendButton:hover{transform:scale(1.05)}
+html:root[data-skin="phoenix"] #composer #sendButton:active{transform:scale(.96)}
+html:root[data-skin="phoenix"] #composer #sendButton:disabled{opacity:.45;transform:none}
+html:root[data-skin="phoenix"] #composer #sendButton svg{width:18px;height:18px;stroke-width:2}
+html:root[data-skin="phoenix"] #composerZone.working #composer #sendButton{background:#f4f4fb!important}
 /* Composer status cards above the field share the glass language. */
-html:root[data-skin="monocode"] #composerZone :is(#taskBlock,#queueBlock){--mc-button-radius:16px;border-radius:18px!important;background:var(--glass-1)!important;border:1px solid var(--glass-line)!important;-webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur));font-family:var(--soft-font)}
-html:root[data-skin="monocode"] #composerZone :is(#taskBlock,#queueBlock)>summary{min-height:40px;padding:8px 14px!important;font:500 13px var(--soft-font)!important;color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] #composerZone .approval-card{--ak-muted:var(--glass-1);--ak-r-lg:18px;--ak-r-sm:12px;--mc-button-radius:12px;border-radius:20px!important;background:var(--glass-2)!important;border:1px solid var(--glass-line-strong)!important;-webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);box-shadow:var(--glass-shadow)!important;font-family:var(--soft-font)}
-html:root[data-skin="monocode"] #composerZone .approval-question-card{padding:14px 16px!important;font-size:13.5px}
-html:root[data-skin="monocode"] #composerZone .approval-card :is(.qa-option,.qa-submit,.qa-custom-submit,.button){min-height:34px!important;border-radius:12px!important;font:500 13px var(--soft-font)!important}
-html:root[data-skin="monocode"] #composerZone .approval-card .qa-option{background:rgb(255 255 255 / 4%);border:1px solid var(--glass-line)}
-html:root[data-skin="monocode"] #composerZone .approval-card .qa-option:hover{background:var(--glass-hover)}
-html:root[data-skin="monocode"] #composerZone .approval-card :is(.qa-submit,.button.primary){background:#f4f4fb!important;color:#1b1d2e!important;border:0!important}
+html:root[data-skin="phoenix"] #composerZone :is(#taskBlock,#queueBlock){--mc-button-radius:16px;border-radius:18px!important;background:var(--glass-1)!important;border:1px solid var(--glass-line)!important;-webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur));font-family:var(--soft-font)}
+html:root[data-skin="phoenix"] #composerZone :is(#taskBlock,#queueBlock)>summary{min-height:40px;padding:8px 14px!important;font:500 13px var(--soft-font)!important;color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] #composerZone .approval-card{--ak-muted:var(--glass-1);--ak-r-lg:18px;--ak-r-sm:12px;--mc-button-radius:12px;border-radius:20px!important;background:var(--glass-2)!important;border:1px solid var(--glass-line-strong)!important;-webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px);box-shadow:var(--glass-shadow)!important;font-family:var(--soft-font)}
+html:root[data-skin="phoenix"] #composerZone .approval-question-card{padding:14px 16px!important;font-size:13.5px}
+html:root[data-skin="phoenix"] #composerZone .approval-card :is(.qa-option,.qa-submit,.qa-custom-submit,.button){min-height:34px!important;border-radius:12px!important;font:500 13px var(--soft-font)!important}
+html:root[data-skin="phoenix"] #composerZone .approval-card .qa-option{background:rgb(255 255 255 / 4%);border:1px solid var(--glass-line)}
+html:root[data-skin="phoenix"] #composerZone .approval-card .qa-option:hover{background:var(--glass-hover)}
+html:root[data-skin="phoenix"] #composerZone .approval-card :is(.qa-submit,.button.primary){background:#f4f4fb!important;color:#1b1d2e!important;border:0!important}
 
 /* ── Empty state: centered, heading above the composer ───────────────── */
-html:root[data-skin="monocode"] #conversationStage.mc-empty{padding-bottom:9vh}
-html:root[data-skin="monocode"] #conversationStage.mc-empty #composerZone{margin:auto auto!important;transform:none!important}
-html:root[data-skin="monocode"] .mc-empty-heading{
+html:root[data-skin="phoenix"] #conversationStage.mc-empty{padding-bottom:9vh}
+html:root[data-skin="phoenix"] #conversationStage.mc-empty #composerZone{margin:auto auto!important;transform:none!important}
+html:root[data-skin="phoenix"] .mc-empty-heading{
   margin:0 0 18px!important;text-align:center;
   font:400 28px/1.25 var(--soft-font)!important;letter-spacing:-.022em;color:var(--soft-ink)!important;
 }
 
 /* ── Right workspace pane and overlays ───────────────────────────────── */
-html:root[data-skin="monocode"] #inspectionSidebar{background:var(--glass-1)!important;-webkit-backdrop-filter:blur(var(--glass-blur))!important;backdrop-filter:blur(var(--glass-blur))!important;border-left:1px solid var(--glass-line)!important}
-html:root[data-skin="monocode"] #inspectionSidebar :is(.inspection-tabbar,.inspection-toolbar,.inspection-panel,.inspection-desktop-panel,#desktopObservationEmpty,.inspection-empty){background:transparent!important}
-html:root[data-skin="monocode"] #desktopObservationStage.no-frame{background:transparent!important}
-html:root[data-skin="monocode"] :is(.inspection-tab,.browser-tab){border-radius:999px!important;font:500 12px/16px var(--soft-font)!important;padding:3px 10px!important}
-html:root[data-skin="monocode"] :is(.modal,.popover,.menu,.menu-layer .menu,.mention-picker,.toast,.prompt-rail-card){
+html:root[data-skin="phoenix"] #inspectionSidebar{background:var(--glass-1)!important;-webkit-backdrop-filter:blur(var(--glass-blur))!important;backdrop-filter:blur(var(--glass-blur))!important;border-left:1px solid var(--glass-line)!important}
+html:root[data-skin="phoenix"] #inspectionSidebar :is(.inspection-tabbar,.inspection-toolbar,.inspection-panel,.inspection-desktop-panel,#desktopObservationEmpty,.inspection-empty){background:transparent!important}
+html:root[data-skin="phoenix"] #desktopObservationStage.no-frame{background:transparent!important}
+html:root[data-skin="phoenix"] :is(.inspection-tab,.browser-tab){border-radius:999px!important;font:500 12px/16px var(--soft-font)!important;padding:3px 10px!important}
+html:root[data-skin="phoenix"] :is(.modal,.popover,.menu,.menu-layer .menu,.mention-picker,.toast,.prompt-rail-card){
   background:var(--glass-pop)!important;-webkit-backdrop-filter:blur(28px) saturate(1.2);backdrop-filter:blur(28px) saturate(1.2);
   border:1px solid var(--glass-line-strong)!important;border-radius:16px!important;box-shadow:var(--menu-shadow)!important;color:var(--soft-ink);font-family:var(--soft-font);
 }
-html:root[data-skin="monocode"] .modal-layer{background:var(--overlay)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+html:root[data-skin="phoenix"] .modal-layer{background:var(--overlay)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 
 /* ── Settings ────────────────────────────────────────────────────────── */
-html:root[data-skin="monocode"] #settingsView{background:var(--sky-layers)!important;background-attachment:fixed!important}
-html:root[data-skin="monocode"] #settingsView :is(#settingsMain,.settings-main){background:transparent!important}
-html:root[data-skin="monocode"] .settings-view{font-family:var(--soft-font)}
-html:root[data-skin="monocode"] .settings-sidebar{margin:10px 0 10px 10px;border-radius:20px;background:var(--glass-1)!important;border:1px solid var(--glass-line)!important;-webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur))}
-html:root[data-skin="monocode"] .settings-card{border-radius:18px!important;background:var(--glass-2)!important;border:1px solid var(--glass-line)!important;-webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur))}
-html:root[data-skin="monocode"] .settings-title h1{font:600 22px/1.3 var(--soft-font)!important;letter-spacing:-.02em}
-html:root[data-skin="monocode"] .settings-title p{font:400 13px/1.5 var(--soft-font)!important;color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] .settings-view .setting-copy strong{font:500 13.5px/1.35 var(--soft-font)!important;color:var(--soft-ink)}
-html:root[data-skin="monocode"] .settings-view .setting-copy p{font:400 12.5px/1.45 var(--soft-font)!important;color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] .settings-view .setting-row{padding:12px 16px!important;min-height:56px!important}
-html:root[data-skin="monocode"] .settings-view :is(.menu-select,.button,.wheel-stepper){border-radius:12px!important;min-height:32px!important;font:500 12.5px var(--soft-font)!important;background:rgb(255 255 255 / 5%);border:1px solid var(--glass-line)}
-html:root[data-skin="monocode"] .settings-view .ember-toggle{background:rgb(255 255 255 / 14%)!important;border-radius:999px!important}
-html:root[data-skin="monocode"] .settings-view .ember-toggle.on{background:#d9d8ff!important}
-html:root[data-skin="monocode"] .settings-view .ember-toggle .ember-check-box{border-radius:999px!important}
-html:root[data-skin="monocode"] .settings-view .ember-toggle.on .ember-check-box{background:#1f2136!important}
-html:root[data-skin="monocode"] :is(.settings-nav button,.settings-sidebar button){border-radius:10px!important;font-family:var(--soft-font)}
+html:root[data-skin="phoenix"] #settingsView{background:var(--sky-layers)!important;background-attachment:fixed!important}
+html:root[data-skin="phoenix"] #settingsView :is(#settingsMain,.settings-main){background:transparent!important}
+html:root[data-skin="phoenix"] .settings-view{font-family:var(--soft-font)}
+html:root[data-skin="phoenix"] .settings-sidebar{margin:10px 0 10px 10px;border-radius:20px;background:var(--glass-1)!important;border:1px solid var(--glass-line)!important;-webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur))}
+html:root[data-skin="phoenix"] .settings-card{border-radius:18px!important;background:var(--glass-2)!important;border:1px solid var(--glass-line)!important;-webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur))}
+html:root[data-skin="phoenix"] .settings-title h1{font:600 22px/1.3 var(--soft-font)!important;letter-spacing:-.02em}
+html:root[data-skin="phoenix"] .settings-title p{font:400 13px/1.5 var(--soft-font)!important;color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] .settings-view .setting-copy strong{font:500 13.5px/1.35 var(--soft-font)!important;color:var(--soft-ink)}
+html:root[data-skin="phoenix"] .settings-view .setting-copy p{font:400 12.5px/1.45 var(--soft-font)!important;color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] .settings-view .setting-row{padding:12px 16px!important;min-height:56px!important}
+html:root[data-skin="phoenix"] .settings-view :is(.menu-select,.button,.wheel-stepper){border-radius:12px!important;min-height:32px!important;font:500 12.5px var(--soft-font)!important;background:rgb(255 255 255 / 5%);border:1px solid var(--glass-line)}
+html:root[data-skin="phoenix"] .settings-view .ember-toggle{background:rgb(255 255 255 / 14%)!important;border-radius:999px!important}
+html:root[data-skin="phoenix"] .settings-view .ember-toggle.on{background:#d9d8ff!important}
+html:root[data-skin="phoenix"] .settings-view .ember-toggle .ember-check-box{border-radius:999px!important}
+html:root[data-skin="phoenix"] .settings-view .ember-toggle.on .ember-check-box{background:#1f2136!important}
+html:root[data-skin="phoenix"] :is(.settings-nav button,.settings-sidebar button){border-radius:10px!important;font-family:var(--soft-font)}
 
 /* ── Motion ──────────────────────────────────────────────────────────── */
 @keyframes soft-rise{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
 @keyframes soft-rise-right{from{opacity:0;transform:translate(10px,6px) scale(.985)}to{opacity:1;transform:none}}
-html:root[data-skin="monocode"] #conversationFeed>:is(.agent-message,.group-message,.work-cluster,.team-work-block):nth-last-child(-n+3){animation:soft-rise .42s var(--soft-ease) both}
-html:root[data-skin="monocode"] #conversationFeed>.user-message:nth-last-child(-n+3){animation:soft-rise-right .38s var(--soft-ease) both}
-html:root[data-skin="monocode"] #conversationFeed>.user-message .user-bubble{transform-origin:100% 100%}
+html:root[data-skin="phoenix"] #conversationFeed>:is(.agent-message,.group-message,.work-cluster,.team-work-block):nth-last-child(-n+3){animation:soft-rise .42s var(--soft-ease) both}
+html:root[data-skin="phoenix"] #conversationFeed>.user-message:nth-last-child(-n+3){animation:soft-rise-right .38s var(--soft-ease) both}
+html:root[data-skin="phoenix"] #conversationFeed>.user-message .user-bubble{transform-origin:100% 100%}
 @media (prefers-reduced-motion:reduce){
-  html:root[data-skin="monocode"] #conversationFeed>*{animation:none!important}
-  html:root[data-skin="monocode"] #composerZone #composer,html:root[data-skin="monocode"] #composer #sendButton{transition:none!important}
+  html:root[data-skin="phoenix"] #conversationFeed>*{animation:none!important}
+  html:root[data-skin="phoenix"] #composerZone #composer,html:root[data-skin="phoenix"] #composer #sendButton{transition:none!important}
 }
-html:root[data-skin="monocode"][data-motion="minimal"] #conversationFeed>*{animation:none!important}
+html:root[data-skin="phoenix"][data-motion="minimal"] #conversationFeed>*{animation:none!important}
 
 /* Without blur support, keep surfaces readable rather than see-through. */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-  html:root[data-skin="monocode"]{--glass-1:rgb(30 33 52 / 92%);--glass-2:rgb(26 28 46 / 94%);--glass-pop:rgb(34 36 56 / 98%)}
-  html:root[data-skin="monocode"][data-theme="light"]{--glass-1:rgb(246 246 252 / 94%);--glass-2:rgb(255 255 255 / 96%);--glass-pop:#fff}
+  html:root[data-skin="phoenix"]{--glass-1:rgb(30 33 52 / 92%);--glass-2:rgb(26 28 46 / 94%);--glass-pop:rgb(34 36 56 / 98%)}
+  html:root[data-skin="phoenix"][data-theme="light"]{--glass-1:rgb(246 246 252 / 94%);--glass-2:rgb(255 255 255 / 96%);--glass-pop:#fff}
 }
 
 /* Team member work pills: name and state sit together, no stretched gap. */
-html:root[data-skin="monocode"] #conversationFeed .group-work-agent{display:inline-flex!important;align-items:center;width:auto!important;max-width:100%}
-html:root[data-skin="monocode"] #conversationFeed .group-work-agent>span:not(.group-work-avatar):not(.group-work-live){display:inline-flex;align-items:baseline;gap:7px;min-width:0}
-html:root[data-skin="monocode"] #conversationFeed .group-work-agent>svg{width:12px;height:12px;opacity:.6}
+html:root[data-skin="phoenix"] #conversationFeed .group-work-agent{display:inline-flex!important;align-items:center;width:auto!important;max-width:100%}
+html:root[data-skin="phoenix"] #conversationFeed .group-work-agent>span:not(.group-work-avatar):not(.group-work-live){display:inline-flex;align-items:baseline;gap:7px;min-width:0}
+html:root[data-skin="phoenix"] #conversationFeed .group-work-agent>svg{width:12px;height:12px;opacity:.6}
 /* Empty state groups the hero, the question and the composer as one block. */
-html:root[data-skin="monocode"] #conversationStage.mc-empty.has-fluffy #fluffyHero{margin:auto 0 6px!important}
-html:root[data-skin="monocode"] #conversationStage.mc-empty.has-fluffy #composerZone{margin:0 auto auto!important}
+html:root[data-skin="phoenix"] #conversationStage.mc-empty.has-fluffy #fluffyHero{margin:auto 0 6px!important}
+html:root[data-skin="phoenix"] #conversationStage.mc-empty.has-fluffy #composerZone{margin:0 auto auto!important}
 /* Scroll edge: a soft mask instead of a blurred strip under the hero. */
-html:root[data-skin="monocode"] #conversationStage #conversationBody::before{content:none!important;display:none!important}
-html:root[data-skin="monocode"] #conversationBody{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 22px,#000 calc(100% - 14px),transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 22px,#000 calc(100% - 14px),transparent 100%)}
-html:root[data-skin="monocode"] #fluffyHero::before{background:var(--glass-1)!important;border-color:var(--glass-line)!important;box-shadow:0 10px 36px rgb(6 8 22 / 22%)!important;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
-html:root[data-skin="monocode"][data-theme="light"] #fluffyHero::before{box-shadow:0 10px 36px rgb(60 66 120 / 12%)!important}
-html:root[data-skin="monocode"] #conversationStage.mc-empty.has-fluffy #fluffyHero{margin-bottom:22px!important}
+html:root[data-skin="phoenix"] #conversationStage #conversationBody::before{content:none!important;display:none!important}
+html:root[data-skin="phoenix"] #conversationBody{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 22px,#000 calc(100% - 14px),transparent 100%);mask-image:linear-gradient(to bottom,transparent 0,#000 22px,#000 calc(100% - 14px),transparent 100%)}
+html:root[data-skin="phoenix"] #fluffyHero::before{background:var(--glass-1)!important;border-color:var(--glass-line)!important;box-shadow:0 10px 36px rgb(6 8 22 / 22%)!important;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+html:root[data-skin="phoenix"][data-theme="light"] #fluffyHero::before{box-shadow:0 10px 36px rgb(60 66 120 / 12%)!important}
+html:root[data-skin="phoenix"] #conversationStage.mc-empty.has-fluffy #fluffyHero{margin-bottom:22px!important}
 /* Steered messages keep their label stacked over the bubble. */
-html:root[data-skin="monocode"] #conversationFeed .user-message.steered-message>.message-content{flex-direction:column;align-items:flex-end;gap:4px}
-html:root[data-skin="monocode"] #conversationFeed .user-message .steered-label{font:500 11px var(--soft-font);color:var(--soft-ink-3);margin-right:8px}
+html:root[data-skin="phoenix"] #conversationFeed .user-message.steered-message>.message-content{flex-direction:column;align-items:flex-end;gap:4px}
+html:root[data-skin="phoenix"] #conversationFeed .user-message .steered-label{font:500 11px var(--soft-font);color:var(--soft-ink-3);margin-right:8px}
 /* Delete controls stay out of sight until the row is hovered or focused. */
-html:root[data-skin="monocode"] #conversationFeed .work-cluster>.work-delete-button{opacity:0!important;transition:opacity .18s}
-html:root[data-skin="monocode"] #conversationFeed .work-cluster:hover>.work-delete-button,
-html:root[data-skin="monocode"] #conversationFeed .work-cluster>.work-delete-button:focus-visible{opacity:.65!important}
+html:root[data-skin="phoenix"] #conversationFeed .work-cluster>.work-delete-button{opacity:0!important;transition:opacity .18s}
+html:root[data-skin="phoenix"] #conversationFeed .work-cluster:hover>.work-delete-button,
+html:root[data-skin="phoenix"] #conversationFeed .work-cluster>.work-delete-button:focus-visible{opacity:.65!important}
 
 /* ── Avatar picker: Fluffies first, then a custom photo ──────────────── */
 /* Primary buttons sat on --mc-bg, which is transparent under the sky. */
-html:root[data-skin="monocode"] .modal-footer .button.primary{color:var(--accent-contrast)!important}
-html:root[data-skin="monocode"] #modalLayer .avatar-studio{
+html:root[data-skin="phoenix"] .modal-footer .button.primary{color:var(--accent-contrast)!important}
+html:root[data-skin="phoenix"] #modalLayer .avatar-studio{
   --picker-card:rgb(255 255 255 / 3.5%);--picker-pick:rgb(201 198 255 / 12%);--picker-ring:rgb(201 198 255 / 55%);
   gap:16px!important;padding:18px!important;border-radius:20px!important;border:1px solid var(--glass-line)!important;
   background:var(--glass-1)!important;-webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur));
   box-shadow:inset 0 1px 0 rgb(255 255 255 / 4%);font-family:var(--soft-font)
 }
-html:root[data-skin="monocode"][data-theme="light"] #modalLayer .avatar-studio{--picker-card:rgb(255 255 255 / 55%);--picker-pick:rgb(75 69 168 / 9%);--picker-ring:rgb(75 69 168 / 45%);box-shadow:inset 0 1px 0 rgb(255 255 255 / 60%)}
+html:root[data-skin="phoenix"][data-theme="light"] #modalLayer .avatar-studio{--picker-card:rgb(255 255 255 / 55%);--picker-pick:rgb(75 69 168 / 9%);--picker-ring:rgb(75 69 168 / 45%);box-shadow:inset 0 1px 0 rgb(255 255 255 / 60%)}
 /* Preview: the chosen avatar on a soft halo. */
-html:root[data-skin="monocode"] #modalLayer .avatar-studio-preview{gap:18px!important;align-items:center}
-html:root[data-skin="monocode"] #modalLayer .avatar-studio-preview>i{
+html:root[data-skin="phoenix"] #modalLayer .avatar-studio-preview{gap:18px!important;align-items:center}
+html:root[data-skin="phoenix"] #modalLayer .avatar-studio-preview>i{
   width:112px!important;height:112px!important;flex:0 0 112px!important;border-radius:50%;
   background:radial-gradient(circle at 50% 42%,rgb(255 255 255 / 9%),rgb(255 255 255 / 2%) 70%);border:1px solid var(--glass-line);overflow:hidden
 }
-html:root[data-skin="monocode"] #modalLayer .avatar-studio-preview>i :is(canvas,.fluffy-token,.fluffy-studio-mirror){width:100px!important;height:100px!important}
-html:root[data-skin="monocode"] #modalLayer .avatar-studio-preview>i>.custom-avatar-shell{width:112px!important;height:112px!important;border-radius:50%!important}
-html:root[data-skin="monocode"] #modalLayer .avatar-studio-preview strong{font:500 15px/1.3 var(--soft-font)!important;letter-spacing:-.01em;color:var(--soft-ink)}
-html:root[data-skin="monocode"] #modalLayer .avatar-studio-preview small{display:block;margin-top:3px;font:400 12.5px/1.45 var(--soft-font)!important;color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] #modalLayer .avatar-photo-empty{display:grid;place-items:center;width:100%;height:100%}
-html:root[data-skin="monocode"] #modalLayer .avatar-photo-empty svg{width:44px;height:44px;fill:none;stroke:var(--soft-ink-3);stroke-width:1.5;stroke-linecap:round}
+html:root[data-skin="phoenix"] #modalLayer .avatar-studio-preview>i :is(canvas,.fluffy-token,.fluffy-studio-mirror){width:100px!important;height:100px!important}
+html:root[data-skin="phoenix"] #modalLayer .avatar-studio-preview>i>.custom-avatar-shell{width:112px!important;height:112px!important;border-radius:50%!important}
+html:root[data-skin="phoenix"] #modalLayer .avatar-studio-preview strong{font:500 15px/1.3 var(--soft-font)!important;letter-spacing:-.01em;color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #modalLayer .avatar-studio-preview small{display:block;margin-top:3px;font:400 12.5px/1.45 var(--soft-font)!important;color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] #modalLayer .avatar-photo-empty{display:grid;place-items:center;width:100%;height:100%}
+html:root[data-skin="phoenix"] #modalLayer .avatar-photo-empty svg{width:44px;height:44px;fill:none;stroke:var(--soft-ink-3);stroke-width:1.5;stroke-linecap:round}
 /* Two kinds, as a calm segmented pill. */
-html:root[data-skin="monocode"] #modalLayer .avatar-studio .avatar-mode-tabs{
+html:root[data-skin="phoenix"] #modalLayer .avatar-studio .avatar-mode-tabs{
   display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:4px!important;padding:4px!important;
   border-radius:16px!important;background:rgb(0 0 0 / 14%)!important;border:1px solid var(--glass-line)!important
 }
-html:root[data-skin="monocode"][data-theme="light"] #modalLayer .avatar-studio .avatar-mode-tabs{background:rgb(40 46 90 / 5%)!important}
-html:root[data-skin="monocode"] #modalLayer .avatar-studio .avatar-mode-tabs button{
+html:root[data-skin="phoenix"][data-theme="light"] #modalLayer .avatar-studio .avatar-mode-tabs{background:rgb(40 46 90 / 5%)!important}
+html:root[data-skin="phoenix"] #modalLayer .avatar-studio .avatar-mode-tabs button{
   display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-height:50px!important;height:auto!important;padding:7px 12px!important;
   border:1px solid transparent!important;border-radius:12px!important;background:transparent!important;color:var(--soft-ink-2)!important;
   transition:background .18s var(--soft-ease),color .18s,border-color .18s
 }
-html:root[data-skin="monocode"] #modalLayer .avatar-studio .avatar-mode-tabs button strong{font:500 13.5px/1.3 var(--soft-font);color:inherit}
-html:root[data-skin="monocode"] #modalLayer .avatar-studio .avatar-mode-tabs button small{font:400 11.5px/1.3 var(--soft-font);color:var(--soft-ink-3)}
-html:root[data-skin="monocode"] #modalLayer .avatar-studio .avatar-mode-tabs button:hover{background:var(--glass-hover)!important;color:var(--soft-ink)!important}
-html:root[data-skin="monocode"] #modalLayer .avatar-studio .avatar-mode-tabs button.selected{
+html:root[data-skin="phoenix"] #modalLayer .avatar-studio .avatar-mode-tabs button strong{font:500 13.5px/1.3 var(--soft-font);color:inherit}
+html:root[data-skin="phoenix"] #modalLayer .avatar-studio .avatar-mode-tabs button small{font:400 11.5px/1.3 var(--soft-font);color:var(--soft-ink-3)}
+html:root[data-skin="phoenix"] #modalLayer .avatar-studio .avatar-mode-tabs button:hover{background:var(--glass-hover)!important;color:var(--soft-ink)!important}
+html:root[data-skin="phoenix"] #modalLayer .avatar-studio .avatar-mode-tabs button.selected{
   background:var(--glass-3)!important;border-color:var(--glass-line-strong)!important;color:var(--soft-ink)!important;box-shadow:0 4px 16px rgb(6 8 22 / 18%)
 }
-html:root[data-skin="monocode"][data-theme="light"] #modalLayer .avatar-studio .avatar-mode-tabs button.selected{background:rgb(255 255 255 / 85%)!important;box-shadow:0 4px 14px rgb(60 66 120 / 10%)}
-html:root[data-skin="monocode"] #modalLayer .avatar-studio .avatar-mode-tabs button:focus-visible{outline:2px solid var(--picker-ring);outline-offset:2px}
+html:root[data-skin="phoenix"][data-theme="light"] #modalLayer .avatar-studio .avatar-mode-tabs button.selected{background:rgb(255 255 255 / 85%)!important;box-shadow:0 4px 14px rgb(60 66 120 / 10%)}
+html:root[data-skin="phoenix"] #modalLayer .avatar-studio .avatar-mode-tabs button:focus-visible{outline:2px solid var(--picker-ring);outline-offset:2px}
 /* Fluffy choices: frosted tiles, a lavender ring on the chosen one. */
-html:root[data-skin="monocode"] #modalLayer .avatar-fluffy-controls{gap:18px!important}
-html:root[data-skin="monocode"] #modalLayer .avatar-fluffy-controls legend{margin-bottom:10px!important;font:500 12.5px/1.3 var(--soft-font)!important;color:var(--soft-ink-2)!important;letter-spacing:.01em}
-html:root[data-skin="monocode"] #modalLayer :is(.fluffy-shape-grid,.fluffy-preview-grid,.fluffy-palette-grid) button{
+html:root[data-skin="phoenix"] #modalLayer .avatar-fluffy-controls{gap:18px!important}
+html:root[data-skin="phoenix"] #modalLayer .avatar-fluffy-controls legend{margin-bottom:10px!important;font:500 12.5px/1.3 var(--soft-font)!important;color:var(--soft-ink-2)!important;letter-spacing:.01em}
+html:root[data-skin="phoenix"] #modalLayer :is(.fluffy-shape-grid,.fluffy-preview-grid,.fluffy-palette-grid) button{
   border:1px solid var(--glass-line)!important;border-radius:16px!important;background:var(--picker-card)!important;color:var(--soft-ink-2)!important;
   font:500 12px/1.3 var(--soft-font)!important;box-shadow:none!important;transition:background .18s var(--soft-ease),border-color .18s,transform .18s var(--soft-ease)
 }
-html:root[data-skin="monocode"] #modalLayer :is(.fluffy-shape-grid,.fluffy-preview-grid,.fluffy-palette-grid) button:hover:not(:disabled){background:var(--glass-hover)!important;border-color:var(--glass-line-strong)!important;color:var(--soft-ink)!important;transform:translateY(-1px)}
-html:root[data-skin="monocode"] #modalLayer :is(.fluffy-shape-grid,.fluffy-palette-grid) button.selected,
-html:root[data-skin="monocode"] #modalLayer .fluffy-preview-grid button.playing{
+html:root[data-skin="phoenix"] #modalLayer :is(.fluffy-shape-grid,.fluffy-preview-grid,.fluffy-palette-grid) button:hover:not(:disabled){background:var(--glass-hover)!important;border-color:var(--glass-line-strong)!important;color:var(--soft-ink)!important;transform:translateY(-1px)}
+html:root[data-skin="phoenix"] #modalLayer :is(.fluffy-shape-grid,.fluffy-palette-grid) button.selected,
+html:root[data-skin="phoenix"] #modalLayer .fluffy-preview-grid button.playing{
   background:var(--picker-pick)!important;border-color:var(--picker-ring)!important;color:var(--soft-ink)!important;box-shadow:0 0 0 3px rgb(201 198 255 / 10%)!important
 }
-html:root[data-skin="monocode"] #modalLayer :is(.fluffy-shape-grid,.fluffy-palette-grid,.fluffy-preview-grid) button:focus-visible{outline:2px solid var(--picker-ring)!important;outline-offset:2px}
-html:root[data-skin="monocode"] #modalLayer .fluffy-palette-grid{grid-template-columns:repeat(8,minmax(0,1fr))!important;gap:8px!important}
-html:root[data-skin="monocode"] #modalLayer .fluffy-palette-grid button{min-height:96px!important;padding:6px 4px 9px!important;gap:2px!important}
-html:root[data-skin="monocode"] #modalLayer .fluffy-palette-grid img{width:64px!important;height:64px!important}
-html:root[data-skin="monocode"] #modalLayer .fluffy-shape-grid button{padding:12px 10px 14px!important}
-html:root[data-skin="monocode"] #modalLayer .fluffy-shape-grid img{width:104px!important;height:104px!important}
-html:root[data-skin="monocode"] #modalLayer .fluffy-live-preview{background:transparent!important}
-html:root[data-skin="monocode"] #modalLayer .fluffy-palette-status{display:none}
-html:root[data-skin="monocode"] #modalLayer .fluffy-preview-help{font:400 12px/1.45 var(--soft-font)!important;color:var(--soft-ink-3)!important}
+html:root[data-skin="phoenix"] #modalLayer :is(.fluffy-shape-grid,.fluffy-palette-grid,.fluffy-preview-grid) button:focus-visible{outline:2px solid var(--picker-ring)!important;outline-offset:2px}
+html:root[data-skin="phoenix"] #modalLayer .fluffy-palette-grid{grid-template-columns:repeat(8,minmax(0,1fr))!important;gap:8px!important}
+html:root[data-skin="phoenix"] #modalLayer .fluffy-palette-grid button{min-height:96px!important;padding:6px 4px 9px!important;gap:2px!important}
+html:root[data-skin="phoenix"] #modalLayer .fluffy-palette-grid img{width:64px!important;height:64px!important}
+html:root[data-skin="phoenix"] #modalLayer .fluffy-shape-grid button{padding:12px 10px 14px!important}
+html:root[data-skin="phoenix"] #modalLayer .fluffy-shape-grid img{width:104px!important;height:104px!important}
+html:root[data-skin="phoenix"] #modalLayer .fluffy-live-preview{background:transparent!important}
+html:root[data-skin="phoenix"] #modalLayer .fluffy-palette-status{display:none}
+html:root[data-skin="phoenix"] #modalLayer .fluffy-preview-help{font:400 12px/1.45 var(--soft-font)!important;color:var(--soft-ink-3)!important}
 /* Custom photo: one frosted drop target. */
-html:root[data-skin="monocode"] #modalLayer .avatar-custom-controls .avatar-drop{
+html:root[data-skin="phoenix"] #modalLayer .avatar-custom-controls .avatar-drop{
   display:flex!important;align-items:center;gap:16px;width:100%;min-height:92px;padding:18px 20px!important;text-align:left;
   border:1px dashed var(--glass-line-strong)!important;border-radius:18px!important;background:var(--picker-card)!important;color:var(--soft-ink)!important;
   transition:background .18s var(--soft-ease),border-color .18s
 }
-html:root[data-skin="monocode"] #modalLayer .avatar-custom-controls .avatar-drop:hover{background:var(--glass-hover)!important;border-color:var(--picker-ring)!important}
-html:root[data-skin="monocode"] #modalLayer .avatar-drop-icon{display:grid;place-items:center;flex:0 0 46px;width:46px;height:46px;border-radius:50%;background:var(--glass-3);border:1px solid var(--glass-line)}
-html:root[data-skin="monocode"] #modalLayer .avatar-drop-icon svg{width:22px;height:22px;fill:none;stroke:var(--soft-ink);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-html:root[data-skin="monocode"] #modalLayer .avatar-drop strong{display:block;font:500 14px/1.3 var(--soft-font)!important;color:var(--soft-ink)}
-html:root[data-skin="monocode"] #modalLayer .avatar-drop small{display:block;margin-top:3px;font:400 12px/1.4 var(--soft-font)!important;color:var(--soft-ink-3)}
+html:root[data-skin="phoenix"] #modalLayer .avatar-custom-controls .avatar-drop:hover{background:var(--glass-hover)!important;border-color:var(--picker-ring)!important}
+html:root[data-skin="phoenix"] #modalLayer .avatar-drop-icon{display:grid;place-items:center;flex:0 0 46px;width:46px;height:46px;border-radius:50%;background:var(--glass-3);border:1px solid var(--glass-line)}
+html:root[data-skin="phoenix"] #modalLayer .avatar-drop-icon svg{width:22px;height:22px;fill:none;stroke:var(--soft-ink);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+html:root[data-skin="phoenix"] #modalLayer .avatar-drop strong{display:block;font:500 14px/1.3 var(--soft-font)!important;color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #modalLayer .avatar-drop small{display:block;margin-top:3px;font:400 12px/1.4 var(--soft-font)!important;color:var(--soft-ink-3)}
 @media(max-width:620px){
-  html:root[data-skin="monocode"] #modalLayer .fluffy-palette-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
-  html:root[data-skin="monocode"] #modalLayer .avatar-studio-preview>i{width:88px!important;height:88px!important;flex-basis:88px!important}
+  html:root[data-skin="phoenix"] #modalLayer .fluffy-palette-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  html:root[data-skin="phoenix"] #modalLayer .avatar-studio-preview>i{width:88px!important;height:88px!important;flex-basis:88px!important}
 }
 
 /* ── UI fix 1: sidebar top, right pane, window chrome, light sky ─────── */
 /* One centre line for the top row: sidebar brand, header, pane tabs and
    window buttons all centre at 30px from the window top. */
-html:root[data-skin="monocode"]{--top-line:30px;--pane-inset:10px}
+html:root[data-skin="phoenix"]{--top-line:30px;--pane-inset:10px}
 
 /* In-page tooltips: glass, never an unstyled light slab. */
-html:root[data-skin="monocode"] .ph-tooltip{background:var(--glass-pop)!important;color:var(--soft-ink)!important;
+html:root[data-skin="phoenix"] .ph-tooltip{background:var(--glass-pop)!important;color:var(--soft-ink)!important;
   border:1px solid var(--glass-line-strong);border-radius:10px;padding:5px 10px;font:500 12px/1.35 var(--soft-font);
   -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:var(--menu-shadow)}
-html:root[data-skin="monocode"] .ph-tooltip:empty{display:none}
+html:root[data-skin="phoenix"] .ph-tooltip:empty{display:none}
 
 /* Left sidebar top: brand row, search and filter share one inner edge. */
-html:root[data-skin="monocode"] #companySidebar .sidebar-header{height:40px!important;min-height:40px!important;flex-basis:40px;margin:0!important;padding:0 10px!important;align-items:center}
-html:root[data-skin="monocode"] #companySidebar .phoenix-brand{
+html:root[data-skin="phoenix"] #companySidebar .sidebar-header{height:40px!important;min-height:40px!important;flex-basis:40px;margin:0!important;padding:0 10px!important;align-items:center}
+html:root[data-skin="phoenix"] #companySidebar .phoenix-brand{
   flex:1 1 auto;width:100%;height:34px!important;min-height:34px;margin:0!important;padding:0 8px 0 9px!important;gap:9px;
   border-radius:11px!important;background:transparent!important;box-shadow:none!important;border:0!important}
-html:root[data-skin="monocode"] #companySidebar .phoenix-brand:is(:hover,:focus-visible){background:var(--glass-hover)!important}
-html:root[data-skin="monocode"] #companySidebar .phoenix-brand .collapse-glyph{margin-left:auto;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;color:var(--soft-ink-3)}
-html:root[data-skin="monocode"] #companySidebar .sidebar-tools{display:flex;align-items:center;gap:6px;padding:4px 10px 8px!important}
-html:root[data-skin="monocode"] #companySidebar .search-box{flex:1 1 auto;min-width:0;height:34px;display:flex;align-items:center;gap:8px;padding:0 10px!important}
-html:root[data-skin="monocode"] #companySidebar .search-box input{flex:1 1 auto;min-width:0;width:auto;background:transparent!important;border:0!important;outline:0;padding:0}
-html:root[data-skin="monocode"] #companySidebar .search-box input::placeholder{color:var(--soft-ink-3);opacity:1}
-html:root[data-skin="monocode"] #companySidebar .search-box kbd{flex:0 0 auto;padding:0}
-html:root[data-skin="monocode"] #companySidebar .filter-button{flex:0 0 34px;width:34px!important;height:34px!important;min-height:34px;padding:0;display:grid;place-items:center;border-radius:11px!important;background:transparent!important;border:0!important;color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] #companySidebar .filter-button:hover{background:var(--glass-hover)!important;color:var(--soft-ink)}
-html:root[data-skin="monocode"] #companySidebar .filter-button svg{width:18px;height:18px}
-html:root[data-skin="monocode"] #companySidebar .sidebar-header{margin-top:0!important}
-html:root[data-skin="monocode"] body.sidebar-collapsed #companySidebar .phoenix-brand{padding:0!important;justify-content:center}
+html:root[data-skin="phoenix"] #companySidebar .phoenix-brand:is(:hover,:focus-visible){background:var(--glass-hover)!important}
+html:root[data-skin="phoenix"] #companySidebar .phoenix-brand .collapse-glyph{margin-left:auto;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;color:var(--soft-ink-3)}
+html:root[data-skin="phoenix"] #companySidebar .sidebar-tools{display:flex;align-items:center;gap:6px;padding:4px 10px 8px!important}
+html:root[data-skin="phoenix"] #companySidebar .search-box{flex:1 1 auto;min-width:0;height:34px;display:flex;align-items:center;gap:8px;padding:0 10px!important}
+html:root[data-skin="phoenix"] #companySidebar .search-box input{flex:1 1 auto;min-width:0;width:auto;background:transparent!important;border:0!important;outline:0;padding:0}
+html:root[data-skin="phoenix"] #companySidebar .search-box input::placeholder{color:var(--soft-ink-3);opacity:1}
+html:root[data-skin="phoenix"] #companySidebar .search-box kbd{flex:0 0 auto;padding:0}
+html:root[data-skin="phoenix"] #companySidebar .filter-button{flex:0 0 34px;width:34px!important;height:34px!important;min-height:34px;padding:0;display:grid;place-items:center;border-radius:11px!important;background:transparent!important;border:0!important;color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] #companySidebar .filter-button:hover{background:var(--glass-hover)!important;color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #companySidebar .filter-button svg{width:18px;height:18px}
+html:root[data-skin="phoenix"] #companySidebar .sidebar-header{margin-top:0!important}
+html:root[data-skin="phoenix"] body.sidebar-collapsed #companySidebar .phoenix-brand{padding:0!important;justify-content:center}
 
 /* Header and window buttons on the shared line. */
-html:root[data-skin="monocode"] #conversationHeader{height:calc(var(--top-line) * 2)!important;min-height:calc(var(--top-line) * 2)!important;flex-basis:calc(var(--top-line) * 2)!important}
-html:root[data-skin="monocode"] .mc-window-controls{top:calc(var(--top-line) - 16px)!important;right:calc(var(--pane-inset) + 8px)!important;height:32px!important;display:flex;align-items:center;gap:2px}
-html:root[data-skin="monocode"] .mc-window-controls button{width:32px!important;height:32px!important;min-height:32px;display:grid;place-items:center;padding:0}
-html:root[data-skin="monocode"] .mc-window-controls svg{width:12px;height:12px}
+html:root[data-skin="phoenix"] #conversationHeader{height:calc(var(--top-line) * 2)!important;min-height:calc(var(--top-line) * 2)!important;flex-basis:calc(var(--top-line) * 2)!important}
+html:root[data-skin="phoenix"] .mc-window-controls{top:calc(var(--top-line) - 16px)!important;right:calc(var(--pane-inset) + 8px)!important;height:32px!important;display:flex;align-items:center;gap:2px}
+html:root[data-skin="phoenix"] .mc-window-controls button{width:32px!important;height:32px!important;min-height:32px;display:grid;place-items:center;padding:0}
+html:root[data-skin="phoenix"] .mc-window-controls svg{width:12px;height:12px}
 
 /* ── Right pane: floating frosted glass, like the left sidebar ───────── */
-html:root[data-skin="monocode"] #inspectionSidebar{
+html:root[data-skin="phoenix"] #inspectionSidebar{
   top:var(--pane-inset)!important;bottom:var(--pane-inset)!important;right:var(--pane-inset)!important;height:auto!important;
   width:calc(var(--inspection-width) - var(--pane-inset) * 2)!important;
   grid-template-rows:calc(var(--top-line) * 2 - var(--pane-inset) * 2) auto minmax(0,1fr)!important;
@@ -605,270 +605,280 @@ html:root[data-skin="monocode"] #inspectionSidebar{
   border:1px solid var(--glass-line)!important;border-radius:20px!important;overflow:hidden;box-shadow:var(--glass-shadow)!important;
   color:var(--soft-ink);font-family:var(--soft-font);
 }
-html:root[data-skin="monocode"] body.inspection-open.inspection-image-active:not(.inspection-expanded) #inspectionSidebar{width:calc(min(var(--inspection-width),100vw - var(--workspace-left)) - var(--pane-inset) * 2)!important}
-html:root[data-skin="monocode"] body.inspection-expanded #inspectionSidebar{left:calc(var(--workspace-left) + var(--pane-inset))!important;width:auto!important}
-html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar{
+html:root[data-skin="phoenix"] body.inspection-open.inspection-image-active:not(.inspection-expanded) #inspectionSidebar{width:calc(min(var(--inspection-width),100vw - var(--workspace-left)) - var(--pane-inset) * 2)!important}
+html:root[data-skin="phoenix"] body.inspection-expanded #inspectionSidebar{left:calc(var(--workspace-left) + var(--pane-inset))!important;width:auto!important}
+html:root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar{
   left:calc(var(--workspace-left) + var(--pane-inset))!important;right:var(--pane-inset)!important;width:auto!important;
   top:calc(var(--top-line) * 2)!important;bottom:auto!important;height:calc(var(--inspection-stack-height) - 32px)!important}
 /* Stacked: the pane sits under the header row, so the window buttons stay
    in the header and the pane's own controls keep the tab row's right end. */
-html:root[data-skin="monocode"] #inspectionResize{background:transparent!important}
+html:root[data-skin="phoenix"] #inspectionResize{background:transparent!important}
 
 /* Tab row: tabs scroll with soft edges, never under the window buttons. */
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-tabbar{
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-tabbar{
   display:flex;align-items:center;gap:6px;height:auto!important;min-height:0!important;box-sizing:border-box;
   padding:0 calc(32px * 3 + 2px * 2 + 16px) 0 8px!important;border-bottom:1px solid var(--glass-line)!important;background:transparent!important}
-html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar .inspection-tabbar,
-html:root[data-skin="monocode"] body:not(.inspection-open) #inspectionSidebar .inspection-tabbar{padding-right:8px!important}
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-tab-strip{
+html:root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar .inspection-tabbar,
+html:root[data-skin="phoenix"] body:not(.inspection-open) #inspectionSidebar .inspection-tabbar{padding-right:8px!important}
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-tab-strip{
   flex:1 1 auto;min-width:0;height:100%;display:flex;align-items:center;gap:4px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;
   scroll-padding-inline:14px;scroll-snap-type:x mandatory;padding:0 14px 0 2px;
   -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 14px,#000 calc(100% - 30px),transparent);mask-image:linear-gradient(90deg,transparent 0,#000 14px,#000 calc(100% - 30px),transparent)}
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-tab-strip::-webkit-scrollbar{display:none}
-html:root[data-skin="monocode"] #inspectionSidebar :is(.inspection-browser-tabs,.inspection-image-tabs){display:contents}
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-tab{
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-tab-strip::-webkit-scrollbar{display:none}
+html:root[data-skin="phoenix"] #inspectionSidebar :is(.inspection-browser-tabs,.inspection-image-tabs){display:contents}
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-tab{
   flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;height:30px!important;min-height:30px;box-sizing:border-box;
   padding:0 12px!important;border-radius:999px!important;border:1px solid transparent!important;background:transparent!important;box-shadow:none!important;
   font:500 12.5px/1 var(--soft-font)!important;color:var(--soft-ink-2)!important;white-space:nowrap}
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-tab:hover{background:var(--glass-hover)!important;color:var(--soft-ink)!important}
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-tab[aria-selected="true"]{background:var(--glass-3)!important;border-color:var(--glass-line)!important;color:var(--soft-ink)!important}
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-tab::after{display:none!important}
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-tab:hover{background:var(--glass-hover)!important;color:var(--soft-ink)!important}
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-tab[aria-selected="true"]{background:var(--glass-3)!important;border-color:var(--glass-line)!important;color:var(--soft-ink)!important}
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-tab::after{display:none!important}
 /* Browser tabs: one width each, title ellipsised inside, close on the right. */
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-tab-strip>*,html:root[data-skin="monocode"] #inspectionSidebar .inspection-browser-tabs>*{scroll-snap-align:start}
-html:root[data-skin="monocode"] #inspectionSidebar .browser-page-tab{width:140px;min-width:140px;max-width:140px;padding:0 6px 0 10px!important}
-html:root[data-skin="monocode"] #inspectionSidebar .browser-page-tab>strong{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:inherit;text-align:left}
-html:root[data-skin="monocode"] #inspectionSidebar .browser-page-tab :is(img,svg,.browser-tab-fallback){flex:0 0 16px;width:16px;height:16px;border-radius:4px}
-html:root[data-skin="monocode"] #inspectionSidebar .browser-tab-close{flex:0 0 20px;width:20px;height:20px;display:grid;place-items:center;border-radius:999px;font-size:14px;line-height:1;color:var(--soft-ink-3);opacity:.85}
-html:root[data-skin="monocode"] #inspectionSidebar .browser-tab-close:hover{background:var(--glass-hover);color:var(--soft-ink)}
-html:root[data-skin="monocode"] #inspectionSidebar .browser-owner-chip{flex:0 0 auto;height:30px;padding:0 11px 0 4px;background:var(--glass-3)!important;border:1px solid var(--glass-line)!important;font:500 12px/1 var(--soft-font);color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] #inspectionSidebar .browser-owner-chip svg{width:22px;height:22px;flex-basis:22px}
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-new-tab{flex:0 0 30px;width:30px;height:30px;display:grid;place-items:center;border-radius:999px!important;background:transparent!important;border:0!important;color:var(--soft-ink-3)}
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-new-tab:hover{background:var(--glass-hover)!important;color:var(--soft-ink)}
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-new-tab svg{width:16px;height:16px;stroke:currentColor;stroke-width:1.6;fill:none}
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-tab-strip>*,html:root[data-skin="phoenix"] #inspectionSidebar .inspection-browser-tabs>*{scroll-snap-align:start}
+html:root[data-skin="phoenix"] #inspectionSidebar .browser-page-tab{width:140px;min-width:140px;max-width:140px;padding:0 6px 0 10px!important}
+html:root[data-skin="phoenix"] #inspectionSidebar .browser-page-tab>strong{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:inherit;text-align:left}
+html:root[data-skin="phoenix"] #inspectionSidebar .browser-page-tab :is(img,svg,.browser-tab-fallback){flex:0 0 16px;width:16px;height:16px;border-radius:4px}
+html:root[data-skin="phoenix"] #inspectionSidebar .browser-tab-close{flex:0 0 20px;width:20px;height:20px;display:grid;place-items:center;border-radius:999px;font-size:14px;line-height:1;color:var(--soft-ink-3);opacity:.85}
+html:root[data-skin="phoenix"] #inspectionSidebar .browser-tab-close:hover{background:var(--glass-hover);color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #inspectionSidebar .browser-owner-chip{flex:0 0 auto;height:30px;padding:0 11px 0 4px;background:var(--glass-3)!important;border:1px solid var(--glass-line)!important;font:500 12px/1 var(--soft-font);color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] #inspectionSidebar .browser-owner-chip svg{width:22px;height:22px;flex-basis:22px}
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-new-tab{flex:0 0 30px;width:30px;height:30px;display:grid;place-items:center;border-radius:999px!important;background:transparent!important;border:0!important;color:var(--soft-ink-3)}
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-new-tab:hover{background:var(--glass-hover)!important;color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-new-tab svg{width:16px;height:16px;stroke:currentColor;stroke-width:1.6;fill:none}
 /* Pane controls: same size and rhythm as the window buttons beside them. */
-html:root[data-skin="monocode"] #inspectionPanelControls{flex:0 0 auto;display:flex;align-items:center;gap:2px;height:32px;padding:0 8px 0 0;margin:0;position:relative}
-html:root[data-skin="monocode"] body.inspection-open:not(.inspection-stacked) #inspectionPanelControls::after{content:"";position:absolute;right:0;top:8px;width:1px;height:16px;background:var(--glass-line-strong)}
-html:root[data-skin="monocode"] #inspectionPanelControls>button{width:32px!important;height:32px!important;min-height:32px;padding:0!important;margin:0!important;display:grid;place-items:center;border-radius:999px!important;background:transparent!important;border:0!important;color:var(--soft-ink-2)!important}
-html:root[data-skin="monocode"] #inspectionPanelControls>button:hover{background:var(--glass-hover)!important;color:var(--soft-ink)!important}
-html:root[data-skin="monocode"] #inspectionPanelControls>button svg{width:17px;height:17px}
+html:root[data-skin="phoenix"] #inspectionPanelControls{flex:0 0 auto;display:flex;align-items:center;gap:2px;height:32px;padding:0 8px 0 0;margin:0;position:relative}
+html:root[data-skin="phoenix"] body.inspection-open:not(.inspection-stacked) #inspectionPanelControls::after{content:"";position:absolute;right:0;top:8px;width:1px;height:16px;background:var(--glass-line-strong)}
+html:root[data-skin="phoenix"] #inspectionPanelControls>button{width:32px!important;height:32px!important;min-height:32px;padding:0!important;margin:0!important;display:grid;place-items:center;border-radius:999px!important;background:transparent!important;border:0!important;color:var(--soft-ink-2)!important}
+html:root[data-skin="phoenix"] #inspectionPanelControls>button:hover{background:var(--glass-hover)!important;color:var(--soft-ink)!important}
+html:root[data-skin="phoenix"] #inspectionPanelControls>button svg{width:17px;height:17px}
 
 /* Toolbar under the tabs. */
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-toolbar{background:transparent!important;border-bottom:0!important;padding:10px 12px 6px!important;height:auto!important;min-height:0!important;box-sizing:border-box}
-html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar{display:flex;align-items:center;gap:10px;width:100%}
-html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger{
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-toolbar{background:transparent!important;border-bottom:0!important;padding:10px 12px 6px!important;height:auto!important;min-height:0!important;box-sizing:border-box}
+html:root[data-skin="phoenix"] #inspectionSidebar .desktop-workspace-toolbar{display:flex;align-items:center;gap:10px;width:100%}
+html:root[data-skin="phoenix"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger{
   flex:0 1 auto;max-width:100%;min-width:0;height:34px!important;min-height:34px;box-sizing:border-box;display:inline-flex;align-items:center;gap:8px;
   padding:0 12px 0 36px!important;border-radius:999px!important;background:var(--glass-3)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important;
   font:500 12.5px/1 var(--soft-font)!important;color:var(--soft-ink)!important;position:relative;
 }
-html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger::before{
+html:root[data-skin="phoenix"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger::before{
   content:"";position:absolute;left:13px;top:50%;width:15px;height:15px;transform:translateY(-50%);background:currentColor;opacity:.7;
   -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2.5' y='3.5' width='15' height='10.5' rx='2'/%3E%3Cpath d='M7 17h6M10 14v3'/%3E%3C/svg%3E") center/contain no-repeat;
   mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2.5' y='3.5' width='15' height='10.5' rx='2'/%3E%3Cpath d='M7 17h6M10 14v3'/%3E%3C/svg%3E") center/contain no-repeat}
-html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger .select-chevron{flex:0 0 14px;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;opacity:.65}
-html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger:disabled{color:var(--soft-ink-2)!important;opacity:1}
-html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger:disabled .select-chevron{display:none}
-html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger:not(:disabled):hover{background:var(--glass-hover)!important;border-color:var(--glass-line-strong)!important}
-html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-status{font:500 11.5px var(--soft-font);color:var(--soft-ink-3)}
+html:root[data-skin="phoenix"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html:root[data-skin="phoenix"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger .select-chevron{flex:0 0 14px;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;opacity:.65}
+html:root[data-skin="phoenix"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger:disabled{color:var(--soft-ink-2)!important;opacity:1}
+html:root[data-skin="phoenix"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger:disabled .select-chevron{display:none}
+html:root[data-skin="phoenix"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger:not(:disabled):hover{background:var(--glass-hover)!important;border-color:var(--glass-line-strong)!important}
+html:root[data-skin="phoenix"] #inspectionSidebar .desktop-workspace-status{font:500 11.5px var(--soft-font);color:var(--soft-ink-3)}
 /* Browser toolbar: glass pills, spaced, aligned on one row. */
 /* Browser toolbar: one 32px row (buttons and address pill alike), centred
    with 10px above and below, so the page view starts 10px under the pill. */
-html:root[data-skin="monocode"] #inspectionSidebar .browser-side-toolbar{display:flex;align-items:center;gap:4px;width:100%;height:auto!important;min-height:32px!important}
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-toolbar:has(.browser-side-toolbar:not([hidden])){height:auto!important;min-height:0!important;padding:10px!important}
-html:root[data-skin="monocode"] #inspectionSidebar .browser-side-toolbar :is(.browser-nav-button,.browser-settings-button){flex:0 0 32px!important;width:32px!important;min-width:32px!important;height:32px!important;min-height:32px!important;margin:0!important;padding:0;display:grid;place-items:center;border-radius:999px!important;background:transparent!important;border:0!important;color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] #inspectionSidebar .browser-side-toolbar :is(.browser-nav-button,.browser-settings-button):hover{background:var(--glass-hover)!important;color:var(--soft-ink)}
-html:root[data-skin="monocode"] #inspectionSidebar .browser-side-toolbar :is(.browser-nav-button,.browser-settings-button) svg{width:17px;height:17px}
-html:root[data-skin="monocode"] #inspectionSidebar .browser-address-shell{box-sizing:border-box;flex:1 1 0!important;min-width:0;height:32px!important;min-height:32px!important;margin:0 4px!important;padding:0 12px;border-radius:999px!important;background:var(--glass-3)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important}
-html:root[data-skin="monocode"] #inspectionSidebar .browser-address-shell input{font:450 12.5px var(--soft-font);color:var(--soft-ink);background:transparent}
+html:root[data-skin="phoenix"] #inspectionSidebar .browser-side-toolbar{display:flex;align-items:center;gap:4px;width:100%;height:auto!important;min-height:32px!important}
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-toolbar:has(.browser-side-toolbar:not([hidden])){height:auto!important;min-height:0!important;padding:10px!important}
+html:root[data-skin="phoenix"] #inspectionSidebar .browser-side-toolbar :is(.browser-nav-button,.browser-settings-button){flex:0 0 32px!important;width:32px!important;min-width:32px!important;height:32px!important;min-height:32px!important;margin:0!important;padding:0;display:grid;place-items:center;border-radius:999px!important;background:transparent!important;border:0!important;color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] #inspectionSidebar .browser-side-toolbar :is(.browser-nav-button,.browser-settings-button):hover{background:var(--glass-hover)!important;color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #inspectionSidebar .browser-side-toolbar :is(.browser-nav-button,.browser-settings-button) svg{width:17px;height:17px}
+html:root[data-skin="phoenix"] #inspectionSidebar .browser-address-shell{box-sizing:border-box;flex:1 1 0!important;min-width:0;height:32px!important;min-height:32px!important;margin:0 4px!important;padding:0 12px;border-radius:999px!important;background:var(--glass-3)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important}
+html:root[data-skin="phoenix"] #inspectionSidebar .browser-address-shell input{font:450 12.5px var(--soft-font);color:var(--soft-ink);background:transparent}
 
 /* The page view (placeholder and the native view, whose bounds are read off
    #browserViewport) is inset 10px left, right and bottom inside the glass,
    matching the toolbar padding, with a 12px radius on every corner. */
-html:root[data-skin="monocode"] body.inspection-open:not(.inspection-stacked):not(.inspection-expanded) .browser-overlay:not([hidden]){
+html:root[data-skin="phoenix"] body.inspection-open:not(.inspection-stacked):not(.inspection-expanded) .browser-overlay:not([hidden]){
   right:calc(var(--pane-inset) + 1px)!important;bottom:calc(var(--pane-inset) + 1px)!important;
   width:calc(var(--inspection-width) - var(--pane-inset) * 2 - 2px)!important;
   background:transparent!important;border-radius:0 0 19px 19px;overflow:hidden;padding:0 10px 10px!important;box-sizing:border-box}
-html:root[data-skin="monocode"] body.inspection-expanded .browser-overlay:not([hidden]){left:calc(var(--workspace-left) + var(--pane-inset) + 1px)!important;right:calc(var(--pane-inset) + 1px)!important;bottom:calc(var(--pane-inset) + 1px)!important;background:transparent!important;padding:0 10px 10px!important;box-sizing:border-box}
-html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) .browser-overlay:not([hidden]){left:calc(var(--workspace-left) + var(--pane-inset) + 1px)!important;right:calc(var(--pane-inset) + 1px)!important;height:calc(var(--inspection-stack-height) + 27px - var(--mc-browser-top,94px))!important;background:transparent!important;padding:0 10px 10px!important;box-sizing:border-box}
-html:root[data-skin="monocode"] .browser-overlay .embedded-browser{border-radius:12px!important;overflow:hidden;background:transparent!important}
-html:root[data-skin="monocode"] .browser-overlay #browserViewport{border-radius:12px;overflow:hidden}
-html:root[data-skin="monocode"] body.inspection-open .browser-overlay:not([hidden]){border:0!important}
+html:root[data-skin="phoenix"] body.inspection-expanded .browser-overlay:not([hidden]){left:calc(var(--workspace-left) + var(--pane-inset) + 1px)!important;right:calc(var(--pane-inset) + 1px)!important;bottom:calc(var(--pane-inset) + 1px)!important;background:transparent!important;padding:0 10px 10px!important;box-sizing:border-box}
+html:root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) .browser-overlay:not([hidden]){left:calc(var(--workspace-left) + var(--pane-inset) + 1px)!important;right:calc(var(--pane-inset) + 1px)!important;height:calc(var(--inspection-stack-height) + 27px - var(--mc-browser-top,94px))!important;background:transparent!important;padding:0 10px 10px!important;box-sizing:border-box}
+html:root[data-skin="phoenix"] .browser-overlay .embedded-browser{border-radius:12px!important;overflow:hidden;background:transparent!important}
+html:root[data-skin="phoenix"] .browser-overlay #browserViewport{border-radius:12px;overflow:hidden}
+html:root[data-skin="phoenix"] body.inspection-open .browser-overlay:not([hidden]){border:0!important}
 /* The overlay's 10px inset is see-through: keep the pane's own empty copy
    from peeking out under the page view. */
-html:root[data-skin="monocode"] body.inspection-browser-active:has(#browserOverlay:not([hidden])) #inspectionBrowserPanel .inspection-empty{visibility:hidden}
+html:root[data-skin="phoenix"] body.inspection-browser-active:has(#browserOverlay:not([hidden])) #inspectionBrowserPanel .inspection-empty{visibility:hidden}
 
 /* Desktop empty state: centred in the pane, quiet icon above. */
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-desktop-panel:not([hidden]){position:relative;display:flex!important;flex-direction:column;min-height:0}
-html:root[data-skin="monocode"] #inspectionSidebar #desktopObservationStage{flex:1 1 auto;min-height:0;margin:4px 12px 12px;border-radius:14px;overflow:hidden}
-html:root[data-skin="monocode"] #inspectionSidebar #desktopObservationStage.no-frame{display:flex;align-items:center;justify-content:center;background:transparent!important;border:0!important}
-html:root[data-skin="monocode"] #inspectionSidebar #desktopObservationStage.no-frame ~ .desktop-observation-caption{display:none}
-html:root[data-skin="monocode"] #inspectionSidebar #desktopObservationEmpty:not([hidden]){
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-desktop-panel:not([hidden]){position:relative;display:flex!important;flex-direction:column;min-height:0}
+html:root[data-skin="phoenix"] #inspectionSidebar #desktopObservationStage{flex:1 1 auto;min-height:0;margin:4px 12px 12px;border-radius:14px;overflow:hidden}
+html:root[data-skin="phoenix"] #inspectionSidebar #desktopObservationStage.no-frame{display:flex;align-items:center;justify-content:center;background:transparent!important;border:0!important}
+html:root[data-skin="phoenix"] #inspectionSidebar #desktopObservationStage.no-frame ~ .desktop-observation-caption{display:none}
+html:root[data-skin="phoenix"] #inspectionSidebar #desktopObservationEmpty:not([hidden]){
   display:flex;flex-direction:column;align-items:center;gap:14px;max-width:280px;margin:0 auto;padding:0 0 6vh!important;
   font:450 13px/1.55 var(--soft-font)!important;color:var(--soft-ink-2)!important;text-align:center;text-wrap:balance}
-html:root[data-skin="monocode"] #inspectionSidebar #desktopObservationEmpty::before{
+html:root[data-skin="phoenix"] #inspectionSidebar #desktopObservationEmpty::before{
   content:"";width:52px;height:52px;border-radius:16px;background:var(--glass-3);border:1px solid var(--glass-line);box-shadow:inset 0 1px 0 rgb(255 255 255 / 8%);
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23a9add0' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2.5' y='3.5' width='15' height='10.5' rx='2'/%3E%3Cpath d='M7 17h6M10 14v3'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:center;background-size:24px}
-html:root[data-skin="monocode"][data-theme="light"] #inspectionSidebar #desktopObservationEmpty::before{
+html:root[data-skin="phoenix"][data-theme="light"] #inspectionSidebar #desktopObservationEmpty::before{
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%235a6088' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2.5' y='3.5' width='15' height='10.5' rx='2'/%3E%3Cpath d='M7 17h6M10 14v3'/%3E%3C/svg%3E")}
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-empty{font-family:var(--soft-font);color:var(--soft-ink-2)}
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-empty strong{font:550 14px/1.35 var(--soft-font);color:var(--soft-ink)}
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-empty small{font:400 12.5px/1.5 var(--soft-font);color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-empty{font-family:var(--soft-font);color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-empty strong{font:550 14px/1.35 var(--soft-font);color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-empty small{font:400 12.5px/1.5 var(--soft-font);color:var(--soft-ink-2)}
 
 
 /* Composer: only the context reading remains under it. */
-html:root[data-skin="monocode"] #composer .mc-composer-head:has(.mc-context:empty){display:none}
-html:root[data-skin="monocode"] #composer .mc-composer-head .mc-context{margin-left:0}
+html:root[data-skin="phoenix"] #composer .mc-composer-head:has(.mc-context:empty){display:none}
+html:root[data-skin="phoenix"] #composer .mc-composer-head .mc-context{margin-left:0}
 
 /* ── Light theme over the scenic sky ─────────────────────────────────── */
-html:root[data-skin="monocode"][data-theme="light"] :is(#companySidebar,#inspectionSidebar){border-color:rgb(255 255 255 / 55%)!important;box-shadow:0 14px 44px rgb(20 40 90 / 18%),inset 0 1px 0 rgb(255 255 255 / 60%)!important}
-html:root[data-skin="monocode"][data-theme="light"] #conversationHeader :is(#conversationDetailToggle,.group-roster-trigger){background:rgb(255 255 255 / 72%)!important;border-color:rgb(255 255 255 / 60%)!important}
+html:root[data-skin="phoenix"][data-theme="light"] :is(#companySidebar,#inspectionSidebar){border-color:rgb(255 255 255 / 55%)!important;box-shadow:0 14px 44px rgb(20 40 90 / 18%),inset 0 1px 0 rgb(255 255 255 / 60%)!important}
+html:root[data-skin="phoenix"][data-theme="light"] #conversationHeader :is(#conversationDetailToggle,.group-roster-trigger){background:rgb(255 255 255 / 72%)!important;border-color:rgb(255 255 255 / 60%)!important}
 /* Text that sits straight on the sky follows its brightness. */
-html:root[data-skin="monocode"][data-theme="light"][data-sky-ink-top="light"] #conversationHeader :is(#stageName,#stageRole,#stageMore,.stage-panel-button){color:rgb(255 255 255 / 96%)!important;text-shadow:0 1px 8px rgb(10 20 50 / 30%)}
-html:root[data-skin="monocode"][data-theme="light"][data-sky-ink-top="light"] .mc-window-controls button{color:rgb(255 255 255 / 92%)!important}
-html:root[data-skin="monocode"][data-theme="light"][data-sky-ink-top="light"] body.inspection-open:not(.inspection-stacked) .mc-window-controls button{color:var(--soft-ink-2)!important}
-html:root[data-skin="monocode"][data-theme="light"][data-sky-ink-mid="light"] .mc-empty-heading{color:#fff!important;text-shadow:0 2px 18px rgb(10 20 50 / 30%)}
-html:root[data-skin="monocode"][data-theme="light"][data-sky-ink-mid="dark"] .mc-empty-heading{text-shadow:0 0 22px rgb(255 255 255 / 55%)}
-html:root[data-skin="monocode"][data-theme="light"] #conversationFeed :is(.agent-message,.group-message) .message-content>header :is(strong,small){text-shadow:0 0 6px rgb(255 255 255 / 85%),0 0 2px rgb(255 255 255 / 90%)}
+html:root[data-skin="phoenix"][data-theme="light"][data-sky-ink-top="light"] #conversationHeader :is(#stageName,#stageRole,#stageMore,.stage-panel-button){color:rgb(255 255 255 / 96%)!important;text-shadow:0 1px 8px rgb(10 20 50 / 30%)}
+html:root[data-skin="phoenix"][data-theme="light"][data-sky-ink-top="light"] .mc-window-controls button{color:rgb(255 255 255 / 92%)!important}
+html:root[data-skin="phoenix"][data-theme="light"][data-sky-ink-top="light"] body.inspection-open:not(.inspection-stacked) .mc-window-controls button{color:var(--soft-ink-2)!important}
+html:root[data-skin="phoenix"][data-theme="light"][data-sky-ink-mid="light"] .mc-empty-heading{color:#fff!important;text-shadow:0 2px 18px rgb(10 20 50 / 30%)}
+html:root[data-skin="phoenix"][data-theme="light"][data-sky-ink-mid="dark"] .mc-empty-heading{text-shadow:0 0 22px rgb(255 255 255 / 55%)}
+html:root[data-skin="phoenix"][data-theme="light"] #conversationFeed :is(.agent-message,.group-message) .message-content>header :is(strong,small){text-shadow:0 0 6px rgb(255 255 255 / 85%),0 0 2px rgb(255 255 255 / 90%)}
 /* Small status text on the light sky (context used, "Responded in …"):
    dark ink with a soft white halo so it reads on pale clouds and blue sky. */
-html:root[data-skin="monocode"][data-theme="light"] #composer .mc-composer-head{color:rgb(30 38 70 / 82%)!important;text-shadow:0 0 6px rgb(255 255 255 / 75%),0 0 2px rgb(255 255 255 / 60%)!important}
-html:root[data-skin="monocode"][data-theme="light"] #conversationFeed .completion-meta{color:rgb(30 38 70 / 78%);text-shadow:0 0 6px rgb(255 255 255 / 70%)}
-html:root[data-skin="monocode"] #conversationStage:not(.mc-empty) #composerZone:has(.mc-composer-head .mc-context:empty){margin-bottom:20px!important}
-html:root[data-skin="monocode"][data-theme="light"] #conversationFeed .member-message .message-content>header strong{color:color-mix(in srgb,var(--speaker,var(--soft-ink)) 40%,var(--soft-ink))!important}
-html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar #desktopObservationEmpty:not([hidden]){padding:0!important;gap:8px;font-size:12.5px!important}
-html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar #desktopObservationEmpty::before{width:38px;height:38px;border-radius:12px;background-size:19px}
+html:root[data-skin="phoenix"][data-theme="light"] #composer .mc-composer-head{color:rgb(30 38 70 / 82%)!important;text-shadow:0 0 6px rgb(255 255 255 / 75%),0 0 2px rgb(255 255 255 / 60%)!important}
+html:root[data-skin="phoenix"][data-theme="light"] #conversationFeed .completion-meta{color:rgb(30 38 70 / 78%);text-shadow:0 0 6px rgb(255 255 255 / 70%)}
+html:root[data-skin="phoenix"] #conversationStage:not(.mc-empty) #composerZone:has(.mc-composer-head .mc-context:empty){margin-bottom:20px!important}
+html:root[data-skin="phoenix"][data-theme="light"] #conversationFeed .member-message .message-content>header strong{color:color-mix(in srgb,var(--speaker,var(--soft-ink)) 40%,var(--soft-ink))!important}
+html:root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar #desktopObservationEmpty:not([hidden]){padding:0!important;gap:8px;font-size:12.5px!important}
+html:root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar #desktopObservationEmpty::before{width:38px;height:38px;border-radius:12px;background-size:19px}
 
 /* ── UI fix 2: higher transcript, readable room hero, window drag ────── */
 /* The room cluster already owns its leader avatar. Use that single face at
    the regular 160px chat size, with members on frosted backplates beside it. */
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty):has(#groupPals){
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty):has(#groupPals){
   --room-hero:160px;--room-pal:56px;
   --room-in-x:112px;--room-in-y:44px;--room-out-x:176px;--room-out-y:18px;--room-more-x:226px;--room-more-y:2px}
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #conversationHeader.has-group-pals{z-index:5}
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals{--leader:var(--room-hero)!important;--pal:var(--room-pal)!important}
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat[data-seat="leader"]{
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #conversationHeader.has-group-pals{z-index:5}
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals{--leader:var(--room-hero)!important;--pal:var(--room-pal)!important}
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat[data-seat="leader"]{
   background:var(--glass-1)!important;box-shadow:0 10px 36px rgb(6 8 22 / 22%)!important;animation:none!important;scale:1}
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat[data-seat="leader"].speaking{
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat[data-seat="leader"].speaking{
   box-shadow:0 0 0 2px var(--ember,#ff6e14),0 0 18px 3px color-mix(in srgb,var(--ember,#ff6e14) 40%,transparent)!important;animation:pal-speak 1.4s ease-in-out infinite!important}
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat:not([data-seat="leader"]){
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat:not([data-seat="leader"]){
   z-index:3;border:0!important;background:var(--glass-2,rgb(255 255 255 / 10%))!important;
   -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat:not([data-seat="leader"]):not(.speaking){
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat:not([data-seat="leader"]):not(.speaking){
   box-shadow:0 0 0 1.5px var(--glass-line-strong,rgb(255 255 255 / 28%)),0 6px 16px rgb(6 8 22 / 26%)!important}
-html:root[data-skin="monocode"][data-theme="light"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat:not([data-seat="leader"]){background:rgb(255 255 255 / 55%)!important}
-html:root[data-skin="monocode"][data-theme="light"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat:not([data-seat="leader"]):not(.speaking){
+html:root[data-skin="phoenix"][data-theme="light"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat:not([data-seat="leader"]){background:rgb(255 255 255 / 55%)!important}
+html:root[data-skin="phoenix"][data-theme="light"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat:not([data-seat="leader"]):not(.speaking){
   box-shadow:0 0 0 1.5px rgb(255 255 255 / 85%),0 6px 16px rgb(60 66 120 / 18%)!important}
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-more{z-index:4}
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals[data-stage] [data-seat="inner-left"]{--x:calc(var(--room-in-x) * -1)!important;--y:var(--room-in-y)!important}
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals[data-stage] [data-seat="inner-right"]{--x:var(--room-in-x)!important;--y:var(--room-in-y)!important}
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals[data-stage] [data-seat="outer-left"]{--x:calc(var(--room-out-x) * -1)!important;--y:var(--room-out-y)!important}
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals[data-stage] [data-seat="outer-right"]{--x:var(--room-out-x)!important;--y:var(--room-out-y)!important}
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals[data-stage] .pal-more{--x:var(--room-more-x)!important;--y:var(--room-more-y)!important}
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-more{z-index:4}
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals[data-stage] [data-seat="inner-left"]{--x:calc(var(--room-in-x) * -1)!important;--y:var(--room-in-y)!important}
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals[data-stage] [data-seat="inner-right"]{--x:var(--room-in-x)!important;--y:var(--room-in-y)!important}
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals[data-stage] [data-seat="outer-left"]{--x:calc(var(--room-out-x) * -1)!important;--y:var(--room-out-y)!important}
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals[data-stage] [data-seat="outer-right"]{--x:var(--room-out-x)!important;--y:var(--room-out-y)!important}
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals[data-stage] .pal-more{--x:var(--room-more-x)!important;--y:var(--room-more-y)!important}
 /* Narrow centre column (pane open on a mid-size window): smaller members
    tucked closer under the hero's sides so the cluster stays inside it. */
-html:root[data-skin="monocode"] #conversationHeader.has-group-pals{container:phx-room-head/inline-size}
+html:root[data-skin="phoenix"] #conversationHeader.has-group-pals{container:phx-room-head/inline-size}
 @container phx-room-head (max-width:440px){
-  html:root[data-skin="monocode"] #conversationHeader #groupPals{--room-pal:40px;--room-in-x:94px;--room-in-y:56px;--room-out-x:min(146px,calc(50cqw - 24px));--room-out-y:34px;--room-more-x:min(146px,calc(50cqw - 24px));--room-more-y:-22px}
+  html:root[data-skin="phoenix"] #conversationHeader #groupPals{--room-pal:40px;--room-in-x:94px;--room-in-y:56px;--room-out-x:min(146px,calc(50cqw - 24px));--room-out-y:34px;--room-more-x:min(146px,calc(50cqw - 24px));--room-more-y:-22px}
 }
 /* The cluster is anchored below the header. Reserve only its leader height
    and a small gap so the transcript starts directly beneath the faces. */
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty):has(#groupPals) #conversationBody{margin-top:calc(var(--room-hero) + 16px)!important}
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty):has(#groupPals) #conversationBody{margin-top:calc(var(--room-hero) + 16px)!important}
 /* Stacked (narrow window, pane above the chat): once there are messages the
    hero and member cluster collapse away; the header roster chip still shows
    the members, and the transcript gets the whole column. */
-html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #conversationStage.has-thread:not(.mc-empty) :is(#fluffyHero,#groupPals){display:none!important}
-html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #conversationStage.has-thread:not(.mc-empty) #conversationBody{margin-top:0!important}
+html:root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) #conversationStage.has-thread:not(.mc-empty) :is(#fluffyHero,#groupPals){display:none!important}
+html:root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) #conversationStage.has-thread:not(.mc-empty) #conversationBody{margin-top:0!important}
 /* Keep a short edge in panes without a hero. The chat fade begins at
    Fluffy's center and softens a full avatar-height of scrolling messages. */
-html:root[data-skin="monocode"] #conversationBody{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 18px)!important;mask-image:linear-gradient(to bottom,transparent 0,#000 18px)!important}
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage.has-fluffy:not(.mc-empty){--chat-hero-diameter:160px;--chat-hero-fade:160px}
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage.has-fluffy:not(.mc-empty) #fluffyHero{--mc-hero-diameter:var(--chat-hero-diameter);height:var(--chat-hero-diameter);flex-basis:var(--chat-hero-diameter)}
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage.has-fluffy:not(.mc-empty) #conversationBody{
+html:root[data-skin="phoenix"] #conversationBody{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 18px)!important;mask-image:linear-gradient(to bottom,transparent 0,#000 18px)!important}
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage.has-fluffy:not(.mc-empty){--chat-hero-diameter:160px;--chat-hero-fade:160px}
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage.has-fluffy:not(.mc-empty) #fluffyHero{--mc-hero-diameter:var(--chat-hero-diameter);height:var(--chat-hero-diameter);flex-basis:var(--chat-hero-diameter)}
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage.has-fluffy:not(.mc-empty) #conversationBody{
  margin-top:calc(var(--chat-hero-diameter) / -2 - 8px)!important;
  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 var(--chat-hero-fade))!important;
  mask-image:linear-gradient(to bottom,transparent 0,#000 var(--chat-hero-fade))!important;
 }
-html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage.has-fluffy:not(.mc-empty) #conversationFeed{padding-top:calc(var(--chat-hero-fade) + 20px)!important}
+html:root[data-skin="phoenix"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage.has-fluffy:not(.mc-empty) #conversationFeed{padding-top:calc(var(--chat-hero-fade) + 20px)!important}
 
 /* Window drag (frameless Electron window: Chromium reads -webkit-app-region).
    Drag: the 10px top edge above the floating panels, the empty part of the
    sidebar brand row, the chat header, and the empty part of the pane tab row.
    Every control inside those strips opts back out with no-drag. */
-html:root[data-skin="monocode"] .window-chrome{display:block!important;position:fixed;left:0;right:0;top:0;height:var(--pane-inset,10px);
+html:root[data-skin="phoenix"] .window-chrome{display:block!important;position:fixed;left:0;right:0;top:0;height:var(--pane-inset,10px);
   padding:0;border:0!important;background:transparent!important;z-index:2;-webkit-app-region:drag}
-html:root[data-skin="monocode"] .window-chrome>*{display:none!important}
-html:root[data-skin="monocode"] body:not(.sidebar-collapsed) #companySidebar .sidebar-header{-webkit-app-region:drag}
-html:root[data-skin="monocode"] body:not(.sidebar-collapsed) #companySidebar .phoenix-brand{flex:0 0 auto!important;width:auto!important;padding-right:12px!important;-webkit-app-region:no-drag}
-html:root[data-skin="monocode"] body:not(.sidebar-collapsed) #companySidebar .phoenix-brand .collapse-glyph{
+html:root[data-skin="phoenix"] .window-chrome>*{display:none!important}
+html:root[data-skin="phoenix"] body:not(.sidebar-collapsed) #companySidebar .sidebar-header{-webkit-app-region:drag}
+html:root[data-skin="phoenix"] body:not(.sidebar-collapsed) #companySidebar .phoenix-brand{flex:0 0 auto!important;width:auto!important;padding-right:12px!important;-webkit-app-region:no-drag}
+html:root[data-skin="phoenix"] body:not(.sidebar-collapsed) #companySidebar .phoenix-brand .collapse-glyph{
   position:absolute;right:10px;top:50%;width:16px!important;height:16px!important;box-sizing:content-box;padding:8px;margin:-16px 0 0!important;
   border-radius:10px;transform:none;-webkit-app-region:no-drag}
-html:root[data-skin="monocode"] body:not(.sidebar-collapsed) #companySidebar .sidebar-header:hover .collapse-glyph{opacity:1}
-html:root[data-skin="monocode"] body:not(.sidebar-collapsed) #companySidebar .phoenix-brand .collapse-glyph:hover{background:var(--glass-hover);color:var(--soft-ink)}
-html:root[data-skin="monocode"] #conversationHeader{-webkit-app-region:drag}
-html:root[data-skin="monocode"] #conversationHeader :is(button,a,input,select,textarea,label,[role="button"],[role="tab"],[contenteditable],[tabindex]:not([tabindex="-1"]),.stage-avatar,.group-pals,.pal-seat,.pal-more){-webkit-app-region:no-drag}
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-tabbar,
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-tabbar :is(.inspection-tab-strip,.inspection-browser-tabs,.inspection-image-tabs,.browser-owner-chip,.inspection-tab-spacer){-webkit-app-region:drag}
-html:root[data-skin="monocode"] #inspectionSidebar .inspection-tabbar :is(button,a,input,select,textarea,label,[role="button"],[role="tab"],[contenteditable],[tabindex]:not([tabindex="-1"]),.inspection-panel-controls,.view-menu){-webkit-app-region:no-drag}
-html:root[data-skin="monocode"] :is(.mc-window-controls,.chrome-controls){-webkit-app-region:no-drag}
-html:root[data-skin="monocode"] :is(#sidebarResize,#inspectionResize,.sidebar-resize,.inspection-resize){-webkit-app-region:no-drag}
+html:root[data-skin="phoenix"] body:not(.sidebar-collapsed) #companySidebar .sidebar-header:hover .collapse-glyph{opacity:1}
+html:root[data-skin="phoenix"] body:not(.sidebar-collapsed) #companySidebar .phoenix-brand .collapse-glyph:hover{background:var(--glass-hover);color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #conversationHeader{-webkit-app-region:drag}
+html:root[data-skin="phoenix"] #conversationHeader :is(button,a,input,select,textarea,label,[role="button"],[role="tab"],[contenteditable],[tabindex]:not([tabindex="-1"]),.stage-avatar,.group-pals,.pal-seat,.pal-more){-webkit-app-region:no-drag}
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-tabbar,
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-tabbar :is(.inspection-tab-strip,.inspection-browser-tabs,.inspection-image-tabs,.browser-owner-chip,.inspection-tab-spacer){-webkit-app-region:drag}
+html:root[data-skin="phoenix"] #inspectionSidebar .inspection-tabbar :is(button,a,input,select,textarea,label,[role="button"],[role="tab"],[contenteditable],[tabindex]:not([tabindex="-1"]),.inspection-panel-controls,.view-menu){-webkit-app-region:no-drag}
+html:root[data-skin="phoenix"] :is(.mc-window-controls,.chrome-controls){-webkit-app-region:no-drag}
+html:root[data-skin="phoenix"] :is(#sidebarResize,#inspectionResize,.sidebar-resize,.inspection-resize){-webkit-app-region:no-drag}
 
 /* Codex speed is independent of effort; only one bolt toggle can be active. */
-html:root[data-skin="monocode"] .goo-head:has(.codex-speed-controls){display:grid;grid-template-columns:1fr auto;gap:2px 12px}
-html:root[data-skin="monocode"] .goo-head:has(.codex-speed-controls) :is(strong,small){grid-column:1}
-html:root[data-skin="monocode"] .goo-head .codex-speed-controls{display:flex;gap:4px;grid-column:2;grid-row:1/3;align-self:center}
-html:root[data-skin="monocode"] .codex-speed-controls button{display:flex;align-items:center;justify-content:center;gap:0;width:34px;height:30px;padding:6px;border:1px solid var(--glass-line);border-radius:10px;background:var(--glass-1);color:var(--soft-ink-2);cursor:pointer}
-html:root[data-skin="monocode"] .codex-speed-controls button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linejoin:round}
-html:root[data-skin="monocode"] .codex-speed-controls button[data-codex-speed="ultrafast"]{width:42px}
-html:root[data-skin="monocode"] .codex-speed-controls button[data-codex-speed="ultrafast"] svg+svg{margin-left:-4px}
-html:root[data-skin="monocode"] .codex-speed-controls button[aria-pressed="true"]{background:var(--glass-3);border-color:var(--soft-accent);color:var(--soft-accent)}
-html:root[data-skin="monocode"] .codex-speed-controls button:hover:not(:disabled){background:var(--glass-hover)}
-html:root[data-skin="monocode"] .codex-speed-controls button:focus-visible{outline:2px solid var(--soft-accent);outline-offset:2px}
-html:root[data-skin="monocode"] .codex-speed-controls button:disabled{opacity:.4;cursor:default}
+html:root[data-skin="phoenix"] .goo-head:has(.codex-speed-controls){display:grid;grid-template-columns:1fr auto;gap:2px 12px}
+html:root[data-skin="phoenix"] .goo-head:has(.codex-speed-controls) :is(strong,small){grid-column:1}
+html:root[data-skin="phoenix"] .goo-head .codex-speed-controls{display:flex;gap:4px;grid-column:2;grid-row:1/3;align-self:center}
+html:root[data-skin="phoenix"] .codex-speed-controls button{display:flex;align-items:center;justify-content:center;gap:0;width:34px;height:30px;padding:6px;border:1px solid var(--glass-line);border-radius:10px;background:var(--glass-1);color:var(--soft-ink-2);cursor:pointer}
+html:root[data-skin="phoenix"] .codex-speed-controls button svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linejoin:round}
+html:root[data-skin="phoenix"] .codex-speed-controls button[data-codex-speed="ultrafast"]{width:42px}
+html:root[data-skin="phoenix"] .codex-speed-controls button[data-codex-speed="ultrafast"] svg+svg{margin-left:-4px}
+html:root[data-skin="phoenix"] .codex-speed-controls button[aria-pressed="true"]{background:var(--glass-3);border-color:var(--soft-accent);color:var(--soft-accent)}
+html:root[data-skin="phoenix"] .codex-speed-controls button:hover:not(:disabled){background:var(--glass-hover)}
+html:root[data-skin="phoenix"] .codex-speed-controls button:focus-visible{outline:2px solid var(--soft-accent);outline-offset:2px}
+html:root[data-skin="phoenix"] .codex-speed-controls button:disabled{opacity:.4;cursor:default}
 
 /* Prompt previews use authored text and stay bounded for long words/URLs. */
-html:root[data-skin="monocode"] .prompt-rail-card-body{box-sizing:border-box;max-width:100%;overflow:hidden}
-html:root[data-skin="monocode"] :is(.prompt-rail-card-title,.prompt-rail-card-desc){overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
-html:root[data-skin="monocode"] .prompt-rail-card-title{-webkit-line-clamp:2}
-html:root[data-skin="monocode"] .prompt-rail-card-desc{-webkit-line-clamp:3}
+html:root[data-skin="phoenix"] .prompt-rail-card-body{box-sizing:border-box;max-width:100%;overflow:hidden}
+html:root[data-skin="phoenix"] :is(.prompt-rail-card-title,.prompt-rail-card-desc){overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
+html:root[data-skin="phoenix"] .prompt-rail-card-title{-webkit-line-clamp:2}
+html:root[data-skin="phoenix"] .prompt-rail-card-desc{-webkit-line-clamp:3}
 
 /* Panel controls stay clickable across the frameless header and workspace bar. */
-html:root[data-skin="monocode"] :is(#stagePanelToggles,#inspectionPanelControls),
-html:root[data-skin="monocode"] :is(#stagePanelToggles,#inspectionPanelControls) *{-webkit-app-region:no-drag!important}
+html:root[data-skin="phoenix"] :is(#stagePanelToggles,#inspectionPanelControls),
+html:root[data-skin="phoenix"] :is(#stagePanelToggles,#inspectionPanelControls) *{-webkit-app-region:no-drag!important}
 
 /* Terminal shares the floating sidebars' surface; xterm paints transparently. */
-html:root[data-skin="monocode"] #termPanel{
+html:root[data-skin="phoenix"] #termPanel{
  --mc-button-radius:12px;--terminal-bg:transparent;--terminal-fg:var(--soft-ink);--terminal-muted:var(--soft-ink-2);--terminal-tab:var(--glass-3);--terminal-hover:var(--glass-hover);--terminal-pressed:var(--glass-hover);--terminal-line:var(--glass-line);--terminal-scrollbar:var(--soft-ink-3);grid-column:2;width:auto!important;margin:0 var(--pane-inset) var(--pane-inset);
  background:var(--glass-1)!important;border:1px solid var(--glass-line)!important;border-radius:20px;
  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.15)!important;backdrop-filter:blur(var(--glass-blur)) saturate(1.15)!important;
  box-shadow:var(--glass-shadow);color:var(--soft-ink);grid-template-rows:36px minmax(0,1fr)!important;
 }
-html:root[data-skin="monocode"] body.term-open #termPanel{height:calc(var(--term-current-h) - var(--pane-inset))!important;margin-right:var(--pane-inset)!important}
-html:root[data-skin="monocode"] #termPanel :is(.term-head,.term-screen,.term-session,.xterm,.xterm-viewport){background:transparent!important;color:var(--soft-ink)}
-html:root[data-skin="monocode"] #termPanel .term-head{height:36px;padding:0 12px 4px;border-bottom:1px solid var(--glass-line)!important}
-html:root[data-skin="monocode"] #termPanel :is(.term-tab,.term-head>button){height:30px;color:var(--soft-ink-2);font-family:var(--soft-font)}
-html:root[data-skin="monocode"] #termPanel :is(.term-tab,.term-head>button):hover{background:var(--glass-hover);color:var(--soft-ink)}
-html:root[data-skin="monocode"] #termPanel .term-tab[aria-selected="true"]{background:var(--glass-3);color:var(--soft-ink)}
-html:root[data-skin="monocode"] #termPanel .term-tab>i:hover{background:var(--glass-hover)}
-html:root[data-skin="monocode"] #termPanel .term-screen{min-height:0;padding:10px 14px}
-html:root[data-skin="monocode"] #termPanel .term-resize:hover::after{background:var(--soft-ink-3)}
-html:root[data-skin="monocode"] body.term-open .terminal-toggle{background:var(--glass-3)!important;color:var(--soft-ink)!important}
-html:root[data-skin="monocode"][data-theme="light"] #termPanel{border-color:rgb(255 255 255 / 55%)!important;box-shadow:0 14px 44px rgb(20 40 90 / 18%),inset 0 1px 0 rgb(255 255 255 / 60%)!important}
-html:root[data-skin="monocode"] body.term-open:not(.inspection-stacked) #inspectionSidebar{bottom:calc(var(--term-h,250px) + var(--pane-inset) * 2)!important}
+html:root[data-skin="phoenix"] body.term-open #termPanel{height:calc(var(--term-current-h) - var(--pane-inset))!important;margin-right:var(--pane-inset)!important}
+html:root[data-skin="phoenix"] #termPanel :is(.term-head,.term-screen,.term-session,.xterm,.xterm-viewport){background:transparent!important;color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #termPanel .term-head{height:36px;padding:0 12px 4px;border-bottom:1px solid var(--glass-line)!important}
+html:root[data-skin="phoenix"] #termPanel :is(.term-tab,.term-head>button){height:30px;color:var(--soft-ink-2);font-family:var(--soft-font)}
+html:root[data-skin="phoenix"] #termPanel :is(.term-tab,.term-head>button):hover{background:var(--glass-hover);color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #termPanel .term-tab[aria-selected="true"]{background:var(--glass-3);color:var(--soft-ink)}
+html:root[data-skin="phoenix"] #termPanel .term-tab>i:hover{background:var(--glass-hover)}
+html:root[data-skin="phoenix"] #termPanel .term-screen{min-height:0;padding:10px 14px}
+html:root[data-skin="phoenix"] #termPanel .term-resize:hover::after{background:var(--soft-ink-3)}
+html:root[data-skin="phoenix"] body.term-open .terminal-toggle{background:var(--glass-3)!important;color:var(--soft-ink)!important}
+html:root[data-skin="phoenix"][data-theme="light"] #termPanel{border-color:rgb(255 255 255 / 55%)!important;box-shadow:0 14px 44px rgb(20 40 90 / 18%),inset 0 1px 0 rgb(255 255 255 / 60%)!important}
+html:root[data-skin="phoenix"] body.term-open:not(.inspection-stacked) #inspectionSidebar{bottom:calc(var(--term-h,250px) + var(--pane-inset) * 2)!important}
 
 /* Dark slider popovers need their own glass surface: the goo SVG blends
    translucent dark fills into a muddy edge over the composer underneath. */
-html:root[data-skin="monocode"][data-theme="dark"] .goo-layer .goo-body{display:none}
-html:root[data-skin="monocode"][data-theme="dark"] .goo-layer .goo-panel{
+html:root[data-skin="phoenix"][data-theme="dark"] .goo-layer .goo-body{display:none}
+html:root[data-skin="phoenix"][data-theme="dark"] .goo-layer .goo-panel{
  background:var(--glass-pop);border:1px solid var(--glass-line-strong);border-radius:20px;
  -webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur));
  color:var(--soft-ink);font-family:var(--soft-font);
 }
-html:root[data-skin="monocode"][data-theme="dark"] .goo-head small{color:var(--soft-ink-2)}
-html:root[data-skin="monocode"][data-theme="dark"] .goo-panel .inline-slider:not([data-glow="max"]){background:rgb(255 255 255 / 6%);box-shadow:inset 0 0 0 1px var(--glass-line)}
-html:root[data-skin="monocode"][data-theme="dark"] .goo-panel .inline-slider[data-glow="pre"]{box-shadow:inset 0 0 0 1px var(--glass-line-strong)}
-html:root[data-skin="monocode"][data-theme="dark"] .goo-panel .inline-slider:not([data-glow="max"]) .is-fill{background:rgb(201 198 255 / 14%)}
-html:root[data-skin="monocode"][data-theme="dark"] .goo-panel .is-thumb{color:var(--soft-accent)}
+html:root[data-skin="phoenix"][data-theme="dark"] .goo-head small{color:var(--soft-ink-2)}
+html:root[data-skin="phoenix"][data-theme="dark"] .goo-panel .inline-slider:not([data-glow="max"]){background:rgb(255 255 255 / 6%);box-shadow:inset 0 0 0 1px var(--glass-line)}
+html:root[data-skin="phoenix"][data-theme="dark"] .goo-panel .inline-slider[data-glow="pre"]{box-shadow:inset 0 0 0 1px var(--glass-line-strong)}
+html:root[data-skin="phoenix"][data-theme="dark"] .goo-panel .inline-slider:not([data-glow="max"]) .is-fill{background:rgb(201 198 255 / 14%)}
+html:root[data-skin="phoenix"][data-theme="dark"] .goo-panel .is-thumb{color:var(--soft-accent)}
 
 /* Chat only wins over every per-answer and streaming work disclosure. */
-html:root[data-skin="monocode"][data-conversation-view="chat"] #conversationStage #conversationFeed :is(.work-cluster,.work-tool,.trace-subgroup,.tool-receipt,.answer-work-toggle){display:none!important}
+html:root[data-skin="phoenix"][data-conversation-view="chat"] #conversationStage #conversationFeed :is(.work-cluster,.work-tool,.trace-subgroup,.tool-receipt,.answer-work-toggle){display:none!important}
+
+/* Keep the resize hit area centred on the floating pane's visible border. */
+html:root[data-skin="phoenix"] #inspectionResize{right:calc(var(--inspection-width) - var(--pane-inset) - 6px);width:12px;bottom:calc(var(--pane-inset) + 20px)}
+html:root[data-skin="phoenix"] body.term-open:not(.inspection-stacked) #inspectionResize{bottom:calc(var(--term-current-h) + var(--pane-inset) + 20px)}
+html:root[data-skin="phoenix"] body.term-open:not(.inspection-stacked) #inspectionSidebar,
+html:root[data-skin="phoenix"] body.term-open.inspection-open:not(.inspection-stacked) .browser-overlay:not([hidden]){bottom:calc(var(--term-current-h) + var(--pane-inset) + 1px)!important}
+/* Quiet terminal tabs share the sidebar toolbar treatment. */
+html:root[data-skin="phoenix"] #termPanel .term-head{padding:3px 12px;align-items:center}
+html:root[data-skin="phoenix"] #termPanel .term-tab{height:26px;border-radius:8px;font-size:12px}
+html:root[data-skin="phoenix"] #termPanel .term-tab[aria-selected="true"]{background:transparent!important;box-shadow:inset 0 -2px var(--glass-line-strong);color:var(--soft-ink)!important}

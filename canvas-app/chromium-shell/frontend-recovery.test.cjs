@@ -1,7 +1,7 @@
 "use strict";
 const test=require("node:test"),assert=require("node:assert/strict"),{EventEmitter}=require("node:events");
 const {install}=require("./frontend-recovery.cjs");
-const URL="http://127.0.0.1:47845/?skin=monocode&chromium=1";
+const URL="http://127.0.0.1:47845/?skin=phoenix&chromium=1";
 const flush=()=>new Promise(r=>setImmediate(r));
 class Contents extends EventEmitter{
  constructor(pid=42){super();this.pid=pid;this.url=URL;this.destroyed=false;this.crashed=false;this.actions=[];}

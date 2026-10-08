@@ -16,7 +16,7 @@ const state = {
   refreshTimer: null,
   completionNotifications: new Set(),
   recentCompletionItems: new Map(),
-  phoenixLogoSource: "assets/phoenix_logo.svg",
+  phoenixLogoSource: "assets/fluffy-butter-surprised.png",
 };
 
 const EMBER_CHECK_D = "M3.85 11.05C3.55 10.15 4.5 9.3 5.45 9.6L8.1 12.55 12.55 6.4 16.45 2.45C16.7 2.18 17.1 2.4 17.02 2.75L15.65 6.95 18.7 5.85C18.98 5.74 19.22 6.12 18.98 6.35L15.7 9.4 9.05 15.7C8.1 16.55 6.7 16.15 6.25 15L3.95 11.75C3.82 11.45 3.8 11.22 3.85 11.05Z";
@@ -1137,7 +1137,7 @@ async function toggleThemeFromButton() {
   // so another ordinary click does not re-save the same stale color theme.
   const theme = resolvedTheme() === "dark" ? "light" : "dark";
   setTheme(theme);
-  try { themeSaveChain = themeSaveChain.catch(() => {}).then(() => window.PhoenixSettings?.setGlobalSetting("appearance.theme", theme)); await themeSaveChain; }
+  try { themeSaveChain = themeSaveChain.catch(() => {}).then(() => window.PhoenixSettings?.saveAppearance("appearance.theme", theme)); await themeSaveChain; }
   catch (error) { toast(`Could not save appearance: ${error.message || error}`, true); }
 }
 function syncThemeToggle() {

@@ -2,7 +2,7 @@
 
 (() => {
   const ui=window.PhoenixUI;if(!ui)return;const $=(id)=>document.getElementById(id),preview=!ui.TAURI||ui.SIDEBAR_PREVIEW;
-  const state={open:false,snapshot:null,snapshotRequest:0,scope:{kind:"global"},section:"General",query:"",searchScope:"all",route:null,models:null,modelRequest:0,modelView:"coworkers",modelFallbackLane:null,modelSaving:false,providerQuery:"",searchTimer:null,liveGeneration:0,paintTarget:null,bundlingWork:false,appearanceSaveChain:Promise.resolve()};
+  const state={open:false,snapshot:null,snapshotRequest:0,scope:{kind:"global"},section:"General",query:"",searchScope:"all",route:null,models:null,modelRequest:0,modelView:"coworkers",modelFallbackLane:null,modelSaving:false,providerQuery:"",searchTimer:null,liveGeneration:0,paintTarget:null,bundlingWork:false,appearanceSaveChain:Promise.resolve(),pendingVisualSettings:new Map()};
   const icon='<svg viewBox="0 0 20 20"><path d="M5 4h10M5 10h10M5 16h10"/></svg>',arrow='<svg viewBox="0 0 20 20"><path d="m8 5 5 5-5 5"/></svg>',back='<svg viewBox="0 0 20 20"><path d="m12 5-5 5 5 5"/></svg>',reset='<svg viewBox="0 0 20 20"><path d="M15 7a6 6 0 1 0 .4 5M15 3v4h-4"/></svg>';
   const escape=(value)=>ui.escapeHtml(value),scopeKey=()=>state.scope.kind==="global"?"global":`${state.scope.kind}:${state.scope.id}`;
   const menuChevron='<svg viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg>';
@@ -260,6 +260,7 @@
     const visualKey=button?.dataset.visual,value=button?.dataset.visualValue,settingKey=VISUAL_KEYS[visualKey];
     if(!visualKey||value==null||!settingKey){ui.toast("This appearance choice is not connected yet.",true);return;}
     try{
+      state.liveGeneration++;
       const prefs=ui.visualPrefs();
       prefs[visualKey]=value;
       ui.applyVisualPrefs(prefs);
@@ -267,13 +268,13 @@
     const row=state.snapshot?.settings.find((entry)=>entry.definition.key===settingKey);if(row)row.value=value;
     if(visualKey==="accent")ui.refreshDirectory?.();
     persistVisualSetting(settingKey,value);
-    render();
+    if(state.open)render();
   }
   async function persistVisualSetting(key,value){
     // These two new controls have no command fields in the current compiled
     // backend. Their existing stable review-profile persistence stays explicit.
     if(["appearance.conversation_text","appearance.conversation_width_mode"].includes(key))return null;
-    if(!state.snapshot?.settings.some((entry)=>entry.definition.key===key))return;
+    const pending={value};state.pendingVisualSettings.set(key,pending);
     state.appearanceSaveChain=state.appearanceSaveChain.catch(()=>{}).then(async()=>{
       try{return await setGlobalSetting(key,value);}
       catch(error){
@@ -281,10 +282,10 @@
         try{
           const fresh=await rpc({Settings:{action:"snapshot",scope:{kind:"global"}}}),snapshot=fresh.Settings.snapshot;
           if(state.open&&state.section==="Appearance"){state.scope={kind:"global"};state.snapshot=snapshot;renderScope();render();}
-          const row=snapshot.settings.find((entry)=>entry.definition.key===key);if(row)applyLiveSetting(key,row.value);
+          const row=snapshot.settings.find((entry)=>entry.definition.key===key);if(row&&state.pendingVisualSettings.get(key)===pending)applyLiveSetting(key,row.value);
         }catch{}
         return null;
-      }
+      }finally{if(state.pendingVisualSettings.get(key)===pending)state.pendingVisualSettings.delete(key);}
     });
     return state.appearanceSaveChain;
   }
@@ -423,12 +424,12 @@
     if(key==="notifications.coworkers")document.documentElement.dataset.notificationsCoworkers=String(value);
   }
   function scopeMatchesSelected(scope){const item=ui.state.selected;if(scope.kind==="global")return true;if(!item)return false;return scope.kind===item.kind&&scope.id===item.id;}
-  function applySnapshotLive(snapshot){for(const row of snapshot?.settings||[])applyLiveSetting(row.definition.key,row.value);window.PhoenixConversation?.applySettings?.(snapshot);}
+  function applySnapshotLive(snapshot){for(const row of snapshot?.settings||[])if(!state.pendingVisualSettings.has(row.definition.key))applyLiveSetting(row.definition.key,row.value);window.PhoenixConversation?.applySettings?.(snapshot);}
   async function setGlobalSetting(key,value){
     const scope={kind:"global"},fresh=await rpc({Settings:{action:"snapshot",scope}}),snapshot=fresh.Settings.snapshot;
     const reply=await rpc({Settings:{action:"set",key,value,scope,expected_revision:snapshot.revision}}),next=reply.Settings.snapshot;
     if(state.open&&state.scope.kind==="global")state.snapshot=next;
-    applyLiveSetting(key,value);hydrateConversationSettings();if(state.open&&state.scope.kind==="global")render();return next;
+    const pending=state.pendingVisualSettings.get(key);if(!pending||pending.value===value)applyLiveSetting(key,value);await hydrateConversationSettings();if(state.open&&state.scope.kind==="global")render();return next;
   }
   async function hydrateConversationSettings(event){const item=event?.detail?.item||ui.state.selected;if(!item)return;const generation=++state.liveGeneration,scope={kind:item.kind,id:item.id};try{const value=await rpc({Settings:{action:"snapshot",scope}});if(generation===state.liveGeneration&&ui.sameItem(item,ui.state.selected))applySnapshotLive(value.Settings.snapshot);}catch{}}
   async function runSearch(){if(!state.query){state.route=null;render();return;}try{const section=state.searchScope==="section"?state.section:null,value=await rpc({Settings:{action:"search",query:state.query,section,scope:state.scope}}),r=value.Settings.results;nav();$("settingsContent").innerHTML=`<header class="settings-title"><span><h1>Search</h1><p>${section?`Results inside ${escape(section)}`:"All settings and specialized control planes"} matching “${escape(state.query)}”.</p></span></header><div class="settings-results-head"><strong>${section?escape(section):"Everywhere"}</strong><small>${r.regular.length+r.advanced.length+r.regular_destinations.length+r.advanced_destinations.length} found</small></div>${r.regular.length?sectionCard("Settings",r.regular):""}${[...r.regular_destinations,...r.advanced_destinations].length?`<section class="settings-section"><h2>Also in</h2><div class="settings-card">${[...r.regular_destinations,...r.advanced_destinations].map((d)=>`<button class="setting-row" data-guide-section="${escape(d.section)}"><span class="setting-copy"><strong>${escape(d.label)}</strong><p>${escape(d.description)}</p></span></button>`).join("")}</div></section>`:""}${r.advanced.length?`<details class="advanced-settings"><summary>${arrow}<span>Advanced results</span></summary>${sectionCard("Advanced settings",r.advanced)}</details>`:""}${!r.regular.length&&!r.advanced.length&&!r.regular_destinations.length&&!r.advanced_destinations.length?empty("No results","Try a coworker, permission, workflow, provider, or browser term."):""}`;}catch(error){ui.toast(error.message,true);}}
@@ -934,7 +935,7 @@
   }
   function renderDestinationSettings(destination){const rows=state.snapshot.settings.filter((r)=>r.definition.section===destination.section);settingsHost().innerHTML=`<button class="settings-sub-back" data-section-back>${back} ${escape(destination.section)}</button><header class="settings-title"><span><h1>${escape(destination.label)}</h1><p>${escape(destination.description)}</p></span></header>${rows.length?sectionCard("Configuration",rows):empty("Managed by Phoenix",`Ask Phoenix to inspect or change ${destination.label.toLowerCase()}; every change will still obey the policies in Settings.`)}`;}
 
-  window.PhoenixSettings=Object.freeze({open,close,setGlobalSetting});
+  window.PhoenixSettings=Object.freeze({open,close,setGlobalSetting,saveAppearance:persistVisualSetting,setConversationView(value){chooseVisual({dataset:{visual:"conversationView",visualValue:value}});return state.appearanceSaveChain;}});
   addEventListener("phoenix:open-settings",open);
   addEventListener("phoenix:directory-ready",hydrateConversationSettings);
   addEventListener("phoenix:select-conversation",hydrateConversationSettings);
