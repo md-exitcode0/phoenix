@@ -50,6 +50,8 @@ pub fn tool_definition(name: &str) -> Option<ToolDefinition> {
         "credential_generate" => credential_generate(),
         "account_manage" => account_manage(),
         "ask_for_login" => ask_for_login(),
+        "ask_for_pass" => ask_for_pass(),
+        "pass_use" => pass_use(),
         "design_reference" => design_reference(),
         "design_studio" => design_studio(),
         "design_website" => design_website(),
@@ -73,13 +75,59 @@ pub fn tool_definition(name: &str) -> Option<ToolDefinition> {
 fn credential_list() -> ToolDefinition {
     ToolDefinition {
         name: "credential_list".into(),
-        description: "List credential METADATA visible in this conversation (private coworker, current group, and company scopes). Secret values are never returned. Use when you need an existing credential id before browser_input_credential; optionally filter by site. The human vault-management lock does not block agent use. Never ask for the master password in prose.".into(),
+        description: "List saved PASSES (logins, payment cards, API keys, tokens, codes, secrets) visible in this conversation (private coworker, current group, and company scopes) as METADATA only: id, kind, title, site, username, and public hints such as a card's brand and last 4. Secret values are never returned. Works while Passes is locked. Use it before pass_use / browser_input_credential; filter by site or kind. If nothing matches, ask the user with ask_for_pass. Never ask for the master password or a secret in prose.".into(),
         parameters: serde_json::json!({
             "type": "object",
             "properties": {
-                "site": {"type": "string", "description": "Optional exact site/domain filter."},
+                "site": {"type": "string", "description": "Optional site/domain filter (subdomains match)."},
+                "kind": {"type": "string", "enum": ["password", "card", "api_key", "token", "verification_code", "secret", "recovery_code"], "description": "Optional pass type filter. Logins are kind `password`."},
                 "limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 50}
             }
+        }),
+    }
+}
+
+fn ask_for_pass() -> ToolDefinition {
+    ToolDefinition {
+        name: "ask_for_pass".into(),
+        description: "Ask the user for a credential through a secure, purpose-built inline popup in the conversation, and wait for it. Pick the kind that fits: `login` (site, username/email, password, optional 2FA/TOTP seed — e.g. \"save your Gmail login\"), `card` (number with brand detection, name, expiry, CVC, billing zip), `api_key` (service, key, optional base URL), `token` (another key/token), `verification_code` (a one-time code the user received; used once then deleted), or `secret` (free-form). The user's entry is encrypted straight into Passes — you receive ONLY the new pass's credential_id and public metadata, never the value. Then use it with pass_use. Call ONCE per missing credential; first check credential_list (an existing matching pass is returned automatically unless force_new). Never ask for secrets in chat text and never call ask_user for this.".into(),
+        parameters: serde_json::json!({
+            "type": "object",
+            "properties": {
+                "kind": {"type": "string", "enum": ["login", "card", "api_key", "token", "verification_code", "secret"]},
+                "reason": {"type": "string", "description": "The concrete outcome it unblocks, phrased to finish 'needs your … to …' (e.g. 'send the weekly update from your inbox')."},
+                "title": {"type": "string", "description": "Short popup title, e.g. 'Gmail login', 'OpenAI API key', 'Card for the domain renewal'."},
+                "site": {"type": "string", "description": "Website or API domain the pass belongs to (gmail.com, api.openai.com). Required for login and api_key. Secrets are only ever filled/sent on this site."},
+                "fields": {"type": "array", "items": {"type": "string", "enum": ["site", "username", "password", "totp", "number", "name", "expiry", "cvc", "billing_zip", "service", "key", "base_url", "value", "code"]}, "description": "Which fields to show (defaults by kind). The primary secret is always included."},
+                "labels": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Optional custom field labels, e.g. {\"key\": \"Secret key (starts with sk-)\"}."},
+                "username_hint": {"type": "string", "description": "Prefill for the username/email when known."},
+                "scope": {"type": "string", "enum": ["agent", "group", "company"], "default": "agent", "description": "Who may use the saved pass."},
+                "force_new": {"type": "boolean", "default": false, "description": "Ask even if a matching pass exists (e.g. the site rejected it)."}
+            },
+            "required": ["kind", "reason"]
+        }),
+    }
+}
+
+fn pass_use() -> ToolDefinition {
+    ToolDefinition {
+        name: "pass_use".into(),
+        description: "Use a saved pass by credential_id WITHOUT seeing it. target `browser_field`: Phoenix types the chosen field into the current browser element [index] (same site binding as browser_input_credential). target `http_header`: Phoenix calls an https URL on the pass's own site (or its saved base URL) with the secret in one header (default `Authorization: Bearer {secret}`) and returns the response with the secret scrubbed. `field` picks password (default for logins), username, totp (the current 6-digit 2FA code), number/name/expiry/exp_month/exp_year/cvc/billing_zip (cards), key (API keys), value, or code. If Passes is locked, Phoenix shows the user a one-time unlock card and waits; never ask for the master password yourself.".into(),
+        parameters: serde_json::json!({
+            "type": "object",
+            "properties": {
+                "credential_id": {"type": "string"},
+                "target": {"type": "string", "enum": ["browser_field", "http_header"], "default": "browser_field"},
+                "field": {"type": "string"},
+                "index": {"type": "integer", "description": "browser_field: element index from the current browser state."},
+                "url": {"type": "string", "description": "http_header: full https URL on the pass's site."},
+                "method": {"type": "string", "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"], "default": "GET"},
+                "header": {"type": "string", "default": "Authorization"},
+                "format": {"type": "string", "default": "Bearer {secret}", "description": "Header value template; {secret} is substituted by the runtime."},
+                "body": {"type": "string", "description": "Optional request body (no secrets; they are never substituted into bodies)."},
+                "content_type": {"type": "string"}
+            },
+            "required": ["credential_id"]
         }),
     }
 }
@@ -1624,7 +1672,8 @@ fn browser_tool_definition(name: &str) -> Option<ToolDefinition> {
                 "type": "object",
                 "properties": {
                     "index": {"type": "integer", "description": "Secret/password input element index from current browser state."},
-                    "credential_id": {"type": "string", "description": "Opaque id returned by credential_list or credential_generate."}
+                    "credential_id": {"type": "string", "description": "Opaque id returned by credential_list or credential_generate."},
+                    "field": {"type": "string", "description": "Optional secret field: password (default), username, totp (current 2FA code), number, cvc, expiry, exp_month, exp_year, name, billing_zip, key, value, code."}
                 },
                 "required": ["index", "credential_id"]
             }),

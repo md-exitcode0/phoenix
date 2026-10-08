@@ -46,6 +46,7 @@ pub mod isolated_desktop;
 mod list_directory;
 pub mod local_mcp;
 pub mod login_request;
+pub mod passes;
 pub mod mcp_client;
 mod message_agent;
 mod read;
@@ -337,7 +338,7 @@ pub fn required_permission_for_tool(tool_name: &str) -> PermissionMode {
         // Coworker hiring has its own exact role-scoped user approval, and
         // provisioning is Phoenix-only plus constrained to that requested
         // record, so neither should ask for broad Full Access as a second gate.
-        "ask_user" | "teach_workflow" | "ask_for_login" | "final_answer" | "talk"
+        "ask_user" | "teach_workflow" | "ask_for_login" | "ask_for_pass" | "final_answer" | "talk"
         | "message_agent" | "agent_control" | "react" | "volume_work" | "todo_write" | "work"
         | "routine" | "recall" | "memory_recall" | "memory_save" | "vital_memory_write"
         | "create_agent" | "agent_provision" => PermissionMode::Talk,
@@ -353,6 +354,7 @@ pub fn required_permission_for_tool(tool_name: &str) -> PermissionMode {
         | "composio_connections"
         | "credential_list"
         | "credential_generate"
+        | "pass_use"
         | "account_manage"
         | "mcp_call" => PermissionMode::FullAccess,
 
@@ -1773,6 +1775,32 @@ impl ToolExecutor {
                     Err(error) => Err(error),
                 }
             }
+            "pass_use" => {
+                let agent_id = self.credential_agent_id();
+                let group_id = self.group_id.clone();
+                let browser_instance = self.browser_instance.clone();
+                let session_id = self.session_id.clone();
+                let browser_enabled = self.setting_enabled("browser.enabled");
+                match agent_id {
+                    Ok(agent_id) => parse_and_run(call.input, move |input: passes::PassUseInput| {
+                        anyhow::ensure!(
+                            browser_enabled || !input.target.starts_with("browser"),
+                            "browser tools are disabled for this coworker in Settings → Browser & Accounts"
+                        );
+                        passes::use_pass(
+                            input,
+                            &agent_id,
+                            group_id.as_deref(),
+                            browser_instance.as_deref(),
+                            session_id.as_deref(),
+                        )
+                    }),
+                    Err(error) => Err(error),
+                }
+            }
+            "ask_for_pass" => Err(anyhow::anyhow!(
+                "ask_for_pass opens an inline popup and is only available inside a Phoenix conversation. Ask the user to add the pass in Settings → Passes, then use credential_list."
+            )),
             "account_manage" => {
                 let agent_id = self.credential_agent_id();
                 let group_id = self.group_id.clone();
@@ -2235,11 +2263,19 @@ const KNOWN_TOOLS: &[(&str, &str)] = &[
     ),
     (
         "credential_list",
-        "List visible credential metadata without exposing secret values.",
+        "List saved Passes (logins, cards, API keys, tokens) as metadata only — never secret values.",
     ),
     (
         "credential_generate",
         "Generate and store a strong password without exposing it to the model.",
+    ),
+    (
+        "ask_for_pass",
+        "Ask the user to save a login, card, API key, token, verification code, or secret through a secure inline popup.",
+    ),
+    (
+        "pass_use",
+        "Use a saved pass by id: Phoenix fills it into a browser field or an HTTP header without exposing it.",
     ),
     (
         "account_manage",

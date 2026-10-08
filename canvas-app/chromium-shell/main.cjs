@@ -15,9 +15,12 @@ const {
   WebContentsView,
   dialog,
   ipcMain,
+  Menu,
   nativeImage,
+  Notification,
   session,
   shell,
+  Tray,
   webContents,
 } = require("electron");
 
@@ -54,6 +57,13 @@ const surfaces = new Map();
 let surfaceBackground = "#ffffff";
 let mainWindow = null;
 let captureWindow = null;
+// Closing the window keeps Phoenix (and every agent's browser) running in the
+// system tray. Only "Quit Phoenix" ends the app, stops the gateway daemon, and
+// drops the unlocked Passes key. PHOENIX_CLOSE_TO_TRAY=0 restores quit-on-close.
+const CLOSE_TO_TRAY = !SELFTEST && process.env.PHOENIX_CLOSE_TO_TRAY !== "0";
+let fullQuitRequested = false;
+let tray = null;
+let trayHintShown = false;
 let bridgeServer = null;
 let rustSocket = null;
 let nextBridgeRequest = 1;
@@ -1049,6 +1059,20 @@ function createMainWindow() {
     if (/^https?:/i.test(url)) shell.openExternal(url);
     return { action: "deny" };
   });
+  mainWindow.on("close", (event) => {
+    if (!CLOSE_TO_TRAY || SERVICES_ONLY || fullQuitRequested || stopping) return;
+    // Hide instead of destroying: the renderer stays connected to the
+    // gateway, so reopening is instant and no agent work is interrupted.
+    event.preventDefault();
+    mainWindow.hide();
+    refreshTrayMenu();
+    if (!trayHintShown && Notification.isSupported()) {
+      trayHintShown = true;
+      try {
+        new Notification({ title: "Phoenix is still running", body: "Your coworkers keep working in the background. Open Phoenix from the tray, or choose Quit Phoenix to stop everything.", silent: true }).show();
+      } catch {}
+    }
+  });
   mainWindow.on("closed", () => {
     mainWindow = null;
     // The invisible render host must not keep Phoenix alive after its UI closes.
@@ -1089,6 +1113,63 @@ function createMainWindow() {
 // Electron IPC handler makes Electron print a full "Error occurred in handler"
 // stack for every caught error. Return a typed envelope and let preload restore
 // normal Promise rejection semantics without polluting the desktop log.
+function gatewayRunning() {
+  try { return fs.statSync(path.join(PHOENIX_HOME, "gateway.sock")).isSocket(); } catch { return false; }
+}
+
+function openFromTray() {
+  if (!mainWindow || mainWindow.isDestroyed()) createMainWindow();
+  else revealMainWindow("tray");
+  refreshTrayMenu();
+}
+
+// A full quit is the one path that also stops the background gateway. The
+// Rust parent reads this marker after Electron exits and performs the
+// verified gateway stop (which wipes the in-memory Passes key with it).
+function quitPhoenixCompletely() {
+  if (fullQuitRequested) return;
+  fullQuitRequested = true;
+  bootLog("full quit requested from tray/menu; gateway will stop");
+  try {
+    fs.writeFileSync(path.join(PHOENIX_HOME, "desktop-quit-requested.json"), JSON.stringify({ at: Date.now(), pid: process.pid }), { mode: 0o600 });
+  } catch (error) { bootLog(`could not record full quit: ${error.message}`); }
+  Promise.race([flushBrowserStorage(), new Promise((done) => setTimeout(done, 1500))])
+    .finally(() => { tray?.destroy(); tray = null; app.quit(); });
+}
+
+function refreshTrayMenu() {
+  if (!tray) return;
+  const visible = Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible());
+  const running = gatewayRunning();
+  tray.setToolTip(running ? "Phoenix — coworkers running" : "Phoenix — gateway starting…");
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: visible ? "Show Phoenix" : "Open Phoenix", click: openFromTray },
+    { type: "separator" },
+    { label: running ? "● Coworkers running in the background" : "○ Gateway starting…", enabled: false },
+    { label: "Closing the window keeps them working", enabled: false },
+    { type: "separator" },
+    { label: "Quit Phoenix", accelerator: "CmdOrCtrl+Q", click: quitPhoenixCompletely },
+  ]));
+}
+
+function createTray() {
+  if (!CLOSE_TO_TRAY || SERVICES_ONLY || tray) return;
+  try {
+    const iconPath = [path.join(__dirname, "..", "icons", "icon.png"), path.join(__dirname, "..", "icons", "phoenix-512.png")].find((file) => fs.existsSync(file));
+    let image = iconPath ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
+    if (!image.isEmpty()) image = image.resize({ width: process.platform === "darwin" ? 18 : 22, height: process.platform === "darwin" ? 18 : 22, quality: "best" });
+    tray = new Tray(image);
+    tray.on("click", openFromTray);
+    tray.on("double-click", openFromTray);
+    refreshTrayMenu();
+    setInterval(refreshTrayMenu, 10000).unref();
+  } catch (error) {
+    // Without a tray (e.g. a desktop with no status-notifier host) the window
+    // still hides on close; launching Phoenix again brings it back.
+    bootLog(`system tray unavailable: ${error.message}`);
+  }
+}
+
 ipcMain.handle("phoenix:invoke", async (_event, command, args) => {
   try {
     return { __phoenixInvokeResult: true, ok: true, value: await invoke(command, args) };
@@ -1146,6 +1227,7 @@ app.whenReady().then(() => {
   startBridgeServer();
   bootLog("creating Phoenix window");
   createMainWindow();
+  createTray();
   bootLog("Phoenix window creation returned");
   setTimeout(() => bootLog("main loop responsive"), 1000).unref();
   if (Number.isInteger(RUST_PARENT_PID) && RUST_PARENT_PID > 1) {
@@ -1155,5 +1237,18 @@ app.whenReady().then(() => {
     }, 2000).unref();
   }
 });
-app.on("window-all-closed", () => app.quit());
-app.on("activate", () => { if (!mainWindow) createMainWindow(); });
+// With close-to-tray the window is hidden, not closed, so this fires only on a
+// real quit (or when tray mode is disabled).
+app.on("window-all-closed", () => { if (!CLOSE_TO_TRAY || fullQuitRequested || stopping) app.quit(); });
+app.on("activate", () => openFromTray());
+// An OS-level quit of the primary window (macOS Cmd+Q, a desktop "Quit"
+// action) is a full quit too. A second instance handing off, a vanished Rust
+// parent, or a stop signal is not, and never stops the gateway.
+app.on("before-quit", (event) => {
+  if (!CLOSE_TO_TRAY || SELFTEST || SERVICES_ONLY || stopping || fullQuitRequested || !PRIMARY_INSTANCE) return;
+  if (Number.isInteger(RUST_PARENT_PID) && RUST_PARENT_PID > 1) {
+    try { process.kill(RUST_PARENT_PID, 0); } catch { return; }
+  }
+  event.preventDefault();
+  quitPhoenixCompletely();
+});

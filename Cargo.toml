@@ -89,6 +89,10 @@ unicode-segmentation = "1.13"
 # records. Secret buffers are cleared when they leave scope.
 argon2 = "0.5"
 aes-gcm = "0.10"
+# Passes: public-key sealing so saving never needs the master password.
+x25519-dalek = { version = "2", features = ["static_secrets", "zeroize"] }
+chacha20poly1305 = "0.10"
+hkdf = "0.12"
 zeroize = { version = "1", features = ["derive"] }
 # Gateway authentication compares fixed-size bearer tokens without leaking the
 # first mismatching byte through ordinary short-circuit string equality. This

@@ -3928,6 +3928,61 @@ impl MeshRunner {
                             continue;
                         }
 
+                        // Using a saved pass while Passes is locked: show the
+                        // one-time unlock card and wait here, instead of
+                        // failing and making the model improvise a prompt.
+                        if matches!(call.tool_name.as_str(), "pass_use" | "browser_input_credential")
+                            && crate::tools::passes::needs_unlock()
+                        {
+                            let agent_label = agent_display_name(&spec.name);
+                            let ask = crate::tools::passes::unlock_ask(&agent_label);
+                            if let Some((open_id, _)) = crate::runtime::asks::pending_duplicate(
+                                &self.main_session_id,
+                                &agent_label,
+                                &ask.questions,
+                            ) {
+                                Self::push_feedback(
+                                    &mut session,
+                                    &mut native_tool_messages,
+                                    call_id,
+                                    &call.tool_name,
+                                    &format!("Passes is locked and the unlock card ({open_id}) is still waiting for the user. Continue independent work; the unlock resumes this conversation. Never ask for the master password in chat."),
+                                );
+                                continue;
+                            }
+                            let ask_id = format!("unlock-{}", &uuid::Uuid::new_v4().to_string()[..8]);
+                            let rx = crate::runtime::asks::register_with_payload(
+                                &ask_id,
+                                &self.main_session_id,
+                                &agent_label,
+                                &ask.questions,
+                                ask.approval.as_ref(),
+                            );
+                            let _abandon_on_drop = AbandonAskOnDrop(&ask_id);
+                            self.emit(CliEvent::AskUser {
+                                id: ask_id.clone(),
+                                agent: agent_label.clone(),
+                                questions: ask.questions.clone(),
+                                approval: ask.approval.clone(),
+                            });
+                            let _ = tokio::time::timeout(
+                                std::time::Duration::from_secs(crate::tools::passes::REQUEST_WAIT_SECONDS),
+                                rx,
+                            )
+                            .await;
+                            if crate::tools::passes::needs_unlock() {
+                                crate::runtime::asks::abandon(&ask_id);
+                                Self::push_feedback(
+                                    &mut session,
+                                    &mut native_tool_messages,
+                                    call_id,
+                                    &call.tool_name,
+                                    "Passes is still locked. The one-time unlock card stays open for the user; continue independent work and retry this pass after they unlock. Never ask for the master password in chat.",
+                                );
+                                continue;
+                            }
+                        }
+
                         match call.tool_name.as_str() {
                             // Structured finish — route straight to the delegator.
                             crate::tools::deferral::LOAD_TOOL => {
@@ -4949,6 +5004,189 @@ impl MeshRunner {
                             // terminal prompt. The turn genuinely awaits — a
                             // blocked agent asking beats one silently skipping
                             // a step the user could unblock in ten seconds.
+                            // Typed credential popup. The user's secret goes
+                            // UI → gateway Vault straight into Passes; this
+                            // turn only ever receives the receipt's id.
+                            "ask_for_pass" => {
+                                let parsed: Result<crate::tools::passes::PassRequestInput, _> =
+                                    serde_json::from_value(call.input.clone());
+                                let request = match parsed
+                                    .map_err(anyhow::Error::from)
+                                    .and_then(|request| request.validate_and_normalize())
+                                {
+                                    Ok(request) => request,
+                                    Err(error) => {
+                                        Self::push_feedback(
+                                            &mut session,
+                                            &mut native_tool_messages,
+                                            call_id,
+                                            "ask_for_pass",
+                                            &format!("invalid pass request: {error:#}"),
+                                        );
+                                        continue;
+                                    }
+                                };
+                                let agent_id = match executor.credential_agent_id() {
+                                    Ok(agent_id) => agent_id,
+                                    Err(error) => {
+                                        Self::push_feedback(
+                                            &mut session,
+                                            &mut native_tool_messages,
+                                            call_id,
+                                            "ask_for_pass",
+                                            &format!("pass request has no owner: {error:#}"),
+                                        );
+                                        continue;
+                                    }
+                                };
+                                let group_id = self
+                                    .group_context
+                                    .as_ref()
+                                    .map(|group| group.group_id.as_str());
+                                let credential_scope =
+                                    match crate::tools::browser_cookie_grants::authorized_scope(
+                                        &request.scope,
+                                        &agent_id,
+                                        group_id,
+                                    ) {
+                                        Ok(scope) => scope,
+                                        Err(error) => {
+                                            Self::push_feedback(
+                                                &mut session,
+                                                &mut native_tool_messages,
+                                                call_id,
+                                                "ask_for_pass",
+                                                &format!("invalid pass sharing scope: {error:#}"),
+                                            );
+                                            continue;
+                                        }
+                                    };
+                                let summary = request.display_title();
+                                crate::runtime::company_activity::record_tool(
+                                    &self.main_session_id,
+                                    &activity_role,
+                                    "ask_for_pass",
+                                );
+                                self.emit(CliEvent::ToolCallStarted {
+                                    agent: agent_display_name(&spec.name),
+                                    tool_name: "ask_for_pass".to_string(),
+                                    input_summary: summary.clone(),
+                                });
+                                let pending_same = tool_results.iter().any(|result| {
+                                    result.tool_name == "ask_for_pass"
+                                        && serde_json::from_str::<serde_json::Value>(&result.output)
+                                            .ok()
+                                            .is_some_and(|value| {
+                                                value["decision"] == "pending_user"
+                                                    && value["kind"] == serde_json::json!(request.kind)
+                                                    && value["site"] == serde_json::json!(request.site)
+                                            })
+                                });
+                                let (decision, metadata) = if let Some(existing) =
+                                    crate::tools::passes::existing_for_request(&request, &agent_id, group_id)
+                                {
+                                    (
+                                        crate::tools::passes::PassDecision::Existing {
+                                            credential_id: existing.credential_id.clone(),
+                                        },
+                                        Some(existing),
+                                    )
+                                } else if pending_same {
+                                    (crate::tools::passes::PassDecision::Pending, None)
+                                } else {
+                                    let ask = request.to_ask(&agent_id, group_id, &credential_scope);
+                                    let ask_id =
+                                        format!("pass-{}", &uuid::Uuid::new_v4().to_string()[..8]);
+                                    let rx = crate::runtime::asks::register_with_payload(
+                                        &ask_id,
+                                        &self.main_session_id,
+                                        &agent_display_name(&spec.name),
+                                        &ask.questions,
+                                        ask.approval.as_ref(),
+                                    );
+                                    let _abandon_on_drop = AbandonAskOnDrop(&ask_id);
+                                    self.emit(CliEvent::AskUser {
+                                        id: ask_id.clone(),
+                                        agent: agent_display_name(&spec.name),
+                                        questions: ask.questions.clone(),
+                                        approval: ask.approval.clone(),
+                                    });
+                                    // The turn genuinely waits for the popup:
+                                    // typing a login takes seconds. Past the
+                                    // window the card stays open and a late
+                                    // answer wakes this coworker with the id.
+                                    match tokio::time::timeout(
+                                        std::time::Duration::from_secs(
+                                            crate::tools::passes::REQUEST_WAIT_SECONDS,
+                                        ),
+                                        rx,
+                                    )
+                                    .await
+                                    {
+                                        Ok(Ok(answer)) => {
+                                            let decision =
+                                                crate::tools::passes::decision_from_answer(&answer);
+                                            let metadata = match &decision {
+                                                crate::tools::passes::PassDecision::Saved {
+                                                    credential_id,
+                                                } => crate::tools::passes::saved_metadata(
+                                                    credential_id,
+                                                    &agent_id,
+                                                    group_id,
+                                                ),
+                                                _ => None,
+                                            };
+                                            (decision, metadata)
+                                        }
+                                        _ => {
+                                            crate::runtime::asks::abandon(&ask_id);
+                                            (crate::tools::passes::PassDecision::Pending, None)
+                                        }
+                                    }
+                                };
+                                let output = crate::tools::passes::decision_result(
+                                    &request,
+                                    &decision,
+                                    metadata.as_ref(),
+                                )
+                                .to_string();
+                                let decision_name = serde_json::from_str::<serde_json::Value>(&output)
+                                    .ok()
+                                    .and_then(|value| value["decision"].as_str().map(str::to_string))
+                                    .unwrap_or_default();
+                                round_log.add_tool("ask_for_pass", 0, true);
+                                if !cfg!(test) {
+                                    crate::runtime::journal::record(
+                                        &self.main_session_id,
+                                        "pass_request",
+                                        &addr.label(),
+                                        &format!("{summary} → {decision_name}"),
+                                    );
+                                }
+                                self.emit(CliEvent::ToolCallCompleted {
+                                    agent: agent_display_name(&spec.name),
+                                    tool_name: "ask_for_pass".to_string(),
+                                    input_summary: summary.clone(),
+                                    success: true,
+                                    output_summary: decision_name,
+                                    diff: None,
+                                });
+                                tool_results.push(ToolCallResult {
+                                    tool_name: "ask_for_pass".to_string(),
+                                    input_summary: summary.clone(),
+                                    success: true,
+                                    output: output.clone(),
+                                });
+                                Self::push_tool_ack(
+                                    &mut session,
+                                    &mut native_tool_messages,
+                                    call_id,
+                                    "ask_for_pass",
+                                    &summary,
+                                    &output,
+                                );
+                                continue;
+                            }
                             "ask_for_login" => {
                                 let parsed: Result<
                                     crate::tools::login_request::LoginRequestInput,

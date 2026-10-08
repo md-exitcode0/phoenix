@@ -556,6 +556,7 @@ fn is_preplan_tool(call: &RequestedToolCall) -> bool {
             | "computer_app_read"
             | "ask_user"
             | "ask_for_login"
+            | "ask_for_pass"
             | "credential_list"
     )
 }

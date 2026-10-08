@@ -1869,7 +1869,7 @@
     },
     {
       "key": "security.vault_auto_lock_minutes",
-      "section": "Security",
+      "section": "Passes",
       "label": "Vault auto-lock",
       "description": "Locks decrypted credential access after inactivity; zero disables auto-lock.",
       "keywords": [
@@ -1894,7 +1894,7 @@
     },
     {
       "key": "security.reveal_requires_password",
-      "section": "Security",
+      "section": "Passes",
       "label": "Password before reveal",
       "description": "Requires the master password before revealing stored credentials.",
       "keywords": [
@@ -2108,7 +2108,7 @@
       "id": "credentials",
       "label": "Credentials",
       "description": "Unlock the encrypted vault, manage scoped website credentials, and reveal only with the master password.",
-      "section": "Security",
+      "section": "Passes",
       "route": "settings/credentials",
       "keywords": [
         "password",
@@ -2373,7 +2373,7 @@
     {
       "title": "Protect accounts",
       "description": "Security configures vault behavior. Credentials are managed through the vault action and never appear in settings data.",
-      "section": "Security",
+      "section": "Passes",
       "search_terms": [
         "vault",
         "credential",

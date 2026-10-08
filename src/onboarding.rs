@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::runtime::company::CompanyStore;
 use crate::runtime::company_directory::{AgentRecord, LifecycleState};
-use crate::security::vault::VaultStatus;
 
 const STATE_VERSION: u32 = 1;
 const MAX_STATE_BYTES: usize = 1024 * 1024;
@@ -434,8 +433,8 @@ fn complete(store: &CompanyStore, home: &std::path::Path) -> Result<()> {
         "configure and verify an AI provider first"
     );
     anyhow::ensure!(
-        crate::security::vault::Vault::at(home).status() != VaultStatus::Uninitialized,
-        "initialize the credential vault and save its recovery key first"
+        crate::security::vault::Vault::at(home).has_master_password(),
+        "create the Passes master password and save its recovery key first"
     );
     update_state(store, home, |state| {
         state.completed_at = Some(chrono::Utc::now().to_rfc3339());
@@ -447,12 +446,9 @@ fn complete(store: &CompanyStore, home: &std::path::Path) -> Result<()> {
 pub fn snapshot(store: &CompanyStore, home: &std::path::Path) -> Result<OnboardingSnapshot> {
     let state = read_state(store, home)?;
     let directory = store.directory_snapshot()?;
-    let vault_status = match crate::security::vault::Vault::at(home).status() {
-        VaultStatus::Uninitialized => "uninitialized",
-        VaultStatus::Locked => "locked",
-        VaultStatus::Unlocked => "unlocked",
-    }
-    .to_string();
+    let vault = crate::security::vault::Vault::at(home);
+    let vault_status = vault.status().as_str().to_string();
+    let vault_protected = vault.has_master_password();
     let provider_configured = provider_configured();
     let provider_ready = provider_verified(&state);
     let configured_identity = current_provider_identity()
@@ -467,7 +463,7 @@ pub fn snapshot(store: &CompanyStore, home: &std::path::Path) -> Result<Onboardi
     } else if !provider_ready {
         required_actions.push("verify_provider".to_string());
     }
-    if vault_status == "uninitialized" {
+    if !vault_protected {
         required_actions.push("initialize_vault".to_string());
     }
     if state.default_account_email.is_none() && !state.account_email_skipped {

@@ -310,6 +310,28 @@ const HISTORICAL_PROMPT_SEEDS: &[(&str, &str)] = &[
         "personal_logistics_system.md",
         "91c29af37052f3f87874aefd04fef486c772dd3548697f5c9bd207426f65920b",
     ),
+    // Shipped defaults immediately before the second voice pass (concierge
+    // voice, status-first, one-step-ahead). Unedited copies refresh to the new text.
+    (
+        "orchestrator_system.md",
+        "8d8ed673605479c242527833eb540d93e836312057c42719940ff57dbcc1220f",
+    ),
+    (
+        "coder_system.md",
+        "4105e64889b5e1bc125005eb34ed0e2f533864bcc58e64bc9c2a0817edd407dc",
+    ),
+    (
+        "researcher_system.md",
+        "90713a70dde71f4587c8796000316161071f672381bbabf9c9fe2c70637db55d",
+    ),
+    (
+        "frontend_system.md",
+        "e43b182665faacbf9436c3da486f5c7abd083d71b16c332a81c13c2e5be1ab4e",
+    ),
+    (
+        "critic_system.md",
+        "2dbf09d1f5127fd5376d46059402bc37801f3ef0366f28d3a84610f64cac93c2",
+    ),
 ];
 
 const DEFAULT_PROMPT_OVERLAYS: &[(&str, &str)] = &[

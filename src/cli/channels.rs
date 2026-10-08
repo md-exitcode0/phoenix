@@ -1545,8 +1545,10 @@ mod tests {
         vault.initialize("a sufficiently long test master password").unwrap();
         save_config(&config).unwrap();
         crate::channels::credentials::save(home.path(), &config, "saved-discord-token").unwrap();
-        vault.lock();
         assert_eq!(read_token(&config, false).unwrap().as_str(), "saved-discord-token");
+        // A locked Passes store keeps the token sealed until one unlock.
+        vault.lock();
+        assert!(read_token(&config, false).is_err());
         assert_eq!(status(&saved_path(&config.id).unwrap()).unwrap()["saved_login"], true);
         assert!(!list_saved().unwrap().to_string().contains("saved-discord-token"));
         remove_saved(&config.id).unwrap();

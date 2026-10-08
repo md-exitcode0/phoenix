@@ -442,6 +442,7 @@ pub(super) fn skill_gate_applies_to_tool(name: &str) -> bool {
             | "computer_window_act"
             | "account_manage"
             | "credential_generate"
+            | "pass_use"
             | "cron"
     )
 }

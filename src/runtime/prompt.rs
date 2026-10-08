@@ -1829,10 +1829,14 @@ mod tests {
         assert!(orchestrator.contains("researcher"));
         assert!(orchestrator.contains("browser"));
         assert!(orchestrator.contains("skill_search"));
+        assert!(orchestrator.contains("You are the root operator"));
+        assert!(coder.contains("To the user, answer naturally at the depth they requested"));
+        assert!(coder.contains("To a coworker, the `talk` body is the evidence"));
 
         let researcher = include_str!("../../prompts/researcher_system.md");
         assert!(researcher.contains("visual-build reference handoff"));
         assert!(researcher.contains("different angles and conditions"));
+        assert!(researcher.contains("No link dumps"));
 
         let frontend = include_str!("../../prompts/frontend_system.md");
         assert!(frontend.contains("use the researcher as a research partner"));

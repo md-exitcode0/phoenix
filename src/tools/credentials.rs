@@ -17,6 +17,8 @@ use crate::security::vault::Vault;
 pub struct CredentialListInput {
     #[serde(default)]
     pub site: Option<String>,
+    #[serde(default)]
+    pub kind: Option<String>,
     #[serde(default = "default_limit")]
     pub limit: usize,
 }
@@ -60,12 +62,28 @@ pub fn list(
         .transpose()?;
     let mut credentials = Vault::open_default().list_for_agent(&scopes)?;
     if let Some(site) = site.as_deref() {
-        credentials.retain(|credential| credential.site == site);
+        credentials.retain(|credential| {
+            crate::tools::browser_cookie_grants::domain_matches_site(&credential.site, site)
+                || crate::tools::browser_cookie_grants::domain_matches_site(site, &credential.site)
+        });
+    }
+    if let Some(kind) = input.kind.as_deref().map(str::trim).filter(|kind| !kind.is_empty()) {
+        let kind = if kind == "login" { "password" } else { kind };
+        credentials.retain(|credential| credential.kind == kind);
     }
     credentials.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
     let omitted = credentials.len().saturating_sub(input.limit);
     credentials.truncate(input.limit);
-    let content = serde_json::to_string_pretty(&credentials)?;
+    let locked = crate::tools::passes::needs_unlock();
+    let content = serde_json::to_string_pretty(&serde_json::json!({
+        "passes": credentials,
+        "passes_locked": locked,
+        "note": if locked {
+            "Metadata is listed while locked. Using a pass (pass_use / browser_input_credential) prompts the user to unlock once."
+        } else {
+            "Use a pass with pass_use or browser_input_credential by credential_id."
+        },
+    }))?;
     Ok(ToolOutput {
         summary: format!(
             "{} visible credential{}{}",

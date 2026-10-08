@@ -29,6 +29,9 @@ use wire_protocol::GATEWAY_WIRE_PROTOCOL;
 // GTK can return zero when its final hidden relay window is destroyed during
 // shutdown. Preserve a failed shell's status across that event-loop teardown.
 static CHROMIUM_EXIT_CODE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+/// Set once a full "Quit Phoenix" is underway so the supervisor never
+/// resurrects the gateway that is being stopped.
+static FULL_QUIT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 const GATEWAY_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(750);
 const GATEWAY_PROBE_ATTEMPTS: usize = 3;
 const GATEWAY_EXIT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
@@ -2322,6 +2325,9 @@ fn start_gateway_supervisor() {
         let mut failures = 0_u32;
         let mut next_attempt = std::time::Instant::now();
         loop {
+            if FULL_QUIT.load(std::sync::atomic::Ordering::Relaxed) {
+                return;
+            }
             if gateway_status_blocking().running {
                 failures = 0;
                 next_attempt = std::time::Instant::now();
@@ -14179,6 +14185,33 @@ fn chromium_bridge_token() -> Result<String, String> {
     Ok(token)
 }
 
+/// Consume the Electron shell's "Quit Phoenix" marker. Only a fresh marker
+/// counts, so a stale file from a crash can never stop a later gateway.
+fn take_full_quit_marker() -> bool {
+    let path = phoenix_home().join("desktop-quit-requested.json");
+    let Ok(raw) = std::fs::read_to_string(&path) else {
+        return false;
+    };
+    let _ = std::fs::remove_file(&path);
+    let at = serde_json::from_str::<serde_json::Value>(&raw)
+        .ok()
+        .and_then(|value| value.get("at").and_then(|at| at.as_u64()))
+        .unwrap_or(0);
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or(0);
+    at > 0 && now.saturating_sub(at) < 120_000
+}
+
+fn stop_gateway_for_full_quit() -> Result<Option<i32>, String> {
+    let _local_lifecycle = gateway_local_lifecycle_lock()
+        .lock()
+        .map_err(|_| "gateway lifecycle lock poisoned".to_string())?;
+    let _cross_process_lifecycle = GatewayLifecycleLease::acquire()?;
+    stop_verified_gateway_blocking()
+}
+
 fn launch_chromium_shell(app: &tauri::AppHandle, token: &str, ports: ChromiumPorts) -> Result<(), String> {
     let shell_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("chromium-shell");
     let electron = shell_root
@@ -14535,6 +14568,18 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("error while building Phoenix desktop")
         .run_return(|_, _| {});
+    // Closing the window only hides Phoenix to the tray; agents keep running
+    // in the detached gateway. "Quit Phoenix" leaves a marker, and only then
+    // does the desktop stop the gateway — which also drops the in-memory
+    // Passes unlock key, so the next launch asks for the master password once.
+    if take_full_quit_marker() {
+        FULL_QUIT.store(true, std::sync::atomic::Ordering::Relaxed);
+        match stop_gateway_for_full_quit() {
+            Ok(Some(pid)) => eprintln!("phoenix: full quit stopped gateway pid {pid}"),
+            Ok(None) => {}
+            Err(error) => eprintln!("phoenix: full quit could not stop the gateway: {error}"),
+        }
+    }
     let shell_code = CHROMIUM_EXIT_CODE.load(std::sync::atomic::Ordering::Relaxed);
     std::process::exit(if shell_code != 0 { shell_code } else { exit_code });
 }

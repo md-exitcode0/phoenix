@@ -422,8 +422,8 @@ fn recovery_route(tool: &str, output: &str) -> &'static str {
     if input_decode_error(&lower) {
         return "Correct the call against the installed Phoenix tool schema and the allowed values in this error. A value listed as allowed is not a report that the browser, login, or workspace is broken.";
     }
-    if lower.contains("vault") && lower.contains("locked") {
-        return "Call ask_user once with header `Unlock vault`, a concise reason, and options `Unlock here` / `Not now`. Phoenix will render the secure local unlock form; never use ask_for_login for a locked vault and never request the master password in prose.";
+    if (lower.contains("vault") || lower.contains("passes")) && lower.contains("locked") {
+        return "Passes is locked. Retry the same pass_use / browser_input_credential call: Phoenix shows the user its one-time unlock card and waits. If the card is already open, continue independent work. Never use ask_for_login for a locked vault and never request the master password in prose.";
     }
     if tool == "composio_run"
         && lower.contains(" accounts connected")
@@ -523,7 +523,7 @@ mod tests {
             assert!(!hint.contains("Use ask_for_login"));
         }
         assert!(recovery_route("browser_input_credential", "HTTP 403 credential error").contains("NOT evidence that its password is wrong"));
-        assert!(recovery_route("web_fetch", "vault locked").contains("Unlock vault"));
+        assert!(recovery_route("web_fetch", "vault locked").contains("one-time unlock card"));
     }
 
     #[test]

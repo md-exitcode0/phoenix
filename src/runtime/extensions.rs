@@ -281,7 +281,7 @@ fn action_category(tool_name: &str) -> &'static str {
         name if name.starts_with("mcp_") || name.starts_with("composio_") => "extension",
         "talk" | "work" | "volume_work" | "create_agent" | "agent_provision" => "collaboration",
         "memory_recall" | "memory_save" | "recall" | "vital_memory_write" => "memory",
-        "credential_generate" | "credential_list" | "browser_input_credential" => "credential",
+        "credential_generate" | "credential_list" | "browser_input_credential" | "ask_for_pass" | "pass_use" => "credential",
         _ => "tool",
     }
 }

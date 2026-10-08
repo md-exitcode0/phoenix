@@ -116,7 +116,9 @@ pub fn specialist_spec(
         output: OutputContract {
             label: output_label.to_string(),
             required_artifacts: required_artifacts.into_iter().map(str::to_string).collect(),
-            final_answer_style: "In direct conversation, answer the user naturally and match their requested depth. \
+            final_answer_style: "In direct conversation, answer the user naturally and match their requested depth: \
+                answer first in plain words, give your honest take, leave paths, commands and counts out unless asked, \
+                and offer the next step in a line when there is one. \
                 For delegated work, return the result to the assigning coworker through the designated return path, \
                 with the evidence, artifacts, verification and unresolved limits they need. \
                 A specialist role does not require a report format; use structure when the request or material calls for it.".to_string(),

@@ -243,6 +243,7 @@ impl ApprovalRequest {
                 | "login_request"
                 | "teach_workflow"
                 | "vault_unlock"
+                | "pass_request"
         ) && !subject.is_empty()
             && !expected.is_empty()
             && questions.iter().any(|question| {

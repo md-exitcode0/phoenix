@@ -2793,11 +2793,14 @@ fn attempt_action(
         // retry. The cached URL used before a transport failure is not an
         // authorization to type a secret into whatever page is active now.
         validate_credential_origin(session, credential)?;
-        actions::input_secret(session, index, credential.secret())?;
+        let field = input.get("field").and_then(Value::as_str);
+        let value = crate::tools::passes::resolve_field(credential, field)?;
+        actions::input_secret(session, index, value.as_str())?;
+        let label = field.unwrap_or(crate::security::vault::primary_field(&credential.metadata.kind));
         return finish_action(
             session,
             format!(
-                "Filled stored credential `{}` into [{index}] without exposing its secret.",
+                "Filled the `{label}` of pass `{}` into [{index}] without exposing it.",
                 credential.metadata.credential_id
             ),
             true,
@@ -2819,6 +2822,12 @@ fn validate_credential_origin(
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| real_url(&session.tab));
     let current_host = credential_host_for_url(&live_url)?;
+    // Cards and one-time codes saved without a site are meant for whichever
+    // checkout or verification page the task is on. Purchases stay behind
+    // the separate purchase approval gate.
+    if crate::security::vault::fillable_anywhere(&credential.metadata) {
+        return Ok(());
+    }
     anyhow::ensure!(
         crate::tools::browser_cookie_grants::domain_matches_site(
             &current_host,

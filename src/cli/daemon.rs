@@ -996,6 +996,10 @@ pub enum VaultCommand {
         #[serde(default = "default_json_object")]
         metadata_json: String,
         secret: String,
+        /// Secondary secret fields (card cvc/expiry/name/billing_zip, login
+        /// totp). Sealed with `secret`; never logged.
+        #[serde(default)]
+        fields: std::collections::BTreeMap<String, String>,
     },
     Update {
         credential_id: String,
@@ -1009,6 +1013,28 @@ pub enum VaultCommand {
         metadata_json: String,
         #[serde(default)]
         replacement_secret: Option<String>,
+        /// With `replacement_secret`, the complete new set of secondary
+        /// secret fields.
+        #[serde(default)]
+        replacement_fields: Option<std::collections::BTreeMap<String, String>>,
+    },
+    /// Answer an agent's `ask_for_pass` popup: seal the typed secret straight
+    /// into Passes under the runtime-bound owner of that request and return
+    /// the metadata-only receipt the UI then submits as the ask's answer.
+    FulfillRequest {
+        ask_id: String,
+        kind: String,
+        #[serde(default)]
+        site: Option<String>,
+        #[serde(default)]
+        label: Option<String>,
+        #[serde(default)]
+        username: Option<String>,
+        #[serde(default = "default_json_object")]
+        metadata_json: String,
+        secret: String,
+        #[serde(default)]
+        fields: std::collections::BTreeMap<String, String>,
     },
     Reveal {
         credential_id: String,
@@ -1037,6 +1063,7 @@ impl VaultCommand {
             Self::List => "list",
             Self::Store { .. } => "store",
             Self::Update { .. } => "update",
+            Self::FulfillRequest { .. } => "fulfill_request",
             Self::Reveal { .. } => "reveal",
             Self::Delete { .. } => "delete",
         }
@@ -1066,11 +1093,22 @@ impl Drop for VaultCommand {
                 current_password.zeroize();
                 new_password.zeroize();
             }
-            Self::Store { secret, .. } => secret.zeroize(),
+            Self::Store { secret, fields, .. } | Self::FulfillRequest { secret, fields, .. } => {
+                secret.zeroize();
+                fields.values_mut().for_each(Zeroize::zeroize);
+            }
             Self::Update {
-                replacement_secret: Some(secret),
+                replacement_secret,
+                replacement_fields,
                 ..
-            } => secret.zeroize(),
+            } => {
+                if let Some(secret) = replacement_secret.as_mut() {
+                    secret.zeroize();
+                }
+                if let Some(fields) = replacement_fields.as_mut() {
+                    fields.values_mut().for_each(Zeroize::zeroize);
+                }
+            }
             Self::Reveal {
                 master_password: Some(password),
                 ..
@@ -1103,9 +1141,17 @@ pub enum VaultReply {
     Revealed {
         credential: crate::security::vault::CredentialMetadata,
         secret: String,
+        #[serde(default)]
+        fields: std::collections::BTreeMap<String, String>,
     },
     Deleted {
         deleted: bool,
+    },
+    /// Metadata-only receipt for an answered `ask_for_pass` popup. `answer`
+    /// is exactly what the UI submits through AnswerAsk.
+    PassRequestFulfilled {
+        credential: crate::security::vault::CredentialMetadata,
+        answer: String,
     },
 }
 
@@ -1121,6 +1167,7 @@ impl std::fmt::Debug for VaultReply {
             Self::Stored { .. } => "stored",
             Self::Revealed { .. } => "revealed",
             Self::Deleted { .. } => "deleted",
+            Self::PassRequestFulfilled { .. } => "pass_request_fulfilled",
         };
         formatter
             .debug_struct("VaultReply")
@@ -1133,7 +1180,10 @@ impl Drop for VaultReply {
     fn drop(&mut self) {
         match self {
             Self::RecoveryKey { recovery_key } => recovery_key.zeroize(),
-            Self::Revealed { secret, .. } => secret.zeroize(),
+            Self::Revealed { secret, fields, .. } => {
+                secret.zeroize();
+                fields.values_mut().for_each(Zeroize::zeroize);
+            }
             _ => {}
         }
     }
@@ -2286,6 +2336,8 @@ pub async fn run_daemon() -> Result<()> {
             }
         }
     }
+    // Full quit: wipe every unlocked Passes key before anything else drains.
+    crate::security::vault::Vault::lock_all();
     let unsettled=tokio::task::spawn_blocking(||
         crate::tools::terminal_jobs::cancel_all_and_wait(std::time::Duration::from_secs(2))).await.unwrap_or(1);
     if unsettled>0 {glog(&format!("terminal shutdown: {unsettled} job(s) did not confirm termination before the bound"));}
@@ -4894,17 +4946,12 @@ fn vault_visible_scopes() -> Vec<crate::security::vault::CredentialScope> {
 }
 
 fn execute_vault_command(command: &VaultCommand) -> Result<VaultReply> {
-    use crate::security::vault::{Vault, VaultStatus};
+    use crate::security::vault::{NewPass, Vault};
 
     let vault = Vault::open_default();
     let result: Result<VaultReply> = match command {
         VaultCommand::Status => Ok(VaultReply::Status {
-            status: match vault.status() {
-                VaultStatus::Uninitialized => "uninitialized",
-                VaultStatus::Locked => "locked",
-                VaultStatus::Unlocked => "unlocked",
-            }
-            .to_string(),
+            status: vault.status().as_str().to_string(),
         }),
         VaultCommand::Initialize { master_password } => {
             let recovery_key = vault.initialize(master_password)?;
@@ -4948,21 +4995,23 @@ fn execute_vault_command(command: &VaultCommand) -> Result<VaultReply> {
             kind,
             metadata_json,
             secret,
+            fields,
         } => {
             anyhow::ensure!(
                 vault_visible_scopes().contains(scope),
                 "credential scope does not name an existing coworker or group"
             );
             Ok(VaultReply::Stored {
-                credential: vault.put(
-                    scope.clone(),
+                credential: vault.put_pass(NewPass {
+                    scope: Some(scope.clone()),
                     site,
                     label,
-                    username.clone(),
+                    username: username.clone(),
                     kind,
                     metadata_json,
                     secret,
-                )?,
+                    fields: fields.clone(),
+                })?,
             })
         }
         VaultCommand::Update {
@@ -4974,6 +5023,7 @@ fn execute_vault_command(command: &VaultCommand) -> Result<VaultReply> {
             kind,
             metadata_json,
             replacement_secret,
+            replacement_fields,
         } => {
             let scopes = vault_visible_scopes();
             anyhow::ensure!(
@@ -4981,41 +5031,57 @@ fn execute_vault_command(command: &VaultCommand) -> Result<VaultReply> {
                 "credential scope does not name an existing coworker or group"
             );
             Ok(VaultReply::Stored {
-                credential: vault.update(
+                credential: vault.update_pass(
                     credential_id,
                     &scopes,
-                    scope.clone(),
-                    site,
-                    label,
-                    username.clone(),
-                    kind,
-                    metadata_json,
-                    replacement_secret.as_deref(),
+                    NewPass {
+                        scope: Some(scope.clone()),
+                        site,
+                        label,
+                        username: username.clone(),
+                        kind,
+                        metadata_json,
+                        secret: replacement_secret.as_deref().unwrap_or(""),
+                        fields: replacement_fields.clone().unwrap_or_default(),
+                    },
+                    replacement_secret.is_some(),
                 )?,
             })
         }
+        VaultCommand::FulfillRequest {
+            ask_id,
+            kind,
+            site,
+            label,
+            username,
+            metadata_json,
+            secret,
+            fields,
+        } => fulfill_pass_request(&vault, ask_id, kind, site.as_deref(), label.as_deref(), username.clone(), metadata_json, secret, fields),
         VaultCommand::Reveal {
             credential_id,
             master_password,
         } => {
-            if crate::settings::effective_bool(
+            // Unlock once per gateway lifetime; the per-reveal re-check is an
+            // opt-in setting.
+            let always_ask = crate::settings::effective_bool(
                 "security.reveal_requires_password",
                 &crate::settings::SettingsScope::Global,
             )
-            .unwrap_or(true)
-            {
+            .unwrap_or(false);
+            let status = vault.status();
+            if (always_ask && vault.has_master_password()) || !status.can_reveal() {
                 vault.unlock_with_password(
                     master_password
                         .as_deref()
-                        .context("master password is required to reveal a credential")?,
+                        .context("Passes is locked; enter your master password to reveal")?,
                 )?;
             }
             let credential = vault.reveal(credential_id, &vault_visible_scopes())?;
-            let secret = credential.secret().to_string();
-            let metadata = credential.metadata.clone();
             Ok(VaultReply::Revealed {
-                credential: metadata,
-                secret,
+                credential: credential.metadata.clone(),
+                secret: credential.secret().to_string(),
+                fields: credential.fields_map(),
             })
         }
         VaultCommand::Delete { credential_id } => Ok(VaultReply::Deleted {
@@ -5023,6 +5089,85 @@ fn execute_vault_command(command: &VaultCommand) -> Result<VaultReply> {
         }),
     };
     result
+}
+
+/// Seal the user's answer to an `ask_for_pass` card. The owner/scope come
+/// from the runtime-bound ask record, never from the client.
+#[allow(clippy::too_many_arguments)]
+fn fulfill_pass_request(
+    vault: &crate::security::vault::Vault,
+    ask_id: &str,
+    kind: &str,
+    site: Option<&str>,
+    label: Option<&str>,
+    username: Option<String>,
+    metadata_json: &str,
+    secret: &str,
+    fields: &std::collections::BTreeMap<String, String>,
+) -> Result<VaultReply> {
+    let record = crate::runtime::asks::decision_record_for(ask_id)?
+        .context("this pass request is no longer available")?;
+    anyhow::ensure!(
+        record.status == "pending" && record.resolved_at.is_none(),
+        "this pass request was already answered"
+    );
+    let approval = record
+        .approval
+        .as_ref()
+        .filter(|approval| approval.action == crate::tools::passes::PASS_REQUEST_ACTION)
+        .context("this card is not a pass request")?;
+    let details = &approval.details;
+    let requested_kind = details.get("kind").map(String::as_str).unwrap_or("secret");
+    anyhow::ensure!(
+        kind == requested_kind,
+        "this request asked for a {requested_kind}, not a {kind}"
+    );
+    let scope: crate::security::vault::CredentialScope = serde_json::from_str(
+        details
+            .get("credential_scope")
+            .context("pass request has no bound owner")?,
+    )
+    .context("pass request owner is invalid")?;
+    // The agent named the site; a login form may refine it (e.g. the user
+    // types accounts.google.com for a gmail.com request).
+    let site = site
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .or(details.get("site").map(String::as_str))
+        .unwrap_or(crate::security::vault::UNBOUND_SITE)
+        .to_string();
+    let title = label
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .or(details.get("title").map(String::as_str))
+        .unwrap_or("Saved pass")
+        .to_string();
+    let mut public: serde_json::Map<String, serde_json::Value> =
+        serde_json::from_str(if metadata_json.trim().is_empty() { "{}" } else { metadata_json })
+            .context("metadata_json must be a JSON object")?;
+    public.insert("requested_by".into(), serde_json::json!(details.get("agent_id")));
+    public.insert("request_id".into(), serde_json::json!(ask_id));
+    if kind == "verification_code" {
+        public.insert("one_time".into(), serde_json::json!(true));
+    }
+    let credential = vault.put_pass(crate::security::vault::NewPass {
+        scope: Some(scope),
+        site: &site,
+        label: &title,
+        username,
+        kind: crate::tools::passes::stored_kind(kind),
+        metadata_json: &serde_json::Value::Object(public).to_string(),
+        secret,
+        fields: fields.clone(),
+    })?;
+    glog(&format!(
+        "ask {ask_id}: pass request saved as {} ({})",
+        credential.credential_id, credential.kind
+    ));
+    Ok(VaultReply::PassRequestFulfilled {
+        answer: crate::tools::passes::fulfilled_answer(&credential),
+        credential,
+    })
 }
 
 async fn handle_connection(stream: UnixStream, turn_locks: TurnLocks) -> Result<()> {
@@ -8222,6 +8367,7 @@ mod ensure_gateway_tests {
             kind: "password".to_string(),
             metadata_json: "{}".to_string(),
             secret: "never-print-this-secret".to_string(),
+            fields: Default::default(),
         };
         assert!(!format!("{store:?}").contains("never-print-this-secret"));
         let stored = super::execute_vault_command(&store).expect("store credential");
@@ -8239,6 +8385,7 @@ mod ensure_gateway_tests {
             kind: "password".to_string(),
             metadata_json: r#"{"note":"edited in settings"}"#.to_string(),
             replacement_secret: None,
+            replacement_fields: None,
         })
         .expect("update credential");
         assert!(
@@ -8249,6 +8396,13 @@ mod ensure_gateway_tests {
         assert!(
             matches!(&listed, VaultReply::Credentials { credentials } if credentials.len() == 1 && credentials[0].credential_id == credential_id)
         );
+        // Locked: a reveal needs the master password once, then stays unlocked.
+        super::execute_vault_command(&VaultCommand::Lock).expect("lock vault");
+        assert!(super::execute_vault_command(&VaultCommand::Reveal {
+            credential_id: credential_id.clone(),
+            master_password: None,
+        })
+        .is_err());
         assert!(super::execute_vault_command(&VaultCommand::Reveal {
             credential_id: credential_id.clone(),
             master_password: Some("wrong password".to_string()),
@@ -8268,7 +8422,15 @@ mod ensure_gateway_tests {
             super::execute_vault_command(&VaultCommand::Lock).expect("lock vault"),
             VaultReply::Locked
         ));
-        assert!(super::execute_vault_command(&VaultCommand::List).is_err());
+        // Passes metadata stays listable while locked; secrets do not.
+        assert!(matches!(
+            &super::execute_vault_command(&VaultCommand::List).expect("list while locked"),
+            VaultReply::Credentials { credentials } if credentials.len() == 1
+        ));
+        assert!(matches!(
+            &super::execute_vault_command(&VaultCommand::Status).expect("status"),
+            VaultReply::Status { status } if status == "locked"
+        ));
         assert!(matches!(
             super::execute_vault_command(&VaultCommand::UnlockWithPassword {
                 master_password: password.to_string(),
@@ -8281,6 +8443,79 @@ mod ensure_gateway_tests {
                 .expect("delete credential"),
             VaultReply::Deleted { deleted: true }
         ));
+    }
+
+    #[test]
+    fn pass_request_popup_seals_into_passes_and_answers_with_metadata_only() {
+        let home = tempfile::tempdir().expect("temp home");
+        let _guard = crate::config::test_env::PhoenixHomeGuard::set_private(home.path());
+        let request = crate::tools::passes::PassRequestInput {
+            kind: "login".into(),
+            reason: "send the weekly update".into(),
+            title: Some("Gmail login".into()),
+            site: Some("gmail.com".into()),
+            fields: vec![],
+            labels: Default::default(),
+            username_hint: Some("me@gmail.com".into()),
+            scope: "agent".into(),
+            force_new: false,
+        }
+        .validate_and_normalize()
+        .expect("valid request");
+        let scope = crate::security::vault::CredentialScope::agent("avery");
+        let ask = request.to_ask("avery", None, &scope);
+        let ask_id = "pass-test0001";
+        let _rx = crate::runtime::asks::register_with_payload(
+            ask_id,
+            "agent-avery",
+            "Avery",
+            &ask.questions,
+            ask.approval.as_ref(),
+        );
+        // No master password exists and none is needed to save.
+        let wrong_kind = VaultCommand::FulfillRequest {
+            ask_id: ask_id.into(),
+            kind: "card".into(),
+            site: None,
+            label: None,
+            username: None,
+            metadata_json: "{}".into(),
+            secret: "4242424242424242".into(),
+            fields: Default::default(),
+        };
+        assert!(super::execute_vault_command(&wrong_kind).is_err());
+        let fulfill = VaultCommand::FulfillRequest {
+            ask_id: ask_id.into(),
+            kind: "login".into(),
+            site: Some("accounts.google.com".into()),
+            label: None,
+            username: Some("me@gmail.com".into()),
+            metadata_json: "{}".into(),
+            secret: "popup-typed-password".into(),
+            fields: std::collections::BTreeMap::from([("totp".to_string(), "JBSWY3DPEHPK3PXP".to_string())]),
+        };
+        assert!(!format!("{fulfill:?}").contains("popup-typed-password"));
+        let reply = super::execute_vault_command(&fulfill).expect("fulfill");
+        let (credential, answer) = match &reply {
+            VaultReply::PassRequestFulfilled { credential, answer } => (credential.clone(), answer.clone()),
+            other => panic!("unexpected reply {other:?}"),
+        };
+        assert_eq!(credential.scope, scope, "owner comes from the runtime-bound ask");
+        assert_eq!(credential.kind, "password");
+        assert_eq!(credential.site, "accounts.google.com");
+        assert!(!answer.contains("popup-typed-password") && !answer.contains("JBSWY3DP"));
+        assert_eq!(
+            crate::tools::passes::decision_from_answer(&answer),
+            crate::tools::passes::PassDecision::Saved { credential_id: credential.credential_id.clone() }
+        );
+        let revealed = crate::security::vault::Vault::open_default()
+            .reveal(&credential.credential_id, &[scope.clone()])
+            .expect("unprotected passes reveal");
+        assert_eq!(revealed.secret(), "popup-typed-password");
+        assert_eq!(crate::tools::passes::resolve_field(&revealed, Some("totp")).unwrap().len(), 6);
+        // Once answered, the card cannot be fulfilled again.
+        assert!(crate::runtime::asks::answer(ask_id, answer));
+        assert!(super::execute_vault_command(&fulfill).is_err());
     }
 
     #[tokio::test]

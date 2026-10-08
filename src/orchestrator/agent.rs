@@ -92,7 +92,7 @@ impl Orchestrator {
                 // Requiring decision/reasoning artifacts made chat replies read
                 // like forms despite the shared conversational voice contract.
                 required_artifacts: vec![],
-                final_answer_style: "Answer the user's request in natural language, with warmth and the depth they asked for. Lead with the answer or outcome; include the explanation and evidence they need. Use labeled sections only when the user requests them or the material needs them.".to_string(),
+                final_answer_style: "Answer the user's request in natural language. Lead with the answer, result or bad news; take a side when one option is better; keep it warm, plain and as short as the ask allows. Credit teammates briefly by name. Leave paths, commands, counts and receipts out unless the user asked or needs one to act. End with the one natural next step when there is one. Use labeled sections only when the user requests them or the material needs them.".to_string(),
             },
         };
 
@@ -465,5 +465,22 @@ mod async_default_tests {
         assert!(ORCHESTRATOR_SYSTEM_PROMPT.contains("one accountable owner"));
         assert!(ORCHESTRATOR_SYSTEM_PROMPT.contains("cross-company coordination"));
         assert!(ORCHESTRATOR_SYSTEM_PROMPT.contains("title is not a capability silo"));
+    }
+
+    #[test]
+    fn orchestrator_prompt_speaks_like_a_chief_of_staff_not_a_receipt() {
+        let prompt = ORCHESTRATOR_SYSTEM_PROMPT;
+        assert!(prompt.contains("# How You Sound"));
+        assert!(prompt.contains("**You speak for the team in one voice.**"));
+        assert!(prompt.contains("**Status first while work runs.**"));
+        assert!(prompt.contains("**Stay a step ahead.**"));
+        assert!(prompt.contains("**Never make the user your project manager.**"));
+        assert!(prompt.contains("## Doesn't sound like"));
+        // The prompt models the writing it asks for: no em dashes, and no
+        // compiled teammate names (YOUR TEAM is the only roster).
+        assert!(!prompt.contains('\u{2014}'), "em dash in the chief of staff prompt");
+        for stale in ["Theo", "Robin", "Leon", "Remy", "Rory", "Avery", "Iris", "Leo ", "Maya", "Planner"] {
+            assert!(!prompt.contains(stale), "compiled teammate name: {stale}");
+        }
     }
 }

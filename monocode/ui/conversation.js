@@ -1007,7 +1007,7 @@
     if (/Tool exceeded its bounded execution window/i.test(raw)) return /termination was NOT CONFIRMED|without confirmed/i.test(raw)?"This action timed out. Check its result before trying again.":"This action took too long and was stopped. Check any partial changes before trying again.";
     if (/Command FAILED with exit code/i.test(raw)) return "The command didn’t finish successfully. Open activity for the details.";
     if (toolName === "response_validation") return "Phoenix adjusted the approach before continuing.";
-    if (/credential vault is locked/i.test(raw)) return "The credential vault is locked.";
+    if (/credential vault is locked|Passes is locked/i.test(raw)) return "Passes is locked.";
     const httpStatus=raw.match(/HTTP\s+(\d{3})\b/i);
     if(httpStatus){
       const webOwned=/browser|web_|crawl|scrape/.test(toolName);
@@ -5267,11 +5267,11 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     if(!state.painting){scrollLatest();syncComposerFade();}
     return node;
   }
-  const DECISION_APPROVAL_ACTIONS = new Set(["tool_permission","governed_effect","outside_group_call","login_request","teach_workflow","vault_unlock","permanent_agent"]);
+  const DECISION_APPROVAL_ACTIONS = new Set(["tool_permission","governed_effect","outside_group_call","login_request","teach_workflow","vault_unlock","permanent_agent","pass_request"]);
   function approvalAccessName(value){return value==="full_access"?"Full Access":value==="workspace"?"Workspace":value==="talk"?"Talk":String(value||"").replaceAll("_"," ").replace(/^./,(letter)=>letter.toUpperCase());}
   function approvalToolAction(tool){
     const name=String(tool||"").toLowerCase();
-    const actions={browser_state:"check the current Chrome page",browser_navigate:"open a page in Chrome",browser_extract:"read the current Chrome page",browser_act:"interact with the current Chrome page",computer_use:"use the computer",computer_act:"interact with the computer",computer_window_act:"interact with an app window",composio_run:"use a connected app",composio_connections:"check connected accounts",credential_list:"check saved accounts",credential_generate:"create a secure password",account_manage:"manage an account",mcp_call:"use a connected service",cron:"change a schedule",skill_install:"install a skill",bash:"run a command"};
+    const actions={browser_state:"check the current Chrome page",browser_navigate:"open a page in Chrome",browser_extract:"read the current Chrome page",browser_act:"interact with the current Chrome page",computer_use:"use the computer",computer_act:"interact with the computer",computer_window_act:"interact with an app window",composio_run:"use a connected app",composio_connections:"check connected accounts",credential_list:"check saved passes",credential_generate:"create a secure password",pass_use:"use a saved pass",account_manage:"manage an account",mcp_call:"use a connected service",cron:"change a schedule",skill_install:"install a skill",bash:"run a command"};
     if(actions[name])return actions[name];
     const label=humanTool(name,true).replace(/^(?:Using|Checking|Running|Reading|Opening|Working in)\s+/i,"").trim();
     return `use ${label?label.toLowerCase():"this tool"}`;
@@ -5284,7 +5284,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     }
     if(action==="governed_effect")return{title:`Approve ${model.approval.subject||"this exact action"}?`,body:`${name} is ready to act. This approval applies once and does not change standing permissions.`,signal:2,label:"Needs review",tone:"orange"};
     if(action==="login_request")return{title:`How should ${name} sign in${site?` to ${site}`:""}?`,body:"Use the site's real sign-in. Passkeys, security keys, passwords, OAuth and 2FA stay between the site, browser and your device; Phoenix keeps only the resulting private session.",signal:3,label:"User presence · no secret capture",tone:"green"};
-    if(action==="vault_unlock")return{title:"Unlock the local credential vault?",body:safeRuntimeCopy(details.reason)||`${name} needs a saved account to continue. The password stays on this device.`,signal:3,label:"Local only",tone:"green"};
+    if(action==="vault_unlock")return{title:"Unlock Passes?",body:safeRuntimeCopy(details.reason)||`${name} needs a saved pass to continue. Unlock once — Passes stays unlocked until you quit Phoenix.`,signal:3,label:"Once per session · stays on this device",tone:"green"};
     if(action==="teach_workflow")return{title:`Teach ${name} this workflow?`,body:safeRuntimeCopy(details.workflow_goal)||"Phoenix will open the teaching surface and save only the workflow you demonstrate.",signal:2,label:"Reusable workflow",tone:"orange"};
     if(action==="permanent_agent")return{title:q.question||`Add ${model.approval.subject||"this coworker"} permanently?`,body:"This changes the company roster. Review the proposed role before continuing.",signal:2,label:"Company change",tone:"orange"};
     if(action==="outside_group_call")return{title:q.question||`Let ${name} contact someone outside this group?`,body:"The action crosses the current group boundary and applies only to this request.",signal:2,label:"Outside this group",tone:"orange"};
@@ -5303,12 +5303,19 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
       // with the answer card right under it.
       feedNode("message-row agent-message decision-request",`${avatar(agentProfile(ask.agent||"phoenix"))}<div class="message-content"><header><strong>${escape(agentLabel(ask.agent||"phoenix"))}</strong></header><div class="markdown">${questions.map(q=>markdown(q.question)).join("<br>")}</div></div>`,{decisionAskId:String(ask.id),from:"assistant"});
     }
+    if(approval.action==="pass_request"&&window.PhoenixPasses){
+      const card=passRequestCard(ask,approval,questions);
+      $("approvalStack").append(card);syncApprovalStack();if(!state.painting)scrollLatest();
+      if(!state.painting)requestAnimationFrame(()=>card.querySelector("input:not([readonly])")?.focus({preventScroll:true}));
+      if(!state.painting&&!preview&&document.hidden&&notificationEnabled("attention"))ui.notify({title:`${agentLabel(ask.agent)} needs ${approval.details?.title||"a pass"}`,body:questions[0]?.question||"Phoenix is waiting for you.",item:{kind:"agent",id:ask.agent||"phoenix"},external:true});
+      return;
+    }
     const card=document.createElement("article");card.className=`approval-card ${decision?"approval-decision-card":"approval-question-card"}`;card.dataset.askId=ask.id;
     card.dataset.agent=approval.details?.owner_agent_id||approval.details?.agent_id||ask.agent||"phoenix";card.dataset.login=login?"true":"false";card.dataset.teaching=teaching?"true":"false";card.dataset.site=approval.details?.site||"";card.dataset.startUrl=approval.details?.start_url||"";card.dataset.teachingScope=approval.details?.scope||"agent";card.dataset.groupId=approval.details?.group_id||"";
     card._askState={ask,approval,questions,index:0,answers:Array(questions.length).fill(null),multiSelections:Array.from({length:questions.length},()=>new Set()),customAnswers:Array(questions.length).fill(""),decisionSelection:0,alternativesOpen:false,login,teaching,vault,decision,cardAgent:card.dataset.agent};
     const kit=window.PhoenixAgentKit;
     const custom=`<div class="approval-custom" hidden><label><span>Your answer</span><input data-ask-custom-input autocomplete="off" placeholder="Type an answer"></label><button class="primary" data-ask-custom-save>Continue</button></div>`;
-    const vaultForm=`<form class="approval-vault" hidden><label><span>Master password</span><input data-vault-password type="password" required minlength="12" autocomplete="current-password" placeholder="Unlock locally"></label><button class="primary" type="submit" data-vault-submit>Unlock and continue</button></form>`;
+    const vaultForm=`<form class="approval-vault" hidden><label><span>Passes master password</span><input data-vault-password type="password" required minlength="12" autocomplete="current-password" placeholder="Unlock once for this session"></label><button class="primary" type="submit" data-vault-submit>Unlock and continue</button></form>`;
     card.dataset.state="pending";
     // Decisions follow beUI ToolApproval; questions follow beUI ApprovalCard.
     card.innerHTML=decision
@@ -5329,6 +5336,51 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     // Only raise an OS notification when the app is actually in the background;
     // duplicating the same request as a corner toast competes with the question.
     if(!state.painting&&!preview&&document.hidden&&notificationEnabled("attention"))ui.notify({title:login?`${agentLabel(ask.agent)} needs a login`:`${agentLabel(ask.agent)} needs your input`,body:questions[0]?.question||"Phoenix is waiting for you.",item:{kind:"agent",id:ask.agent||"phoenix"},external:true});
+  }
+  // ask_for_pass: a purpose-built popup that renders exactly the fields the
+  // agent asked for. The secret goes UI → gateway Vault (sealed to Passes);
+  // the agent's answer is only the metadata receipt the gateway returns.
+  function passRequestCard(ask,approval,questions){
+    const P=window.PhoenixPasses,details=approval.details||{},kind=P.KINDS[details.kind]?details.kind:"secret",meta=P.KINDS[kind];
+    let fields=[],labels={};try{fields=JSON.parse(details.fields||"[]");}catch{}try{labels=JSON.parse(details.labels||"{}");}catch{}
+    if(kind==="login"&&!fields.includes("site"))fields.unshift("site");
+    if(kind==="api_key"&&!fields.includes("service"))fields.unshift("service");
+    const name=agentLabel(ask.agent||details.agent_id||"phoenix"),title=details.title||meta.label,site=details.site||"";
+    const values={site,service:site,username:details.username_hint||""};
+    const optional=kind==="login"&&fields.includes("totp");
+    const fieldNames=optional?fields.filter((field)=>field!=="totp"):fields;
+    const card=document.createElement("article");
+    card.className="approval-card pass-request-card";card.dataset.askId=ask.id;card.dataset.agent=details.agent_id||ask.agent||"phoenix";card.dataset.kind=kind;card.dataset.state="pending";
+    card._askState={ask,approval,questions,index:0,answers:Array(questions.length).fill(null),multiSelections:questions.map(()=>new Set()),customAnswers:questions.map(()=>""),decision:true,pass:true,cardAgent:card.dataset.agent};
+    card.innerHTML=`<div class="pr-head"><span class="pr-tile pr-tile-${kind}">${P.icons[meta.icon]}</span><div class="pr-titles"><h3 class="pr-title" tabindex="-1">${escape(title)}</h3><p class="pr-reason">${escape(questions[0]?.question||`${name} needs this to continue.`)}</p></div><button type="button" class="approval-dismiss pr-dismiss" data-pass-cancel aria-label="Not now">${window.PhoenixAgentKit?.icon("x")||"×"}</button></div>
+      <form class="pr-form" autocomplete="off" novalidate>
+        <div class="pr-fields pr-fields-${kind}">${P.renderFields(kind,fieldNames,{labels,values,lockSite:Boolean(site)})}</div>
+        ${optional?`<details class="pr-more"><summary>Add 2FA setup key <small>optional — lets ${escape(name)} fill your 6-digit codes</small></summary>${P.renderFields(kind,["totp"],{labels})}</details>`:""}
+        <footer class="pr-foot"><span class="pr-lock">${P.icons.lock}<span>Encrypted on this device. ${escape(name)} gets a reference, never the value.</span></span><span class="pr-actions"><button type="button" class="ta-btn ghost" data-pass-cancel>Not now</button><button type="submit" class="ta-btn primary" data-pass-save>Save to Passes</button></span></footer>
+      </form>`;
+    const form=card.querySelector(".pr-form");P.bind(form);
+    form.addEventListener("submit",(event)=>{event.preventDefault();savePassRequest(card);});
+    form.addEventListener("keydown",(event)=>{if(event.key==="Escape"){event.preventDefault();dismissPassRequest(card);}});
+    card.querySelectorAll("[data-pass-cancel]").forEach((button)=>button.addEventListener("click",(event)=>{event.preventDefault();event.stopPropagation();dismissPassRequest(card);}));
+    return card;
+  }
+  function dismissPassRequest(card){window.PhoenixPasses.wipe(card.querySelector(".pr-form"));card.dataset.state="leaving";dismissAsk(card);}
+  async function savePassRequest(card){
+    const P=window.PhoenixPasses,model=card._askState,details=model.approval.details||{},kind=card.dataset.kind,form=card.querySelector(".pr-form");
+    const value=P.collect(form,kind);if(!value){card.classList.remove("pr-shake");void card.offsetWidth;card.classList.add("pr-shake");return;}
+    const save=card.querySelector("[data-pass-save]");card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);save.classList.add("busy");save.textContent="Saving…";
+    try{
+      const reply=await rpc({Vault:{action:"fulfill_request",ask_id:card.dataset.askId,kind,site:value.site||details.site||null,label:details.title||null,username:value.username,metadata_json:JSON.stringify(value.metadata||{}),secret:value.secret,fields:value.fields}},20000);
+      P.wipe(form);
+      const receipt=reply?.Vault?.answer;if(!receipt)throw new Error("Passes did not confirm the save.");
+      card.dataset.state="saved";save.innerHTML=`${P.icons.check}Saved`;
+      model.answers=model.questions.map(()=>`Saved to Passes · ${details.title||P.KINDS[kind].label}`);
+      await new Promise((resolve)=>setTimeout(resolve,420));
+      await submitAsk(card,receipt);
+    }catch(error){
+      card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);save.classList.remove("busy");save.textContent="Save to Passes";
+      ui.toast(error.message||String(error),true);
+    }
   }
   function approvalParameters(model,q){
     const details=model.approval.details||{};
@@ -5416,7 +5468,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   async function submitAsk(card,answer){const token=activeSelectionToken(),session_id=state.sessionId,owner=canvasConversationOwner();card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);try{await rpc({AnswerAsk:{ask_id:card.dataset.askId,answer,session_id,owner}},8000,token?.signal);if(selectionIsCurrent(token))resolveAskDisplay(card,answer,"answered");}catch(error){if(!selectionIsCurrent(token))return;if(card._askState?.decision&&OBSOLETE_ASK.test(String(error?.message||error))){resolveAskDisplay(card,answer,"answered");return;}card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);ui.toast(error.message,true);}}
   async function dismissAsk(card){const token=activeSelectionToken(),session_id=state.sessionId,owner=canvasConversationOwner();card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);try{await rpc({DismissAsk:{ask_id:card.dataset.askId,session_id,owner}},8000,token?.signal);if(!selectionIsCurrent(token))return;card._askState.answers=card._askState.questions.map(()=>"Not now");resolveAskDisplay(card,"Not now","dismissed");}catch(error){if(!selectionIsCurrent(token))return;card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);ui.toast(error.message,true);}}
   function recordAskAnswer(card,answer){const model=card._askState;model.answers[model.index]=answer;if(model.index<model.questions.length-1){model.index+=1;renderApprovalQuestion(card);card.querySelector(".approval-question").focus?.();return;}submitAsk(card,formatAskAnswers(model));}
-  async function unlockApprovalVault(card){const input=card.querySelector("[data-vault-password]"),password=input.value;if(password.length<12){input.reportValidity();return;}card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);try{await rpc({Vault:{action:"unlock_with_password",master_password:password}},20000);input.value="";card._askState.answers[card._askState.index]="Unlocked";await submitAsk(card,"The local credential vault is unlocked. Continue the blocked action now.");}catch(error){card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);input.focus();ui.toast(error.message,true);}}
+  async function unlockApprovalVault(card){const input=card.querySelector("[data-vault-password]"),password=input.value;if(password.length<12){input.reportValidity();return;}card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);try{await rpc({Vault:{action:"unlock_with_password",master_password:password}},20000);input.value="";card._askState.answers[card._askState.index]="Unlocked";await submitAsk(card,"A: Unlock here\nPasses is unlocked for this Phoenix session. Continue the blocked action now.");}catch(error){card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);input.focus();ui.toast(error.message,true);}}
   function closeApproval(){$("approvalStack").replaceChildren();syncApprovalStack();}
   function answerApproval(button){const card=button.closest(".approval-card"),model=card._askState,answer=button.dataset.askOption;if(model.questions[model.index].multi_select){const selected=model.multiSelections[model.index];selected.has(answer)?selected.delete(answer):selected.add(answer);renderApprovalQuestion(card);return;}
     if(!model.decision){const index=model.index;model.answers[index]=answer;model.customAnswers[index]="";renderApprovalQuestion(card);clearTimeout(model.advanceTimer);if(index<model.questions.length-1)model.advanceTimer=setTimeout(()=>{if(card.isConnected&&model.index===index){model.index+=1;renderApprovalQuestion(card);card.querySelector(".approval-question")?.focus?.({preventScroll:true});}},240);return;}

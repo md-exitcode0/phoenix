@@ -82,6 +82,8 @@ Iris's design package is vendored with its source, reference library, and integr
 
 MonoCode rooms include a configurable leader, coworker avatars, and messages delivered while work is running. All coworkers have the bundled motion graphics workflow; see [docs/motion-graphics.md](docs/motion-graphics.md) for its actions and media dependencies.
 
+Settings → Passes manages encrypted logins, cards, and keys. Coworkers can request and use passes through typed tools; see [docs/passes.md](docs/passes.md). Closing the desktop window hides Phoenix to the tray, where **Quit Phoenix** stops the runtime.
+
 ## Cross-platform
 
 Linux is the current release target. The core runtime and Tauri UI are structured for Windows and macOS ports; native desktop control, notification delivery, process supervision, and credential integration have platform-specific implementations.

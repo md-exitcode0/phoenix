@@ -135,6 +135,25 @@ async function main() {
     assert.deepEqual(motion.pickerOptions.sort(),motion.expectedMembers.sort(),'Leader picker contains exactly the room members');
     assert.ok(motion.anchored&&motion.aboveComposer,'Back to latest stays above the composer');
     assert.ok(motion.sendNow&&motion.immediate&&motion.notQueued&&motion.stillWorking&&motion.composerCleared,'A working direct conversation receives its new message immediately');
+    const passes=await evaluate(`(()=>{
+      const p=window.PhoenixPasses;if(!p)throw Error('Passes kit did not load');
+      const form=document.createElement('form');document.body.append(form);
+      form.innerHTML=p.renderFields('login',null,{values:{site:'example.com'},lockSite:true});p.bind(form);
+      const fixedSite=form.querySelector('[name="site"]').readOnly;
+      const masked=form.querySelector('[name="password"]').type==='password';
+      const missingPassword=p.collect(form,'login')===null;
+      form.querySelector('[name="username"]').value='fixture@example.com';form.querySelector('[name="password"]').value='fixture-only-password';
+      const login=p.collect(form,'login');p.wipe(form);const wiped=[...form.querySelectorAll('input')].every(input=>!input.value);
+      form.innerHTML=p.renderFields('card');p.bind(form);
+      form.querySelector('[name="number"]').value='4242424242424242';form.querySelector('[name="number"]').dispatchEvent(new Event('input',{bubbles:true}));
+      form.querySelector('[name="cvc"]').value='123';form.querySelector('[name="expiry"]').value='12 / 99';
+      const card=p.collect(form,'card'),formatted=form.querySelector('[name="number"]').value==='4242 4242 4242 4242';
+      const secondarySealed=card.fields.cvc==='123'&&card.fields.expiry==='12 / 99'&&!('cvc' in card.metadata)&&!('expiry' in card.metadata);
+      p.wipe(form);form.remove();
+      return {fixedSite,masked,missingPassword,wiped,loginValid:login.kind==='login'&&login.site==='example.com',formatted,secondarySealed};
+    })()`);
+    console.log(JSON.stringify({passes},null,2));
+    assert.ok(Object.values(passes).every(Boolean),'Passes forms validate, mask, and wipe secrets while keeping card fields out of public metadata');
     if (process.env.PHOENIX_TEST_SCREENSHOT) {
       await evaluate(`(async()=>{const t=window.MonocodeRoomTest;await t.ui.selectItem({kind:'group',id:t.ui.state.view.directory.groups[0].group_id});t.syncGroupPals();})()`);
       const screenshot=await command("Page.captureScreenshot",{format:"png"});

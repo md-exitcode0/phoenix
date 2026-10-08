@@ -39,8 +39,8 @@ pub const FAMILIES: &[Family] = &[
     },
     Family {
         name: "vault",
-        summary: "stored credentials and accounts: list, generate, manage",
-        members: |name| matches!(name, "credential_list" | "credential_generate" | "account_manage"),
+        summary: "Passes — saved logins, cards, API keys, tokens: list, ask the user for one (ask_for_pass), use one without seeing it (pass_use), generate passwords, track accounts",
+        members: |name| matches!(name, "credential_list" | "credential_generate" | "account_manage" | "ask_for_pass" | "pass_use"),
     },
     Family {
         name: "mcp",

@@ -514,7 +514,7 @@ fn semantic_tool_phase(tool: &str) -> &'static str {
         | "computer_focus_window" => "desktop_act",
         "composio_search" | "composio_schemas" | "composio_connections" => "structured_discover",
         "composio_run" => "structured_execute",
-        "ask_for_login" | "account_manage" | "credential_generate" => "authentication",
+        "ask_for_login" | "ask_for_pass" | "pass_use" | "account_manage" | "credential_generate" => "authentication",
         _ => "other",
     }
 }

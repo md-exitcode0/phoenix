@@ -55,6 +55,24 @@ fn reveal(
     );
     Ok(value)
 }
+/// Ownership/binding check from public metadata only, so saving or forgetting
+/// a bot login never needs Passes unlocked.
+fn verify_binding(vault: &Vault, config: &ChannelConfig, reference: &Reference) -> Result<bool> {
+    let Some(metadata) = vault
+        .list_for_agent(&[CredentialScope::agent(&config.agent_id)])?
+        .into_iter()
+        .find(|meta| meta.credential_id == reference.credential_id)
+    else {
+        return Ok(false);
+    };
+    let expected = serde_json::json!({"channel_id":config.id,"binding":config.binding()});
+    let actual: serde_json::Value = serde_json::from_str(&metadata.metadata_json)?;
+    anyhow::ensure!(
+        metadata.kind == KIND && actual == expected,
+        "Saved credential does not belong to this channel"
+    );
+    Ok(true)
+}
 pub fn saved(home: &Path, config: &ChannelConfig) -> Result<bool> {
     Ok(reference(home, config)?.is_some())
 }
@@ -73,8 +91,9 @@ pub fn save(home: &Path, config: &ChannelConfig, token: &str) -> Result<()> {
     );
     let vault = Vault::at(home);
     private_io::with_private_lock(&path(home, config).with_extension("operation"), || {
-        if let Some(reference) = reference(home, config)? {
-            reveal(&vault, config, &reference)?;
+        if let Some(reference) = reference(home, config)?
+            .filter(|reference| verify_binding(&vault, config, reference).unwrap_or(false))
+        {
             return vault.replace_secret_for_agent(
                 &reference.credential_id,
                 &[CredentialScope::agent(&config.agent_id)],
@@ -119,13 +138,8 @@ pub fn forget(home: &Path, config: &ChannelConfig) -> Result<()> {
             // Verify ownership before removing a referenced credential. A stale
             // or altered reference must not delete another saved login.
             let scope = CredentialScope::agent(&config.agent_id);
-            if vault
-                .list_for_agent(&[scope])?
-                .iter()
-                .any(|m| m.credential_id == reference.credential_id)
-            {
-                reveal(&vault, config, &reference)?;
-            }
+            let _ = scope;
+            verify_binding(&vault, config, &reference)?;
             vault.delete_for_agent(
                 &reference.credential_id,
                 &[CredentialScope::agent(&config.agent_id)],
@@ -156,7 +170,9 @@ mod tests {
             enabled: true, group_id:None 
         };
         assert!(!saved(home.path(), &config).unwrap());
-        assert!(save(home.path(), &config, "token-before-setup").is_err());
+        // Saving never needs a master password.
+        save(home.path(), &config, "token-before-setup").unwrap();
+        assert_eq!(load(home.path(), &config).unwrap().unwrap().as_str(), "token-before-setup");
         let vault = Vault::at(home.path());
         vault
             .initialize("a sufficiently long test master password")
@@ -166,12 +182,18 @@ mod tests {
             .unwrap()
             .unwrap()
             .credential_id;
-        vault.lock();
         assert_eq!(
             load(home.path(), &config).unwrap().unwrap().as_str(),
             "first-bot-secret"
         );
+        vault.lock();
+        // Locked: the token can be replaced but not read back.
+        assert!(load(home.path(), &config).is_err());
         save(home.path(), &config, "replacement-bot-secret").unwrap();
+        assert_eq!(vault.status(), crate::security::vault::VaultStatus::Locked);
+        vault
+            .unlock_with_password("a sufficiently long test master password")
+            .unwrap();
         assert_eq!(
             reference(home.path(), &config)
                 .unwrap()
@@ -183,9 +205,8 @@ mod tests {
             load(home.path(), &config).unwrap().unwrap().as_str(),
             "replacement-bot-secret"
         );
-        assert_eq!(vault.status(), crate::security::vault::VaultStatus::Locked);
         for p in [
-            home.path().join("vault/credentials.enc"),
+            home.path().join("vault/passes.json"),
             path(home.path(), &config),
         ] {
             let bytes = std::fs::read(p).unwrap();
