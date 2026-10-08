@@ -569,12 +569,12 @@
     let previous = null;
     for (const node of $("conversationFeed").children) {
       node.classList.remove("message-continuation", "message-group-start");
-      if (node.hidden || node.matches(".superseded-answer,.superseded-update")) {
+      if (node.hidden || node.matches(".superseded-answer,.superseded-update") || getComputedStyle(node).display === "none") {
         if (node.classList.contains("decision-request")) previous = null;
         continue;
       }
       const message = node.dataset.slot === "message"
-        && !node.matches(".decision-request,.peer-message,.answer-resume-message");
+        && !node.matches(".decision-request,.peer-message");
       const speaker = message ? (node.dataset.from === "user" ? "user" : node.dataset.speaker) : null;
       if (speaker && previous?.speaker === speaker) {
         node.classList.add("message-continuation");
@@ -588,6 +588,7 @@
     const turnId=state.renderingTurnId||state.activeTurnId||state.displayRows.at(-1)?.turn_id||"";
     if(turnId)node.dataset.turnId=turnId;
     Object.assign(node.dataset, data);
+    if(!state.painting){node.classList.add("message-entering");node.addEventListener("animationend",()=>node.classList.remove("message-entering"),{once:true});setTimeout(()=>node.classList.remove("message-entering"),500);}
     const feed=$("conversationFeed"),pending=feed.querySelector(':scope > .user-message[data-queued-pending="true"]'),authored=/(?:^|\s)user-message(?:\s|$)/.test(className)&&!/(?:^|\s)peer-message(?:\s|$)/.test(className);
     // Output from the still-running turn stays before any follow-up the user
     // has queued. The queued prompt is a normal bubble, but it is also the next
@@ -4613,7 +4614,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     }catch(error){ui.toast(`Browser control failed: ${error.message||error}`,true);}
   }
 
-  async function catchUpConversation(token=activeSelectionToken(),{quiet=false}={}) {
+  async function catchUpConversation(token=activeSelectionToken(),{quiet=true}={}) {
     if(!token)return;
     try {
       const rows=await ui.invoke("session_context_get",{sessionId:token.sessionId,owner:token.owner});
@@ -4644,7 +4645,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     clearEphemeralWorkersForConversation(conversationKeyOf(state.item));syncActivitySummary();
     const socket=new WebSocket(ui.wsUrl());state.subscription=socket;
     socket.onopen=()=>{if(selectionIsCurrent(token)&&state.subscription===socket)socket.send(JSON.stringify({SubscribeJournal:{session_id:token.sessionId,owner:token.owner}}));};
-    socket.onmessage=(message)=>{if(state.subscription!==socket||!selectionIsCurrent(token))return;state.lastJournalEventAt=Date.now();try{const value=JSON.parse(message.data);consumeFluffyWire(value,fluffyContext());if(consumeVolumeWorkerLifecycle(value))return;if(value.StoryReplay)renderStory(value.StoryReplay,true);else if(value==="Pong"||value?.Pong!==undefined){if(state.replayNeedsRepaint){state.replayNeedsRepaint=false;repaintConversation(conversationScrollBookmark(),false);syncRestoredWorkVisibility();}if(!state.historyHydrating)catchUpConversation(token);return;}else if(value.Story){
+    socket.onmessage=(message)=>{if(state.subscription!==socket||!selectionIsCurrent(token))return;state.lastJournalEventAt=Date.now();try{const value=JSON.parse(message.data);consumeFluffyWire(value,fluffyContext());if(consumeVolumeWorkerLifecycle(value))return;if(value.StoryReplay)renderStory(value.StoryReplay,true);else if(value==="Pong"||value?.Pong!==undefined){if(state.replayNeedsRepaint){state.replayNeedsRepaint=false;repaintConversation(conversationScrollBookmark(),false);syncRestoredWorkVisibility();}if(!state.historyHydrating)catchUpConversation(token,{quiet:true});return;}else if(value.Story){
       const event=value.Story,disposition=journalStoryDisposition(event);
       if(disposition==="render")renderStory(event);
       else if(disposition==="browser")autoRevealAgentBrowser(normalizeGroupOperationalAgent(event));

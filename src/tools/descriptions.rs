@@ -682,7 +682,7 @@ fn composio_connections() -> ToolDefinition {
 fn user_update() -> ToolDefinition {
     ToolDefinition {
         name: "user_update".into(),
-        description: "Send one intentional mid-work update to the user while continuing the task. Use rarely, only for a material result, an important change in direction, or a brief confirmation the user needs before the final answer. Routine narration, reasoning, drafts, repeated paraphrases and per-tool status stay private. Usually do not call this at all; deliver the completed result once with final_answer. For a question or required approval use ask_user instead. Never include secrets.".into(),
+        description: "Send one intentional mid-work update to the user while continuing the task. At the start of a new user request, briefly confirm in your own words what you understood and will do, specific to this request; no canned phrases. An immediately complete answer can go straight to final_answer. Subsequent updates are rare: only a material result, important change, or necessary confirmation. Routine narration, reasoning, drafts, repeated paraphrases and per-tool status stay private. Deliver the completed result once with final_answer without repeating earlier updates. For a question or required approval use ask_user instead. Never include secrets.".into(),
         parameters: serde_json::json!({"type":"object","properties":{"message":{"type":"string","minLength":1,"maxLength":1200,"description":"A short, concrete update the user needs to see."}},"required":["message"],"additionalProperties":false}),
     }
 }
@@ -1465,7 +1465,7 @@ fn vital_memory_write() -> ToolDefinition {
 fn recall() -> ToolDefinition {
     ToolDefinition {
         name: "recall".into(),
-        description: "Recover this session's compacted-out history. SEARCH: set query to search terms and line/offset to null. To audit failed tools, set failed_only:true and optionally tool_prefix (for example computer_); query may be empty to list all matching failures. Filters inspect structured tool names/success flags, not words in the text. EXACT READ: clear tool_prefix/failed_only, set line to a returned archive line, query to an empty string, and offset to zero or returned next_offset. Continue pages until next_offset is null. Never guess a line number while searching. Excerpts are not full records; historical claims still need evidence and may be superseded by corrections.".into(),
+        description: "Recover this session's compacted-out history. Use only for a specific fact actually missing from the current context. Do not search visible context, repeat a successful search, or retry a no-match query without new evidence. SEARCH: set query to search terms and line/offset to null. To audit failed tools, set failed_only:true and optionally tool_prefix (for example computer_); query may be empty to list all matching failures. Filters inspect structured tool names/success flags, not words in the text. EXACT READ: clear tool_prefix/failed_only, set line to a returned archive line, query to an empty string, and offset to zero or returned next_offset. Continue pages until next_offset is null. Never guess a line number while searching. Excerpts are not full records; historical claims still need evidence and may be superseded by corrections.".into(),
         parameters: serde_json::json!({
             "type": "object",
             "properties": {

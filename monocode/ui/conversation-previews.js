@@ -166,6 +166,12 @@ export function installConversationPreviews({
       setWorking(false);await sleep(40);checks.activityStops=orb.hidden;
       clearFeed();checks.clearKeepsProgressControls=tail.isConnected&&$("taskBlock").isConnected&&feed.lastElementChild===tail;
       renderUser("A new conversation");checks.newMessageBeforeProgress=tail.previousElementSibling?.classList.contains("user-message");
+      const firstUser=tail.previousElementSibling,hiddenTrace=document.createElement('article');hiddenTrace.className='work-cluster';hiddenTrace.hidden=true;feed.insertBefore(hiddenTrace,tail);
+      const followUp=renderUser("One short follow-up");await sleep(520);
+      checks.userFollowUpsStayClose=followUp.classList.contains('message-continuation')&&followUp.getBoundingClientRect().top-firstUser.getBoundingClientRect().bottom<=6;
+      checks.savedMessagesDoNotAnimate=getComputedStyle(firstUser).animationName==='none'&&!firstUser.classList.contains('message-entering');
+      hiddenTrace.remove();
+
       renderApproval({kind:"ask_pending",id:"unlock-clean-proof",agent:"phoenix",questions:[{header:"Unlock Passes",question:"Unlock your saved pass for this task.",options:["Unlock here","Not now"],multi_select:false}],approval:{action:"vault_unlock",details:{reason:"Use the saved account"}}});
       const card=$("approvalStack").lastElementChild;card.querySelector("[data-vault-open]").click();await sleep(20);
       checks.unlockFormHasOneActionRow=!card.querySelector(".approval-vault").hidden&&getComputedStyle(card.querySelector(".approval-decision-footer")).display==="none";
@@ -180,7 +186,11 @@ export function installConversationPreviews({
       PhoenixQuestionDrafts.discard(restored);closeApproval();
       document.body.classList.add("sidebar-collapsed");await sleep(250);
       const sidebar=$("companySidebar").getBoundingClientRect();checks.railIconsContained=[...document.querySelectorAll("#sidebarList .company-row")].every(row=>{const r=row.getBoundingClientRect();return r.left>=sidebar.left&&r.right<=sidebar.right});
-      checks.railNoLongEmptyColumn=sidebar.height<innerHeight-30;
+      const footer=$("companySidebar").querySelector('.sidebar-footer').getBoundingClientRect(),center=sidebar.left+sidebar.width/2;
+      checks.settingsStayAtBottom=Math.abs(sidebar.bottom-(innerHeight-10))<2&&Math.abs(footer.bottom-sidebar.bottom)<2;
+      checks.railControlsCentered=[document.querySelector('.phoenix-mark'),$("filterButton"),$("settingsButton"),...document.querySelectorAll('#sidebarList .company-row .agent-avatar')].every(node=>{const r=node.getBoundingClientRect();return Math.abs(r.left+r.width/2-center)<2});
+      checks.oneCenteredVisibleLogo=getComputedStyle(document.querySelector('.phoenix-mark')).visibility==='visible'&&getComputedStyle($("sidebarWake")).display==='none';
+      checks.filterDoesNotOverlapAgents=$("filterButton").getBoundingClientRect().bottom<=$("sidebarList").getBoundingClientRect().top;
       state.tasks=[{task:"Check the prompt",status:"completed"},{task:"Choose one example",status:"in-progress"}];renderTasks();
       feed.scrollTop=feed.scrollHeight;await sleep(40);
     } catch(error){checks.fixture=false;document.documentElement.dataset.previewLoadError=String(error);}
