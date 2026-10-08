@@ -847,7 +847,10 @@ html:root[data-skin="phoenix"] .codex-speed-controls button:focus-visible{outlin
 html:root[data-skin="phoenix"] .codex-speed-controls button:disabled{opacity:.4;cursor:default}
 
 /* Prompt previews use authored text and stay bounded for long words/URLs. */
-html:root[data-skin="phoenix"] .prompt-rail-card-body{box-sizing:border-box;max-width:100%;overflow:hidden}
+/* One glass surface: nested beUI borders produced a second, mismatched rim. */
+html:root[data-skin="phoenix"] #promptRailCard{border:0!important;box-shadow:0 8px 24px rgb(8 10 24 / 16%)!important}
+html:root[data-skin="phoenix"][data-theme="light"] #promptRailCard{box-shadow:0 8px 24px rgb(24 44 90 / 12%)!important}
+html:root[data-skin="phoenix"] .prompt-rail-card-body{box-sizing:border-box;max-width:100%;overflow:hidden;border:0!important;border-radius:inherit!important;background:transparent!important;box-shadow:none!important}
 html:root[data-skin="phoenix"] :is(.prompt-rail-card-title,.prompt-rail-card-desc){overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
 html:root[data-skin="phoenix"] .prompt-rail-card-title{-webkit-line-clamp:2}
 html:root[data-skin="phoenix"] .prompt-rail-card-desc{-webkit-line-clamp:3}
