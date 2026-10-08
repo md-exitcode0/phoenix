@@ -855,3 +855,17 @@ html:root[data-skin="monocode"] #termPanel .term-resize:hover::after{background:
 html:root[data-skin="monocode"] body.term-open .terminal-toggle{background:var(--glass-3)!important;color:var(--soft-ink)!important}
 html:root[data-skin="monocode"][data-theme="light"] #termPanel{border-color:rgb(255 255 255 / 55%)!important;box-shadow:0 14px 44px rgb(20 40 90 / 18%),inset 0 1px 0 rgb(255 255 255 / 60%)!important}
 html:root[data-skin="monocode"] body.term-open:not(.inspection-stacked) #inspectionSidebar{bottom:calc(var(--term-h,250px) + var(--pane-inset) * 2)!important}
+
+/* Dark slider popovers need their own glass surface: the goo SVG blends
+   translucent dark fills into a muddy edge over the composer underneath. */
+html:root[data-skin="monocode"][data-theme="dark"] .goo-layer .goo-body{display:none}
+html:root[data-skin="monocode"][data-theme="dark"] .goo-layer .goo-panel{
+ background:var(--glass-pop);border:1px solid var(--glass-line-strong);border-radius:20px;
+ -webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur));
+ color:var(--soft-ink);font-family:var(--soft-font);
+}
+html:root[data-skin="monocode"][data-theme="dark"] .goo-head small{color:var(--soft-ink-2)}
+html:root[data-skin="monocode"][data-theme="dark"] .goo-panel .inline-slider:not([data-glow="max"]){background:rgb(255 255 255 / 6%);box-shadow:inset 0 0 0 1px var(--glass-line)}
+html:root[data-skin="monocode"][data-theme="dark"] .goo-panel .inline-slider[data-glow="pre"]{box-shadow:inset 0 0 0 1px var(--glass-line-strong)}
+html:root[data-skin="monocode"][data-theme="dark"] .goo-panel .inline-slider:not([data-glow="max"]) .is-fill{background:rgb(201 198 255 / 14%)}
+html:root[data-skin="monocode"][data-theme="dark"] .goo-panel .is-thumb{color:var(--soft-accent)}
