@@ -175,7 +175,7 @@
       // Commit the collapsed first frame before opening the grid row. Without
       // this read, browsers can coalesce both states and the panel simply pops.
       panel.getBoundingClientRect();
-      requestAnimationFrame(()=>document.body.classList.add("term-open"));
+      document.body.classList.add("term-open");
     }else{
       document.body.classList.remove("term-open");
       panel.setAttribute("aria-hidden","true");
@@ -185,9 +185,9 @@
     terminalView().open=Boolean(open);
     if (open) {
       if(!terminalTabs().length)await startShell();
-      // The first terminal can mount before the opening frame removes
-      // visibility:hidden. Focus it after that frame so typing reaches the PTY.
-      requestAnimationFrame(()=>{if(termOpen()&&terminalView().open)focusTerminal();});
+      // Opening is synchronous so a delayed animation frame cannot leave
+      // the terminal hidden or send its first keystrokes to the chat composer.
+      if(termOpen()&&terminalView().open)focusTerminal();
     }
   }
 

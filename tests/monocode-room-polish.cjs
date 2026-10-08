@@ -74,6 +74,8 @@ async function main() {
     await clickControl('stageSidebarButton');
     assert.ok(await evaluate(`!document.body.classList.contains('inspection-open')&&document.getElementById('terminalToggle').parentElement.id==='stagePanelToggles'`),'Workspace button closes and returns both controls to the chat header');
     await clickControl('termClose');
+    assert.ok(await evaluate(`(()=>{const raf=window.requestAnimationFrame;try{window.requestAnimationFrame=()=>0;void window.PhoenixView.toggleTerminal(true);return document.body.classList.contains('term-open')&&!document.getElementById('termPanel').hidden;}finally{window.requestAnimationFrame=raf;}})()`),'Terminal opens even when animation frames are delayed');
+    await evaluate(`window.PhoenixView.toggleTerminal(false)`);await sleep(400);
     if(process.env.PHOENIX_TEST_TERMINAL_SCREENSHOT){
       await clickControl('terminalToggle');
       await evaluate(`(()=>{document.documentElement.dataset.theme='light';window.PhoenixSky.set('12:00');dispatchEvent(new CustomEvent('phoenix:theme-changed'));})()`);
