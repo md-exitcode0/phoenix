@@ -115,6 +115,47 @@ export function installConversationPreviews({
   targetName,
   syncBrowserAddress
 }) {
+  async function runCleanConversationProof() {
+    const checks={},feed=$("conversationFeed"),tail=$("conversationTail"),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+    try {
+      clearFeed();replaceDisplayRows([],false);state.activeTurnId="clean-proof";state.tasks=[];renderTasks();
+      const prompt=renderUser("Help me choose one turning point.");setWorking(true);beginTurnActivity(prompt,"phoenix");
+      renderStory({kind:"commentary",agent:"phoenix",text:"EARLY DRAFT one"});
+      renderStory({kind:"narration",agent:"phoenix",text:"EARLY DRAFT two"});
+      renderStory({kind:"thinking",agent:"phoenix",text:"Private planning"});
+      checks.routineProseHidden=!feed.textContent.includes("EARLY DRAFT")&&!feed.textContent.includes("Private planning");
+      renderStory({kind:"tool_start",agent:"phoenix",tool:"user_update",target:"One important update"});
+      renderStory({kind:"tool",agent:"phoenix",tool:"user_update",ok:true,detail:"I found the teacher’s specific feedback."});
+      renderHistory({role:"tool",agent:"phoenix",tool:"user_update",ok:true,detail:"I found the teacher’s specific feedback."});
+      renderHistory({role:"narration",agent:"phoenix",text:"EARLY DRAFT replay"});
+      checks.explicitUpdateShownOnce=feed.querySelectorAll(".commentary-message").length===1&&feed.textContent.includes("teacher’s specific feedback");
+      checks.historyDraftsHidden=!feed.textContent.includes("EARLY DRAFT");
+      renderAnswer("Choose the stubborn problem you finally solved.","phoenix");
+      checks.oneFinalAnswer=feed.querySelectorAll(".agent-message:not(.commentary-message)").length===1;
+      state.tasks=[{task:"Check the prompt",status:"completed"},{task:"Choose one example",status:"in-progress"}];renderTasks();await sleep(100);
+      checks.progressFollowsMessages=feed.lastElementChild===tail&&tail.contains($("taskBlock"))&&tail.contains($("conversationThinking"))&&!$("composerZone").contains($("taskBlock"));
+      const orb=$("conversationThinking");
+      for(let i=0;i<20;i++)renderUser(`Earlier message ${i}: ${"Transcript content. ".repeat(20)}`);
+      feed.scrollTop=feed.scrollHeight;await sleep(40);const orbAtLatest=orb.getBoundingClientRect().top;
+      feed.scrollTop=0;await sleep(40);
+      checks.activityScrollsWithFeed=orb.parentElement===tail&&orb.getBoundingClientRect().top-orbAtLatest>500;
+      setWorking(false);await sleep(40);checks.activityStops=orb.hidden;
+      clearFeed();checks.clearKeepsProgressControls=tail.isConnected&&$("taskBlock").isConnected&&feed.lastElementChild===tail;
+      renderUser("A new conversation");checks.newMessageBeforeProgress=tail.previousElementSibling?.classList.contains("user-message");
+      renderApproval({kind:"ask_pending",id:"unlock-clean-proof",agent:"phoenix",questions:[{header:"Unlock Passes",question:"Unlock your saved pass for this task.",options:["Unlock here","Not now"],multi_select:false}],approval:{action:"vault_unlock",details:{reason:"Use the saved account"}}});
+      const card=$("approvalStack").lastElementChild;card.querySelector("[data-vault-open]").click();await sleep(20);
+      checks.unlockFormHasOneActionRow=!card.querySelector(".approval-vault").hidden&&getComputedStyle(card.querySelector(".approval-decision-footer")).display==="none";
+      checks.unlockFormMatchesGlass=getComputedStyle(card.querySelector(".approval-vault")).backgroundColor==="rgba(0, 0, 0, 0)";
+      document.body.classList.add("sidebar-collapsed");await sleep(250);
+      const sidebar=$("companySidebar").getBoundingClientRect();checks.railIconsContained=[...document.querySelectorAll("#sidebarList .company-row")].every(row=>{const r=row.getBoundingClientRect();return r.left>=sidebar.left&&r.right<=sidebar.right});
+      checks.railNoLongEmptyColumn=sidebar.height<innerHeight-30;
+      state.tasks=[{task:"Check the prompt",status:"completed"},{task:"Choose one example",status:"in-progress"}];renderTasks();
+      feed.scrollTop=feed.scrollHeight;await sleep(40);
+    } catch(error){checks.fixture=false;document.documentElement.dataset.previewLoadError=String(error);}
+    document.documentElement.dataset.conversationAcceptanceChecks=JSON.stringify(checks);
+    const failed=Object.entries(checks).filter(([,value])=>!value).map(([name])=>name);
+    document.title=failed.length?`FAIL clean conversation: ${failed.join(", ")}`:"PASS clean conversation";
+  }
   async function runConversationAcceptance() {
     // This fixture exercises the actual renderer and computed layout. It is
     // deliberately opt-in so production startup and the user's journal remain
@@ -1219,6 +1260,7 @@ export function installConversationPreviews({
   if (preview&&new URLSearchParams(location.search).get("shot")==="conversation-acceptance") {
     runPreviewWhenDirectoryReady(runConversationAcceptance,120);
   }
+  if(preview&&previewShot==="clean-conversation-proof"){runPreviewWhenDirectoryReady(runCleanConversationProof,200);}
   if(preview&&previewShot==="owned-journal-acceptance"){
     runPreviewWhenDirectoryReady(runOwnedJournalAcceptance,120);
   }

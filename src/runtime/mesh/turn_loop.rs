@@ -6392,7 +6392,7 @@ impl MeshRunner {
                                     tool_name: tool_name.to_string(),
                                     input_summary,
                                     success: result.success,
-                                    output_summary: first_line(&result.output).to_string(),
+                                    output_summary: if tool_name == "user_update" { result.output.clone() } else { first_line(&result.output).to_string() },
                                     diff: if result.success {
                                         edit_display_diff(
                                             tool_name,

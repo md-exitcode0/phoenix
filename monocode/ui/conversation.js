@@ -4,6 +4,8 @@
   const ui = window.PhoenixUI;
   if (!ui) return;
   const $ = (id) => document.getElementById(id);
+  const conversationTail = $("conversationTail");
+  const lastConversationRow = () => conversationTail.previousElementSibling;
   const preview = !ui.TAURI || ui.SIDEBAR_PREVIEW;
   const previewShot = new URLSearchParams(location.search).get("shot") || "";
   const state = {
@@ -590,7 +592,7 @@
     // Output from the still-running turn stays before any follow-up the user
     // has queued. The queued prompt is a normal bubble, but it is also the next
     // turn boundary—not a place for the current answer to land underneath.
-    if(pending&&!authored&&turnId&&turnId===state.activeTurnId)feed.insertBefore(node,pending);else feed.append(node);
+    if(pending&&!authored&&turnId&&turnId===state.activeTurnId)feed.insertBefore(node,pending);else feed.insertBefore(node,conversationTail);
     if(/(?:^|\s)(?:agent-message|group-message|commentary-line|work-cluster)(?:\s|$)/.test(className))setComposerThreadState(true);
     if (!state.painting) scrollLatest();
     return node;
@@ -769,10 +771,10 @@
     const target = promptMessages()[Number(index)] || promptMessages().at(-1); if (!target) return;
     state.pinToLatest=false;target.scrollIntoView({ behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth", block:"center" }); target.classList.add("flash"); setTimeout(() => target.classList.remove("flash"), 1100);
   }
-  function clearFeed() { togglePromptHistory(false); stopTurnMood(); clearTimeout(state.reasoningCursorTimer);state.reasoningCursorTimer=0;if(state.scrollFrame){cancelAnimationFrame(state.scrollFrame);state.scrollFrame=0;} $("conversationFeed").replaceChildren(); $("conversationFeed").classList.remove("turn-active","thread-switching"); $("conversationPromptRail").replaceChildren(); $("conversationPromptRail").hidden = true; state.turnStatus = null; state.activeTurnId=""; state.queuedWakeTurnId=""; state.replayWorkCluster = null; state.replayNeedsRepaint=false; state.pendingAnswer = null; state.pendingHandoffReturns=[]; state.activeTools.clear(); state.shimmerClusters.clear(); state.toolRows = []; state.taskSignature="";state.taskAllComplete=false;setComposerThreadState(false); }
+  function clearFeed() { togglePromptHistory(false); stopTurnMood(); clearTimeout(state.reasoningCursorTimer);state.reasoningCursorTimer=0;if(state.scrollFrame){cancelAnimationFrame(state.scrollFrame);state.scrollFrame=0;} $("conversationFeed").replaceChildren(conversationTail); $("conversationFeed").classList.remove("turn-active","thread-switching"); $("conversationPromptRail").replaceChildren(); $("conversationPromptRail").hidden = true; state.turnStatus = null; state.activeTurnId=""; state.queuedWakeTurnId=""; state.replayWorkCluster = null; state.replayNeedsRepaint=false; state.pendingAnswer = null; state.pendingHandoffReturns=[]; state.activeTools.clear(); state.shimmerClusters.clear(); state.toolRows = []; state.taskSignature="";state.taskAllComplete=false;setComposerThreadState(false); }
   function detachChildren(node) {
     const fragment=document.createDocumentFragment();
-    while(node?.firstChild)fragment.appendChild(node.firstChild);
+    for(const child of [...(node?.childNodes||[])])if(child!==conversationTail)fragment.appendChild(child);
     return fragment;
   }
   function conversationScrollBookmark(feed=$("conversationFeed")) {
@@ -845,7 +847,7 @@
     state.turnFocusUntil=view.turnFocusUntil;state.turnStartedAt=view.turnStartedAt;state.pendingAnswer=view.pendingAnswer;state.replayNeedsRepaint=view.replayNeedsRepaint;state.completionKeys=view.completionKeys;
     state.pendingHandoffReturns=view.pendingHandoffReturns;state.shimmerClusters=view.shimmerClusters;state.feedHasAgent=view.feedHasAgent;state.turnUsageSeen=view.turnUsageSeen;
     state.tasks=view.tasks||state.tasks;state.queue=view.queue||state.queue;state.taskSignature=view.taskSignature;state.taskAllComplete=view.taskAllComplete;
-    $("conversationFeed").appendChild(view.feed);$("conversationPromptRail").appendChild(view.rail);$("approvalStack").appendChild(view.approval);
+    $("conversationFeed").insertBefore(view.feed,conversationTail);$("conversationPromptRail").appendChild(view.rail);$("approvalStack").appendChild(view.approval);
     $("conversationPromptRail").hidden=!$("conversationPromptRail").children.length;setComposerThreadState(state.feedHasAgent);syncApprovalStack();
     $("composerZone").classList.toggle("working",state.working);$("taskBlock").classList.toggle("live",state.working&&Boolean(state.tasks?.length));syncSendMode();renderTasks();renderQueue();syncActivitySummary();
     restoreConversationScroll(view.bookmark,view.key);return true;
@@ -853,7 +855,7 @@
   function renderConversationLoading() {
     const feed=$("conversationFeed"),profile=currentProfile();
     feed.setAttribute("aria-busy","true");
-    const node=document.createElement("article");node.className="conversation-loading";node.innerHTML=`<span class="conversation-loading-avatar">${ui.avatarSvg(profile,state.item?.kind)}</span><span><strong>Opening ${escape(currentName())}</strong><small>Loading this conversation…</small></span><i aria-hidden="true"></i>`;feed.append(node);
+    const node=document.createElement("article");node.className="conversation-loading";node.innerHTML=`<span class="conversation-loading-avatar">${ui.avatarSvg(profile,state.item?.kind)}</span><span><strong>Opening ${escape(currentName())}</strong><small>Loading this conversation…</small></span><i aria-hidden="true"></i>`;feed.insertBefore(node,conversationTail);
   }
   function displayRowsEqual(left,right) {
     return left===right||(left.length===right.length&&left.every((entry,index)=>{const other=right[index];return entry.source===other?.source&&displayTurnId(entry)===displayTurnId(other)&&JSON.stringify(entry.value)===JSON.stringify(other.value);}));
@@ -874,7 +876,7 @@
       const preserved=detachChildren(feed),saved={activeTurnId:state.activeTurnId,replayWorkCluster:state.replayWorkCluster,turnStatus:state.turnStatus,feedHasAgent:state.feedHasAgent};
       const loader=preserved.querySelector?.(".conversation-history-loader");loader?.remove();state.replayWorkCluster=null;state.painting=true;
       try{state.displayRows.slice(nextStart,previousStart).forEach(renderDisplayEntry);}finally{state.painting=false;}
-      feed.append(preserved);state.renderedRowStart=nextStart;state.activeTurnId=saved.activeTurnId;state.replayWorkCluster=saved.replayWorkCluster;state.turnStatus=saved.turnStatus;state.feedHasAgent=saved.feedHasAgent;renderHistoryLoader();renderPromptRail();syncComposerFade();
+      feed.insertBefore(preserved,conversationTail);state.renderedRowStart=nextStart;state.activeTurnId=saved.activeTurnId;state.replayWorkCluster=saved.replayWorkCluster;state.turnStatus=saved.turnStatus;state.feedHasAgent=saved.feedHasAgent;renderHistoryLoader();renderPromptRail();syncComposerFade();
       const land=()=>{feed.scrollTop=Math.max(0,oldTop+feed.scrollHeight-oldHeight);};land();requestAnimationFrame(()=>{land();requestAnimationFrame(land);});state.historyPagePending=false;
     };
     if(immediate)load();else queueMicrotask(load);
@@ -882,7 +884,7 @@
   function repaintConversation(bookmark=null,followLatest=!bookmark,resetWindow=false) {
     const feed=$("conversationFeed");clearFeed();closeApproval();
     if(resetWindow)state.renderedRowStart=recentConversationRowStart();else state.renderedRowStart=normalizedConversationRowStart();
-    paintFeed(()=>{state.displayRows.slice(state.renderedRowStart).forEach(renderDisplayEntry);if(!feed.children.length)renderEmpty();renderHistoryLoader();},followLatest);
+    paintFeed(()=>{state.displayRows.slice(state.renderedRowStart).forEach(renderDisplayEntry);if(!lastConversationRow())renderEmpty();renderHistoryLoader();},followLatest);
     feed.removeAttribute("aria-busy");
     if(bookmark&&!followLatest)restoreConversationScroll(bookmark);
   }
@@ -899,7 +901,7 @@
     state.activeTools=new Map();state.toolRows=[];state.shimmerClusters=new Set();state.painting=true;
     try{state.displayRows.filter((entry)=>displayTurnId(entry)===turnId).forEach(renderDisplayEntry);}
     finally{
-      const replacement=detachChildren(feed);marker.replaceWith(replacement);feed.append(preserved);
+      const replacement=detachChildren(feed);marker.replaceWith(replacement);feed.insertBefore(preserved,conversationTail);
       Object.assign(state,saved);renderPromptRail();restoreConversationScroll(bookmark);
     }
   }
@@ -2045,7 +2047,7 @@
   // cluster this answer belongs to. The cluster header itself becomes the
   // persistent Thought disclosure; there is no second summary row.
   function precedingWorkCluster(agent) {
-    let cursor = $("conversationFeed").lastElementChild;
+    let cursor = lastConversationRow();
     while (cursor && !cursor.classList.contains("user-message") && !cursor.classList.contains("agent-message")) {
       if (cursor.classList.contains("work-cluster") && (!agent||canonicalAgentId(cursor.dataset.agent)===canonicalAgentId(agent)) && cursor.querySelector(".work-tool,.agent-update,.commentary-line,.ask-history-row,.handoff-chain,.context-compaction")) return cursor;
       cursor = cursor.previousElementSibling;
@@ -2568,31 +2570,25 @@
   }
   // Thinking only relabels the live working cube while this turn is running.
   // It never adds a row, and it disappears when real activity replaces it.
-  function renderThinking(agent,text){
-    if(state.painting||!state.working||isCompactionText(text))return;
-    clearProviderRetry();
-    const cluster=ensureWorkCluster(agent||state.item?.id||"phoenix");
-    const group=ensureLiveThinkingPlaceholder(cluster)||cluster.querySelector(".reasoning-subgroup.pending-activity");
-    if(!group)return;
-    const parts=reasoningParts(text);
-    group.dataset.summary=expandedReasoningSummary(parts.summary,parts.detail)||"Thinking";
-    setReasoningGroupRunning(group,true);
+  function renderThinking(_agent,text) {
+    if(!state.painting&&state.working&&!isCompactionText(text))clearProviderRetry();
   }
-  // A short message the agent wrote to the user between tool calls: an update
-  // or an early answer. It is a real transcript row, in order with the tools,
-  // and the live cube stays below it.
-  function renderAgentUpdate(agent,text,muted=false){
+  // Only user_update intentionally publishes an intermediate message.
+  // Ordinary model prose and reasoning never become chat bubbles.
+  function renderAgentUpdate(agent,text,muted=false,explicit=false){
     if(runtimeFailureSummary(text))return renderRuntimeFailure(text,agent);
     if(isCompactionText(text))return null;
+    clearProviderRetry();
+    if(!explicit)return null;
     const cleaned=safeRuntimeCopy(String(text||"")).trim();
     if(!cleaned)return null;
     clearProviderRetry();
+    const fingerprint=progressFingerprint(cleaned),speaker=canonicalAgentId(agent||state.item?.id||"phoenix"),turnId=state.renderingTurnId||state.activeTurnId||state.displayRows.at(-1)?.turn_id||"";
+    // A live receipt and its canonical history row can describe the same
+    // update. Deduplicate within its turn even if a tool row intervened.
+    if([...$("conversationFeed").querySelectorAll(":scope > .commentary-message")].some(node=>node.dataset.progressFingerprint===fingerprint&&node.dataset.speaker===speaker&&node.dataset.turnId===turnId))return null;
     markHandoffsWorking(agent);
-    const cluster=ensureWorkCluster(agent||state.item?.id||"phoenix"),list=cluster.querySelector(".work-tools");
-    // Authored updates are messages in both display modes. Each stays at its
-    // event boundary rather than being copied into a tool disclosure.
-    const fingerprint=progressFingerprint(cleaned),tail=$("conversationFeed").lastElementChild;
-    if(tail?.classList.contains("commentary-message")&&tail.dataset.progressFingerprint===fingerprint&&tail.dataset.speaker===canonicalAgentId(agent||state.item?.id||"phoenix")&&tail.dataset.turnId===(state.renderingTurnId||state.activeTurnId||cluster.dataset.turnId))return null;
+    const cluster=ensureWorkCluster(agent||state.item?.id||"phoenix");
     delete cluster.dataset.latestProgress;syncWorkProgress(cluster);
     const profile=agentProfile(agent||state.item?.id||"phoenix");
     const html=avatar(profile)+'<div class="message-content" data-slot="message-content"><header><strong>'+escape(profile?.display_name||currentName())+'</strong></header><div class="markdown">'+markdown(cleaned)+'</div></div>';
@@ -2602,42 +2598,7 @@
     scrollLatest();
     return node;
   }
-  function renderCommentary(agent, text, muted = false) {
-    if (isCompactionText(text)) return null;
-    clearProviderRetry();
-    const parts=reasoningParts(text),cleaned=parts.detail||parts.summary;
-    if(!cleaned)return null;
-    markHandoffsWorking(agent);
-    const cluster=ensureWorkCluster(agent||state.item?.id||"phoenix"),list=cluster.querySelector(".work-tools");
-    const fingerprint=progressFingerprint(cleaned),previous=cluster.dataset.progressFingerprint||"";
-    if(tooSimilarProgress(previous,fingerprint))return null;
-    cluster.dataset.progressFingerprint=fingerprint;
-    const kind = muted ? "narration" : "commentary";
-    let group=cluster.querySelector(".reasoning-subgroup.pending-activity")||(parts.summary?null:currentReasoningSubgroup(cluster));
-    const claimedPlaceholder=Boolean(group?.classList.contains("pending-activity"));
-    if(!group?.dataset.awaitingDetail)group=ensureReasoningSubgroup(cluster);
-    group.classList.remove("pending-activity");
-    if(parts.summary){group.dataset.summary=expandedReasoningSummary(parts.summary,parts.detail);group.dataset.awaitingDetail=parts.detail?"false":"true";}
-    else{
-      // The immediate cube begins as “Thinking”, then travels with the first
-      // real activity. If that first event is prose rather than a bold
-      // heading, promote a short lead into the row title so the generic label
-      // never gets stranded beside genuine reasoning (the Iris blank-lane
-      // symptom after switching conversations).
-      if(claimedPlaceholder){const lead=expandedReasoningSummary("",cleaned);group.dataset.summary=lead;}
-      else if(group.dataset.summary&&group.dataset.summary!=="Thinking"){group.dataset.summary=expandedReasoningSummary(group.dataset.summary,cleaned);}
-      else{group.dataset.summary=expandedReasoningSummary("",cleaned);}
-      group.dataset.awaitingDetail="false";
-    }
-    setReasoningGroupRunning(group,!state.painting&&cluster.classList.contains("live"));
-    const sequence=group.closest(".reasoning-cluster");if(sequence)setReasoningClusterRunning(sequence,!state.painting&&cluster.classList.contains("live"));
-    if(parts.detail)appendReasoningLine(group,agent,kind,parts.detail);
-    syncReasoningDisclosure(group);
-    cluster.classList.add("has-progress");armReasoningCursor(group);syncTeamWorkSummary(cluster);
-    if(cluster.classList.contains("live"))list.hidden=false;
-    scrollLatest();
-    return group;
-  }
+  function renderCommentary(_agent, _text, _muted = false) { return null; }
   function appendReasoningLine(group,agent,kind,text) {
     if(!group||!text)return null;
     const body=group.querySelector(".reasoning-subgroup-body");if(!body)return null;
@@ -2779,11 +2740,11 @@
     // between tool events, so DOM adjacency is not a reliable turn boundary.
     // Reuse the live turn cluster instead of creating a second "other action"
     // block when work resumes after the user answers.
-    if (state.turnStatus?.isConnected && state.working && sameTurn(state.turnStatus) && feed.lastElementChild===state.turnStatus) {
+    if (state.turnStatus?.isConnected && state.working && sameTurn(state.turnStatus) && lastConversationRow()===state.turnStatus) {
       const currentAgent=String(state.turnStatus.dataset.agent||""),wanted=String(agent||"");
       if(!currentAgent||!wanted||canonicalAgentId(currentAgent)===canonicalAgentId(wanted))return decorateGroupWorkCluster(state.turnStatus,agent);
     }
-    if (state.turnStatus?.isConnected && sameTurn(state.turnStatus) && feed.lastElementChild===state.turnStatus && canonicalAgentId(state.turnStatus.dataset.agent)===canonicalAgentId(agent) && state.turnStatus.classList.contains("turn-pending") && !state.turnStatus.querySelector(".work-tool")) {
+    if (state.turnStatus?.isConnected && sameTurn(state.turnStatus) && lastConversationRow()===state.turnStatus && canonicalAgentId(state.turnStatus.dataset.agent)===canonicalAgentId(agent) && state.turnStatus.classList.contains("turn-pending") && !state.turnStatus.querySelector(".work-tool")) {
       state.turnStatus.dataset.agent = agent || "";
       state.turnStatus.classList.remove("turn-pending");
       return decorateGroupWorkCluster(state.turnStatus,agent);
@@ -3156,6 +3117,10 @@
     // asked Phoenix to perform. Surfacing it as a failed tool fabricated a
     // scary “Adjusted the approach” error after otherwise successful work.
     if(toolName==="response_validation")return;
+    if(toolName==="user_update"){
+      if(event.kind==="tool_start"||event.ok===false)return;
+      return renderAgentUpdate(event.agent,event.detail||"",false,true);
+    }
     if(toolName==="react")return void renderReaction(event);
     // Only a live action moves the agent cursor. A repaint or a journal replay
     // re-renders old browser steps; animating those moved the cursor (and the
@@ -5243,7 +5208,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     settleReasoningSubgroups(activeCluster||replayCluster);
     const replay=replayCluster?.querySelector(".work-tools");
     const active=activeCluster?.querySelector(".work-tools");
-    (active||replay||$("conversationFeed")).append(node);
+    if(active||replay)(active||replay).append(node);else $("conversationFeed").insertBefore(node,conversationTail);
     if(!state.painting){scrollLatest();syncComposerFade();}
     return node;
   }
@@ -5295,7 +5260,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     card._askState={ask,approval,questions,index:0,answers:Array(questions.length).fill(null),multiSelections:Array.from({length:questions.length},()=>new Set()),customAnswers:Array(questions.length).fill(""),decisionSelection:0,alternativesOpen:false,login,teaching,vault,decision,cardAgent:card.dataset.agent};
     const kit=window.PhoenixAgentKit;
     const custom=`<div class="approval-custom" hidden><label><span>Your answer</span><input data-ask-custom-input autocomplete="off" placeholder="Type an answer"></label><button class="primary" data-ask-custom-save>Continue</button></div>`;
-    const vaultForm=`<form class="approval-vault" hidden><label><span>Passes master password</span><input data-vault-password type="password" required minlength="12" autocomplete="current-password" placeholder="Unlock once for this session"></label><button class="primary" type="submit" data-vault-submit>Unlock and continue</button></form>`;
+    const vaultForm=`<form class="approval-vault" hidden><label><span>Passes master password</span><input data-vault-password type="password" required minlength="12" autocomplete="current-password" placeholder="Unlock once for this session"></label><div class="approval-vault-actions"><button type="button" data-vault-cancel>Not now</button><button class="primary" type="submit" data-vault-submit>Unlock and continue</button></div></form>`;
     card.dataset.state="pending";
     // Decisions follow beUI ToolApproval; questions follow beUI ApprovalCard.
     card.innerHTML=decision
@@ -5455,6 +5420,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     if(model.decision){card.dataset.state="approving";card.querySelector(".ta-badge")&&(card.querySelector(".ta-badge").textContent=DENY_OPTION.test(String(answer).trim())?"Denying":"Approving");}if(model.login&&/log in|sign in/i.test(answer)){state.loginAsk={answer,card};card.querySelectorAll("button").forEach((item)=>item.disabled=true);openBrowser(card.dataset.agent||state.item?.id||"phoenix","login",card.dataset.site?`https://${card.dataset.site}`:null).catch((error)=>{card.querySelectorAll("button").forEach((item)=>item.disabled=false);state.loginAsk=null;ui.toast(error.message||String(error),true);});return;}if(model.teaching&&answer===model.approval.approved_option){state.teachingAsk={answer,card};card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);startTeaching(card.dataset.agent||state.item?.id||"phoenix",card.dataset.startUrl||null,card.dataset.teachingScope||"agent",card.dataset.groupId||null);return;}recordAskAnswer(card,answer);}
   function approvalAction(button){
     const card=button.closest(".approval-card"),model=card._askState;
+    if(button.hasAttribute("data-vault-cancel")){renderApprovalQuestion(card);return;}
     if(button.hasAttribute("data-vault-open")){card.querySelector(".approval-decision-footer")?.setAttribute("hidden","");card.querySelector(".approval-alternatives")?.setAttribute("hidden","");card.querySelector(".approval-vault").hidden=false;card.querySelector("[data-vault-password]").focus();return;}
     if(button.hasAttribute("data-ta-details")){const panel=card.querySelector(".ta-details"),open=panel.hidden;panel.hidden=!open;button.setAttribute("aria-expanded",String(open));return;}
     if(button.hasAttribute("data-ask-alternatives")){model.alternativesOpen=!model.alternativesOpen;renderApprovalQuestion(card);return;}

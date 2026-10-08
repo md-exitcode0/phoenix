@@ -32,6 +32,7 @@ mod cron_tool;
 mod descriptions;
 pub mod fast_apply;
 pub mod react;
+mod user_update;
 // pub: the prompt assembler re-materializes pinned design references
 // (runtime/prompt.rs) and the session pin registry canonicalizes paths
 // (session/manager.rs).
@@ -338,7 +339,7 @@ pub fn required_permission_for_tool(tool_name: &str) -> PermissionMode {
         // Coworker hiring has its own exact role-scoped user approval, and
         // provisioning is Phoenix-only plus constrained to that requested
         // record, so neither should ask for broad Full Access as a second gate.
-        "ask_user" | "teach_workflow" | "ask_for_login" | "ask_for_pass" | "final_answer" | "talk"
+        "ask_user" | "user_update" | "teach_workflow" | "ask_for_login" | "ask_for_pass" | "final_answer" | "talk"
         | "message_agent" | "agent_control" | "react" | "volume_work" | "todo_write" | "work"
         | "routine" | "recall" | "memory_recall" | "memory_save" | "vital_memory_write"
         | "create_agent" | "agent_provision" => PermissionMode::Talk,
@@ -1959,6 +1960,7 @@ impl ToolExecutor {
                     },
                 };
             }
+            "user_update" => parse_and_run(call.input, user_update::execute),
             "react" => {
                 // A reaction is an acknowledgement, so a malformed one is not
                 // worth failing a turn over — it degrades to no reaction.
@@ -2226,6 +2228,7 @@ impl ToolExecutor {
 
 const KNOWN_TOOLS: &[(&str, &str)] = &[
     ("ask_user", "Ask the user for clarification or approval."),
+    ("user_update", "Send a rare, deliberate mid-work update to the user."),
     (
         "react",
         "Acknowledge a short request with a single emoji instead of a written reply.",

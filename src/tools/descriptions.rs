@@ -34,6 +34,7 @@ pub fn tool_definition(name: &str) -> Option<ToolDefinition> {
         "web_scrape" => web_scrape(),
         "web_crawl" => web_crawl(),
         "ask_user" => ask_user(),
+        "user_update" => user_update(),
         "react" => react(),
         "teach_workflow" => teach_workflow(),
         "todo_write" => todo_write(),
@@ -678,6 +679,14 @@ fn composio_connections() -> ToolDefinition {
 /// The structured-finish tool. Calling it ends the turn with a validated
 /// `FinalResponse` — the provider's function-calling machinery guarantees the
 /// shape, which removes the fragile free-text JSON envelope parse + repair path.
+fn user_update() -> ToolDefinition {
+    ToolDefinition {
+        name: "user_update".into(),
+        description: "Send one intentional mid-work update to the user while continuing the task. Use rarely, only for a material result, an important change in direction, or a brief confirmation the user needs before the final answer. Routine narration, reasoning, drafts, repeated paraphrases and per-tool status stay private. Usually do not call this at all; deliver the completed result once with final_answer. For a question or required approval use ask_user instead. Never include secrets.".into(),
+        parameters: serde_json::json!({"type":"object","properties":{"message":{"type":"string","minLength":1,"maxLength":1200,"description":"A short, concrete update the user needs to see."}},"required":["message"],"additionalProperties":false}),
+    }
+}
+
 fn final_answer() -> ToolDefinition {
     ToolDefinition {
         name: "final_answer".into(),

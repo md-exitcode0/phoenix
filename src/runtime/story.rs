@@ -412,9 +412,11 @@ impl StoryReducer {
                     tool: tool_name.clone(),
                     target: tool_target(tool_name, input_summary),
                     ok: *success,
-                    detail: detailed_receipts
-                        .then(|| truncate(output_summary, 400))
-                        .unwrap_or_default(),
+                    detail: if tool_name == "user_update" {
+                        truncate_multiline(output_summary, 1200)
+                    } else {
+                        detailed_receipts.then(|| truncate(output_summary, 400)).unwrap_or_default()
+                    },
                     // Diffs keep their newlines: flattened to one line they
                     // counted +0 −0 in Review and rendered as one squashed row.
                     diff: detailed_receipts
@@ -1060,6 +1062,18 @@ mod tests {
             }
             other => panic!("expected one ask row, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn user_update_survives_story_reduction_without_losing_paragraphs() {
+        let mut reducer = StoryReducer::new();
+        let text = format!("An important result.\n\n{}", "Evidence remains available. ".repeat(20));
+        let rows = reducer.push(&CliEvent::ToolCallCompleted {
+            agent: "coder".into(), tool_name: "user_update".into(),
+            input_summary: "intentional update".into(), success: true,
+            output_summary: text.clone(), diff: None,
+        });
+        assert!(matches!(&rows[0], StoryEvent::Tool { tool, detail, ok: true, .. } if tool == "user_update" && detail == &text));
     }
 
     #[test]

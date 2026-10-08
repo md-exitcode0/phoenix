@@ -106,7 +106,14 @@
       </header>
       <div id="conversationBody" class="conversation-body">
         <button id="workingElsewhereBanner" class="working-elsewhere-banner" type="button" hidden></button>
-        <section id="conversationFeed" class="conversation-feed" aria-live="polite" aria-label="Conversation"></section>
+        <section id="conversationFeed" class="conversation-feed" aria-live="polite" aria-label="Conversation">
+          <div id="conversationTail" class="conversation-tail">
+            <details id="taskBlock" class="status-block task-block" hidden>
+              <summary class="td-trigger"><span class="td-head-icon" aria-hidden="true"><svg class="td-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg><svg class="td-done" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="currentColor"/><path d="M7.5 12.25 10.5 15.25 16.75 8.75" fill="none" stroke="#fff" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" pathLength="1"/></svg></span><strong id="taskHeadline" class="td-title">To-dos</strong><small id="taskProgress" class="td-count"></small><svg class="td-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+              <ol id="taskList" class="task-list td-list-items" aria-live="polite"></ol>
+            </details>
+          </div>
+        </section>
         <nav id="conversationPromptRail" class="conversation-prompt-rail" aria-label="Your recent prompts" hidden></nav>
         <div id="composerFade" class="composer-fade" hidden></div>
       </div>
@@ -125,11 +132,6 @@
         <details id="queueBlock" class="status-block queue-block" hidden>
           <summary><span class="queue-count" id="queueCount">1</span><span><strong>Queued</strong><small id="queuePreview"></small></span><svg viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></svg></summary>
           <div id="queueList" class="queue-list"></div>
-        </details>
-
-        <details id="taskBlock" class="status-block task-block" hidden>
-          <summary class="td-trigger"><span class="td-head-icon" aria-hidden="true"><svg class="td-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="6" height="6" rx="1"/><path d="m3 17 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg><svg class="td-done" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="currentColor"/><path d="M7.5 12.25 10.5 15.25 16.75 8.75" fill="none" stroke="#fff" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" pathLength="1"/></svg></span><strong id="taskHeadline" class="td-title">To-dos</strong><small id="taskProgress" class="td-count"></small><svg class="td-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
-          <ol id="taskList" class="task-list td-list-items" aria-live="polite"></ol>
         </details>
 
         <div id="mentionPicker" class="mention-picker" hidden></div>

@@ -1646,6 +1646,11 @@ function bindChrome() {
   $("settingsButton").onclick = () => window.dispatchEvent(new CustomEvent("phoenix:open-settings"));
   $("stageMore").onclick = (event) => openRowMenu(event.currentTarget,state.selected);
   $("companySearch").addEventListener("input",(event) => { state.query = event.target.value; render(); });
+  const railSearch=$("companySearch").closest(".search-box");
+  railSearch.tabIndex=0;railSearch.setAttribute("aria-label","Search your company");
+  const openRailSearch=()=>{if(document.body.classList.contains("sidebar-collapsed")){toggleSidebar(false);$("companySearch").focus();}};
+  railSearch.addEventListener("click",openRailSearch);
+  railSearch.addEventListener("keydown",event=>{if(event.target===railSearch&&["Enter"," "].includes(event.key)){event.preventDefault();openRailSearch();$("companySearch").focus();}});
   addEventListener("keydown",(event) => {
     if(document.body.classList.contains("onboarding-open") || event.defaultPrevented)return;
     if ((event.ctrlKey||event.metaKey) && event.key === "\\") { event.preventDefault(); toggleSidebar(); return; }

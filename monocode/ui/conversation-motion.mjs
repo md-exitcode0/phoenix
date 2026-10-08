@@ -11,7 +11,7 @@ host.hidden = true;
 host.setAttribute('role', 'status');
 host.setAttribute('aria-label', 'Working');
 host.innerHTML = '<canvas width="64" height="64" aria-hidden="true"></canvas>';
-zone.prepend(host);
+document.getElementById('conversationTail').prepend(host);
 const canvas = host.firstElementChild, ctx = canvas.getContext('2d');
 const preset = resolvePreset('composing', 64);
 let frame = 0, started = 0, dead = false;
