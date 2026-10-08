@@ -1473,6 +1473,9 @@ function applyTheme(choice) {
   const color = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim()
     || (resolved === "dark" ? "#18191d" : "#f8f7f4");
   win.setTheme?.(resolved)?.catch?.(() => {});
+  // The soft sky has a transparent --bg; soft-sky.js sends the sky colour
+  // instead, so never hand the native window a colour it cannot parse.
+  if (/^(transparent|rgba\(0, 0, 0, 0\))$/.test(color)) return;
   win.setBackgroundColor?.(color)?.catch?.(() => {});
 }
 const VISUAL_DEFAULTS = Object.freeze({ conversationView:"compact", density:"comfortable", radius:"soft", fire:"full", contrast:"standard", feed:"regular", accent:"ember", stageFire:"full", flicker:"on", rail:"bold", type:"regular", glow:"ember", conversationText:"default", conversationWidth:"default" });

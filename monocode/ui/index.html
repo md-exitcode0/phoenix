@@ -26,7 +26,7 @@
   <link rel="stylesheet" href="room-polish.css">
   <link rel="stylesheet" href="passes.css?v=20261007a">
   <link rel="preload" href="fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="soft-sky.css?v=20261008b">
+  <link rel="stylesheet" href="soft-sky.css?v=20261008c">
 </head>
 <body>
   <div class="window-chrome" data-tauri-drag-region>
@@ -42,7 +42,7 @@
       <div class="fire-field" aria-hidden="true"></div>
 
       <header class="sidebar-header">
-        <button id="sidebarToggle" class="phoenix-brand" type="button" aria-label="Collapse sidebar" title="Collapse sidebar (Ctrl+\\)">
+        <button id="sidebarToggle" class="phoenix-brand" type="button" aria-label="Collapse sidebar" title="Collapse sidebar (Ctrl+\)">
           <img class="phoenix-mark phoenix-raster-logo" data-phoenix-logo src="assets/phoenix_logo.svg" alt="">
           <span class="brand-copy"><strong>Phoenix</strong><small>your company</small></span>
           <svg class="collapse-glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="m12.5 5-5 5 5 5"/></svg>
@@ -52,7 +52,7 @@
       <div class="sidebar-tools">
         <label class="search-box" for="companySearch">
           <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.7" cy="8.7" r="5.1"/><path d="m12.6 12.6 3.6 3.6"/></svg>
-          <input id="companySearch" type="search" autocomplete="off" placeholder="Search your company">
+          <input id="companySearch" type="search" autocomplete="off" placeholder="Search" aria-label="Search your company">
           <kbd>⌘K</kbd>
         </label>
         <button id="filterButton" class="icon-button filter-button" type="button" aria-label="Filter company" aria-expanded="false" title="Filter company">
@@ -80,7 +80,7 @@
       <div id="sidebarResize" class="sidebar-resize" role="separator" aria-orientation="vertical" aria-label="Resize sidebar"></div>
     </aside>
 
-    <button id="sidebarWake" class="sidebar-wake" type="button" aria-label="Open sidebar" title="Open sidebar (Ctrl+\\)">
+    <button id="sidebarWake" class="sidebar-wake" type="button" aria-label="Open sidebar" title="Open sidebar (Ctrl+\)">
       <img class="phoenix-raster-logo" data-phoenix-logo src="assets/phoenix_logo.svg" alt="">
     </button>
 
@@ -211,7 +211,7 @@
     </header>
     <div class="inspection-toolbar">
       <div class="inspection-toolbar-view desktop-workspace-toolbar" data-inspection-toolbar="desktop">
-        <select id="desktopWorkspacePicker" aria-label="Agent desktop" disabled></select>
+        <select id="desktopWorkspacePicker" aria-label="Agent desktop" data-placeholder="No desktop open yet" disabled></select>
         <span id="desktopWorkspaceStatus" class="desktop-workspace-status" role="status"></span>
       </div>
       <div id="inspectionBrowserToolbar" class="inspection-toolbar-view browser-side-toolbar" data-inspection-toolbar="browser" hidden>
@@ -301,7 +301,7 @@
 
   <script src="fluid-orb.js?v=20260926a"></script>
   <script src="matrix-orb.js?v=20260926a"></script>
-  <script src="components.js?v=20260928a"></script>
+  <script src="components.js?v=20261008c"></script>
   <script src="terminal-bundle.js?v=20260904b"></script>
   <script src="sidekicks2d-bundle.js?v=20260921-fireforms-final3"></script>
   <script src="agent-kit.js?v=20260929a"></script>
@@ -313,9 +313,9 @@
   <script src="fluffy-activity.js"></script>
   <script src="fluffy-native-player.js"></script>
   <script src="fluffy-view.js"></script>
-  <script src="sidebar.js?v=20261008-avatars"></script>
+  <script src="sidebar.js?v=20261008c"></script>
   <script src="provider-setup.js?v=20260917-provider-recovery-2"></script>
-  <script src="desktop-viewer.js?v=20260926b"></script>
+  <script src="desktop-viewer.js?v=20261008c"></script>
   <script src="passes-kit.js?v=20261007a"></script>
   <script src="conversation.js?v=20261007-passes"></script>
   <script src="channels.js?v=20260927e"></script>
@@ -326,7 +326,7 @@
   <script src="command-palette.js?v=20260904b"></script>
   <script src="onboarding.js?v=20261008-avatars"></script>
   <script src="monocode.js"></script>
-  <script src="soft-sky.js?v=20261008a"></script>
+  <script src="soft-sky.js?v=20261008c"></script>
   <script src="cursor-motion.js"></script>
   <script type="module" src="conversation-motion.mjs"></script>
 </body>

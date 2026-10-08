@@ -97,6 +97,8 @@
         if(selected)select.value=selected;
       }
       select.disabled=!workspaces.length;
+      // With no desktop selected the picker shows this instead of a generic label.
+      select.dataset.placeholder=workspaces.length?(ownerScoped?'Choose a teammate’s desktop':'Choose an agent’s desktop'):(ownerScoped?'No teammate desktop open yet':'No agent desktop open yet');
       if(!selected){status.textContent='';clearImage();message(ownerScoped?'A desktop will appear here when this coworker or group member opens an app.':'An agent’s screen will appear here when it opens an app.');return;}
       const workspace=workspaces.find(w=>w.scope_key===selected);
       status.textContent=!workspace?.running?'Stopped':workspace.in_use?'Working':'Available';

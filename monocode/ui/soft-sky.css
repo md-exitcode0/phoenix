@@ -50,17 +50,18 @@ html:root[data-skin="monocode"]{
   color-scheme:dark;
 }
 html:root[data-skin="monocode"][data-theme="light"]{
-  --sky-top:#c6daf1;--sky-mid:#dce5f3;--sky-low:#f1e8e4;--sky-glow:rgb(255 246 236 / 50%);
-  --sky-cloud:#fff;--sky-cloud-far:.44;--sky-cloud-near:.32;--sky-stars:0;
-  --glass-1:rgb(255 255 255 / 38%);
-  --glass-2:rgb(255 255 255 / 58%);
-  --glass-3:rgb(64 70 120 / 9%);
+  --sky-top:#2c6cb3;--sky-mid:#6aa0d5;--sky-low:#c3dbef;--sky-glow:rgb(255 255 255 / 40%);
+  --sky-cloud:#fff;--sky-cloud-far:.72;--sky-cloud-near:.58;--sky-stars:0;
+  /* White frosted glass over a scenic sky: opaque enough for dark ink. */
+  --glass-1:rgb(255 255 255 / 56%);
+  --glass-2:rgb(255 255 255 / 80%);
+  --glass-3:rgb(255 255 255 / 86%);
   --glass-hover:rgb(40 46 90 / 5.5%);
   --glass-press:rgb(40 46 90 / 9%);
   --glass-pop:rgb(250 250 255 / 90%);
   --glass-line:rgb(40 46 90 / 9%);
   --glass-line-strong:rgb(40 46 90 / 16%);
-  --glass-shadow:0 10px 40px rgb(60 66 120 / 12%);
+  --glass-shadow:0 12px 40px rgb(24 44 90 / 18%);
   --soft-ink:rgb(28 30 48 / 94%);
   --soft-ink-2:rgb(52 56 84 / 76%);
   --soft-ink-3:rgb(60 64 96 / 62%);
@@ -558,3 +559,235 @@ html:root[data-skin="monocode"] #modalLayer .avatar-drop small{display:block;mar
   html:root[data-skin="monocode"] #modalLayer .fluffy-palette-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
   html:root[data-skin="monocode"] #modalLayer .avatar-studio-preview>i{width:88px!important;height:88px!important;flex-basis:88px!important}
 }
+
+/* ── UI fix 1: sidebar top, right pane, window chrome, light sky ─────── */
+/* One centre line for the top row: sidebar brand, header, pane tabs and
+   window buttons all centre at 30px from the window top. */
+html:root[data-skin="monocode"]{--top-line:30px;--pane-inset:10px}
+
+/* In-page tooltips: glass, never an unstyled light slab. */
+html:root[data-skin="monocode"] .ph-tooltip{background:var(--glass-pop)!important;color:var(--soft-ink)!important;
+  border:1px solid var(--glass-line-strong);border-radius:10px;padding:5px 10px;font:500 12px/1.35 var(--soft-font);
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:var(--menu-shadow)}
+html:root[data-skin="monocode"] .ph-tooltip:empty{display:none}
+
+/* Left sidebar top: brand row, search and filter share one inner edge. */
+html:root[data-skin="monocode"] #companySidebar .sidebar-header{height:40px!important;min-height:40px!important;flex-basis:40px;margin:0!important;padding:0 10px!important;align-items:center}
+html:root[data-skin="monocode"] #companySidebar .phoenix-brand{
+  flex:1 1 auto;width:100%;height:34px!important;min-height:34px;margin:0!important;padding:0 8px 0 9px!important;gap:9px;
+  border-radius:11px!important;background:transparent!important;box-shadow:none!important;border:0!important}
+html:root[data-skin="monocode"] #companySidebar .phoenix-brand:is(:hover,:focus-visible){background:var(--glass-hover)!important}
+html:root[data-skin="monocode"] #companySidebar .phoenix-brand .collapse-glyph{margin-left:auto;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;color:var(--soft-ink-3)}
+html:root[data-skin="monocode"] #companySidebar .sidebar-tools{display:flex;align-items:center;gap:6px;padding:4px 10px 8px!important}
+html:root[data-skin="monocode"] #companySidebar .search-box{flex:1 1 auto;min-width:0;height:34px;display:flex;align-items:center;gap:8px;padding:0 10px!important}
+html:root[data-skin="monocode"] #companySidebar .search-box input{flex:1 1 auto;min-width:0;width:auto;background:transparent!important;border:0!important;outline:0;padding:0}
+html:root[data-skin="monocode"] #companySidebar .search-box input::placeholder{color:var(--soft-ink-3);opacity:1}
+html:root[data-skin="monocode"] #companySidebar .search-box kbd{flex:0 0 auto;padding:0}
+html:root[data-skin="monocode"] #companySidebar .filter-button{flex:0 0 34px;width:34px!important;height:34px!important;min-height:34px;padding:0;display:grid;place-items:center;border-radius:11px!important;background:transparent!important;border:0!important;color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] #companySidebar .filter-button:hover{background:var(--glass-hover)!important;color:var(--soft-ink)}
+html:root[data-skin="monocode"] #companySidebar .filter-button svg{width:18px;height:18px}
+html:root[data-skin="monocode"] #companySidebar .sidebar-header{margin-top:0!important}
+html:root[data-skin="monocode"] body.sidebar-collapsed #companySidebar .phoenix-brand{padding:0!important;justify-content:center}
+
+/* Header and window buttons on the shared line. */
+html:root[data-skin="monocode"] #conversationHeader{height:calc(var(--top-line) * 2)!important;min-height:calc(var(--top-line) * 2)!important;flex-basis:calc(var(--top-line) * 2)!important}
+html:root[data-skin="monocode"] .mc-window-controls{top:calc(var(--top-line) - 16px)!important;right:calc(var(--pane-inset) + 8px)!important;height:32px!important;display:flex;align-items:center;gap:2px}
+html:root[data-skin="monocode"] .mc-window-controls button{width:32px!important;height:32px!important;min-height:32px;display:grid;place-items:center;padding:0}
+html:root[data-skin="monocode"] .mc-window-controls svg{width:12px;height:12px}
+
+/* ── Right pane: floating frosted glass, like the left sidebar ───────── */
+html:root[data-skin="monocode"] #inspectionSidebar{
+  top:var(--pane-inset)!important;bottom:var(--pane-inset)!important;right:var(--pane-inset)!important;height:auto!important;
+  width:calc(var(--inspection-width) - var(--pane-inset) * 2)!important;
+  grid-template-rows:calc(var(--top-line) * 2 - var(--pane-inset) * 2) auto minmax(0,1fr)!important;
+  background:var(--glass-1)!important;
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.15)!important;backdrop-filter:blur(var(--glass-blur)) saturate(1.15)!important;
+  border:1px solid var(--glass-line)!important;border-radius:20px!important;overflow:hidden;box-shadow:var(--glass-shadow)!important;
+  color:var(--soft-ink);font-family:var(--soft-font);
+}
+html:root[data-skin="monocode"] body.inspection-open.inspection-image-active:not(.inspection-expanded) #inspectionSidebar{width:calc(min(var(--inspection-width),100vw - var(--workspace-left)) - var(--pane-inset) * 2)!important}
+html:root[data-skin="monocode"] body.inspection-expanded #inspectionSidebar{left:calc(var(--workspace-left) + var(--pane-inset))!important;width:auto!important}
+html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar{
+  left:calc(var(--workspace-left) + var(--pane-inset))!important;right:var(--pane-inset)!important;width:auto!important;
+  top:calc(var(--top-line) * 2)!important;bottom:auto!important;height:calc(var(--inspection-stack-height) - 32px)!important}
+/* Stacked: the pane sits under the header row, so the window buttons stay
+   in the header and the pane's own controls keep the tab row's right end. */
+html:root[data-skin="monocode"] #inspectionResize{background:transparent!important}
+
+/* Tab row: tabs scroll with soft edges, never under the window buttons. */
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-tabbar{
+  display:flex;align-items:center;gap:6px;height:auto!important;min-height:0!important;box-sizing:border-box;
+  padding:0 calc(32px * 3 + 2px * 2 + 16px) 0 8px!important;border-bottom:1px solid var(--glass-line)!important;background:transparent!important}
+html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar .inspection-tabbar,
+html:root[data-skin="monocode"] body:not(.inspection-open) #inspectionSidebar .inspection-tabbar{padding-right:8px!important}
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-tab-strip{
+  flex:1 1 auto;min-width:0;height:100%;display:flex;align-items:center;gap:4px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;
+  scroll-padding-inline:14px;scroll-snap-type:x mandatory;padding:0 14px 0 2px;
+  -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 14px,#000 calc(100% - 30px),transparent);mask-image:linear-gradient(90deg,transparent 0,#000 14px,#000 calc(100% - 30px),transparent)}
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-tab-strip::-webkit-scrollbar{display:none}
+html:root[data-skin="monocode"] #inspectionSidebar :is(.inspection-browser-tabs,.inspection-image-tabs){display:contents}
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-tab{
+  flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;height:30px!important;min-height:30px;box-sizing:border-box;
+  padding:0 12px!important;border-radius:999px!important;border:1px solid transparent!important;background:transparent!important;box-shadow:none!important;
+  font:500 12.5px/1 var(--soft-font)!important;color:var(--soft-ink-2)!important;white-space:nowrap}
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-tab:hover{background:var(--glass-hover)!important;color:var(--soft-ink)!important}
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-tab[aria-selected="true"]{background:var(--glass-3)!important;border-color:var(--glass-line)!important;color:var(--soft-ink)!important}
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-tab::after{display:none!important}
+/* Browser tabs: one width each, title ellipsised inside, close on the right. */
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-tab-strip>*,html:root[data-skin="monocode"] #inspectionSidebar .inspection-browser-tabs>*{scroll-snap-align:start}
+html:root[data-skin="monocode"] #inspectionSidebar .browser-page-tab{width:140px;min-width:140px;max-width:140px;padding:0 6px 0 10px!important}
+html:root[data-skin="monocode"] #inspectionSidebar .browser-page-tab>strong{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:inherit;text-align:left}
+html:root[data-skin="monocode"] #inspectionSidebar .browser-page-tab :is(img,svg,.browser-tab-fallback){flex:0 0 16px;width:16px;height:16px;border-radius:4px}
+html:root[data-skin="monocode"] #inspectionSidebar .browser-tab-close{flex:0 0 20px;width:20px;height:20px;display:grid;place-items:center;border-radius:999px;font-size:14px;line-height:1;color:var(--soft-ink-3);opacity:.85}
+html:root[data-skin="monocode"] #inspectionSidebar .browser-tab-close:hover{background:var(--glass-hover);color:var(--soft-ink)}
+html:root[data-skin="monocode"] #inspectionSidebar .browser-owner-chip{flex:0 0 auto;height:30px;padding:0 11px 0 4px;background:var(--glass-3)!important;border:1px solid var(--glass-line)!important;font:500 12px/1 var(--soft-font);color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] #inspectionSidebar .browser-owner-chip svg{width:22px;height:22px;flex-basis:22px}
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-new-tab{flex:0 0 30px;width:30px;height:30px;display:grid;place-items:center;border-radius:999px!important;background:transparent!important;border:0!important;color:var(--soft-ink-3)}
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-new-tab:hover{background:var(--glass-hover)!important;color:var(--soft-ink)}
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-new-tab svg{width:16px;height:16px;stroke:currentColor;stroke-width:1.6;fill:none}
+/* Pane controls: same size and rhythm as the window buttons beside them. */
+html:root[data-skin="monocode"] #inspectionPanelControls{flex:0 0 auto;display:flex;align-items:center;gap:2px;height:32px;padding:0 8px 0 0;margin:0;position:relative}
+html:root[data-skin="monocode"] body.inspection-open:not(.inspection-stacked) #inspectionPanelControls::after{content:"";position:absolute;right:0;top:8px;width:1px;height:16px;background:var(--glass-line-strong)}
+html:root[data-skin="monocode"] #inspectionPanelControls>button{width:32px!important;height:32px!important;min-height:32px;padding:0!important;margin:0!important;display:grid;place-items:center;border-radius:999px!important;background:transparent!important;border:0!important;color:var(--soft-ink-2)!important}
+html:root[data-skin="monocode"] #inspectionPanelControls>button:hover{background:var(--glass-hover)!important;color:var(--soft-ink)!important}
+html:root[data-skin="monocode"] #inspectionPanelControls>button svg{width:17px;height:17px}
+
+/* Toolbar under the tabs. */
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-toolbar{background:transparent!important;border-bottom:0!important;padding:10px 12px 6px!important;height:auto!important;min-height:0!important;box-sizing:border-box}
+html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar{display:flex;align-items:center;gap:10px;width:100%}
+html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger{
+  flex:0 1 auto;max-width:100%;min-width:0;height:34px!important;min-height:34px;box-sizing:border-box;display:inline-flex;align-items:center;gap:8px;
+  padding:0 12px 0 36px!important;border-radius:999px!important;background:var(--glass-3)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important;
+  font:500 12.5px/1 var(--soft-font)!important;color:var(--soft-ink)!important;position:relative;
+}
+html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger::before{
+  content:"";position:absolute;left:13px;top:50%;width:15px;height:15px;transform:translateY(-50%);background:currentColor;opacity:.7;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2.5' y='3.5' width='15' height='10.5' rx='2'/%3E%3Cpath d='M7 17h6M10 14v3'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2.5' y='3.5' width='15' height='10.5' rx='2'/%3E%3Cpath d='M7 17h6M10 14v3'/%3E%3C/svg%3E") center/contain no-repeat}
+html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger .select-chevron{flex:0 0 14px;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;opacity:.65}
+html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger:disabled{color:var(--soft-ink-2)!important;opacity:1}
+html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger:disabled .select-chevron{display:none}
+html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-toolbar .ph-select-trigger:not(:disabled):hover{background:var(--glass-hover)!important;border-color:var(--glass-line-strong)!important}
+html:root[data-skin="monocode"] #inspectionSidebar .desktop-workspace-status{font:500 11.5px var(--soft-font);color:var(--soft-ink-3)}
+/* Browser toolbar: glass pills, spaced, aligned on one row. */
+html:root[data-skin="monocode"] #inspectionSidebar .browser-side-toolbar{display:flex;align-items:center;gap:4px;width:100%}
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-toolbar:has(.browser-side-toolbar:not([hidden])){height:auto!important;min-height:0!important;padding:8px 10px!important}
+html:root[data-skin="monocode"] #inspectionSidebar .browser-side-toolbar :is(.browser-nav-button,.browser-settings-button){width:32px!important;height:32px!important;min-height:32px;padding:0;display:grid;place-items:center;border-radius:999px!important;background:transparent!important;border:0!important;color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] #inspectionSidebar .browser-side-toolbar :is(.browser-nav-button,.browser-settings-button):hover{background:var(--glass-hover)!important;color:var(--soft-ink)}
+html:root[data-skin="monocode"] #inspectionSidebar .browser-side-toolbar :is(.browser-nav-button,.browser-settings-button) svg{width:17px;height:17px}
+html:root[data-skin="monocode"] #inspectionSidebar .browser-address-shell{flex:1 1 auto;min-width:0;height:34px!important;min-height:34px;margin:0 4px;padding:0 12px;border-radius:999px!important;background:var(--glass-3)!important;border:1px solid var(--glass-line)!important;box-shadow:none!important}
+html:root[data-skin="monocode"] #inspectionSidebar .browser-address-shell input{font:450 12.5px var(--soft-font);color:var(--soft-ink);background:transparent}
+
+/* The native browser view sits inside the pane's rounded glass. */
+html:root[data-skin="monocode"] body.inspection-open:not(.inspection-stacked):not(.inspection-expanded) .browser-overlay:not([hidden]){
+  right:calc(var(--pane-inset) + 1px)!important;bottom:calc(var(--pane-inset) + 1px)!important;
+  width:calc(var(--inspection-width) - var(--pane-inset) * 2 - 2px)!important;
+  background:transparent!important;border-radius:0 0 19px 19px;overflow:hidden;padding:0 6px 6px!important;box-sizing:border-box}
+html:root[data-skin="monocode"] body.inspection-expanded .browser-overlay:not([hidden]){left:calc(var(--workspace-left) + var(--pane-inset) + 1px)!important;right:calc(var(--pane-inset) + 1px)!important;bottom:calc(var(--pane-inset) + 1px)!important;background:transparent!important;padding:0 6px 6px!important;box-sizing:border-box}
+html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) .browser-overlay:not([hidden]){left:calc(var(--workspace-left) + var(--pane-inset) + 1px)!important;right:calc(var(--pane-inset) + 1px)!important;height:calc(var(--inspection-stack-height) + 27px - var(--mc-browser-top,94px))!important;background:transparent!important;padding:0 6px 6px!important;box-sizing:border-box}
+html:root[data-skin="monocode"] .browser-overlay .embedded-browser{border-radius:14px;overflow:hidden;background:transparent!important}
+
+/* Desktop empty state: centred in the pane, quiet icon above. */
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-desktop-panel:not([hidden]){position:relative;display:flex!important;flex-direction:column;min-height:0}
+html:root[data-skin="monocode"] #inspectionSidebar #desktopObservationStage{flex:1 1 auto;min-height:0;margin:4px 12px 12px;border-radius:14px;overflow:hidden}
+html:root[data-skin="monocode"] #inspectionSidebar #desktopObservationStage.no-frame{display:flex;align-items:center;justify-content:center;background:transparent!important;border:0!important}
+html:root[data-skin="monocode"] #inspectionSidebar #desktopObservationStage.no-frame ~ .desktop-observation-caption{display:none}
+html:root[data-skin="monocode"] #inspectionSidebar #desktopObservationEmpty:not([hidden]){
+  display:flex;flex-direction:column;align-items:center;gap:14px;max-width:280px;margin:0 auto;padding:0 0 6vh!important;
+  font:450 13px/1.55 var(--soft-font)!important;color:var(--soft-ink-2)!important;text-align:center;text-wrap:balance}
+html:root[data-skin="monocode"] #inspectionSidebar #desktopObservationEmpty::before{
+  content:"";width:52px;height:52px;border-radius:16px;background:var(--glass-3);border:1px solid var(--glass-line);box-shadow:inset 0 1px 0 rgb(255 255 255 / 8%);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23a9add0' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2.5' y='3.5' width='15' height='10.5' rx='2'/%3E%3Cpath d='M7 17h6M10 14v3'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:center;background-size:24px}
+html:root[data-skin="monocode"][data-theme="light"] #inspectionSidebar #desktopObservationEmpty::before{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%235a6088' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2.5' y='3.5' width='15' height='10.5' rx='2'/%3E%3Cpath d='M7 17h6M10 14v3'/%3E%3C/svg%3E")}
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-empty{font-family:var(--soft-font);color:var(--soft-ink-2)}
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-empty strong{font:550 14px/1.35 var(--soft-font);color:var(--soft-ink)}
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-empty small{font:400 12.5px/1.5 var(--soft-font);color:var(--soft-ink-2)}
+
+
+/* Composer: only the context reading remains under it. */
+html:root[data-skin="monocode"] #composer .mc-composer-head:has(.mc-context:empty){display:none}
+html:root[data-skin="monocode"] #composer .mc-composer-head .mc-context{margin-left:0}
+
+/* ── Light theme over the scenic sky ─────────────────────────────────── */
+html:root[data-skin="monocode"][data-theme="light"] :is(#companySidebar,#inspectionSidebar){border-color:rgb(255 255 255 / 55%)!important;box-shadow:0 14px 44px rgb(20 40 90 / 18%),inset 0 1px 0 rgb(255 255 255 / 60%)!important}
+html:root[data-skin="monocode"][data-theme="light"] #conversationHeader :is(#conversationDetailToggle,.group-roster-trigger){background:rgb(255 255 255 / 72%)!important;border-color:rgb(255 255 255 / 60%)!important}
+/* Text that sits straight on the sky follows its brightness. */
+html:root[data-skin="monocode"][data-theme="light"][data-sky-ink-top="light"] #conversationHeader :is(#stageName,#stageRole,#stageMore,.stage-panel-button){color:rgb(255 255 255 / 96%)!important;text-shadow:0 1px 8px rgb(10 20 50 / 30%)}
+html:root[data-skin="monocode"][data-theme="light"][data-sky-ink-top="light"] .mc-window-controls button{color:rgb(255 255 255 / 92%)!important}
+html:root[data-skin="monocode"][data-theme="light"][data-sky-ink-top="light"] body.inspection-open:not(.inspection-stacked) .mc-window-controls button{color:var(--soft-ink-2)!important}
+html:root[data-skin="monocode"][data-theme="light"][data-sky-ink-mid="light"] .mc-empty-heading{color:#fff!important;text-shadow:0 2px 18px rgb(10 20 50 / 30%)}
+html:root[data-skin="monocode"][data-theme="light"][data-sky-ink-mid="dark"] .mc-empty-heading{text-shadow:0 0 22px rgb(255 255 255 / 55%)}
+html:root[data-skin="monocode"][data-theme="light"] #conversationFeed :is(.agent-message,.group-message) .message-content>header :is(strong,small){text-shadow:0 0 6px rgb(255 255 255 / 85%),0 0 2px rgb(255 255 255 / 90%)}
+html:root[data-skin="monocode"][data-theme="light"] #composer .mc-composer-head{color:rgb(255 255 255 / 92%)!important;text-shadow:0 1px 6px rgb(10 20 50 / 40%)!important}
+html:root[data-skin="monocode"] #conversationStage:not(.mc-empty) #composerZone:has(.mc-composer-head .mc-context:empty){margin-bottom:20px!important}
+html:root[data-skin="monocode"][data-theme="light"] #conversationFeed .member-message .message-content>header strong{color:color-mix(in srgb,var(--speaker,var(--soft-ink)) 40%,var(--soft-ink))!important}
+html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar #desktopObservationEmpty:not([hidden]){padding:0!important;gap:8px;font-size:12.5px!important}
+html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar #desktopObservationEmpty::before{width:38px;height:38px;border-radius:12px;background-size:19px}
+
+/* ── UI fix 2: higher transcript, readable room hero, window drag ────── */
+/* The room cluster already owns its leader avatar. Use that single face at
+   the regular 160px chat size, with members on frosted backplates beside it. */
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty):has(#groupPals){
+  --room-hero:160px;--room-pal:56px;
+  --room-in-x:112px;--room-in-y:44px;--room-out-x:176px;--room-out-y:18px;--room-more-x:226px;--room-more-y:2px}
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #conversationHeader.has-group-pals{z-index:5}
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals{--leader:var(--room-hero)!important;--pal:var(--room-pal)!important}
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat[data-seat="leader"]{
+  background:var(--glass-1)!important;box-shadow:0 10px 36px rgb(6 8 22 / 22%)!important;animation:none!important;scale:1}
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat[data-seat="leader"].speaking{
+  box-shadow:0 0 0 2px var(--ember,#ff6e14),0 0 18px 3px color-mix(in srgb,var(--ember,#ff6e14) 40%,transparent)!important;animation:pal-speak 1.4s ease-in-out infinite!important}
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat:not([data-seat="leader"]){
+  z-index:3;border:0!important;background:var(--glass-2,rgb(255 255 255 / 10%))!important;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat:not([data-seat="leader"]):not(.speaking){
+  box-shadow:0 0 0 1.5px var(--glass-line-strong,rgb(255 255 255 / 28%)),0 6px 16px rgb(6 8 22 / 26%)!important}
+html:root[data-skin="monocode"][data-theme="light"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat:not([data-seat="leader"]){background:rgb(255 255 255 / 55%)!important}
+html:root[data-skin="monocode"][data-theme="light"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-seat:not([data-seat="leader"]):not(.speaking){
+  box-shadow:0 0 0 1.5px rgb(255 255 255 / 85%),0 6px 16px rgb(60 66 120 / 18%)!important}
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals .pal-more{z-index:4}
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals[data-stage] [data-seat="inner-left"]{--x:calc(var(--room-in-x) * -1)!important;--y:var(--room-in-y)!important}
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals[data-stage] [data-seat="inner-right"]{--x:var(--room-in-x)!important;--y:var(--room-in-y)!important}
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals[data-stage] [data-seat="outer-left"]{--x:calc(var(--room-out-x) * -1)!important;--y:var(--room-out-y)!important}
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals[data-stage] [data-seat="outer-right"]{--x:var(--room-out-x)!important;--y:var(--room-out-y)!important}
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty) #groupPals[data-stage] .pal-more{--x:var(--room-more-x)!important;--y:var(--room-more-y)!important}
+/* Narrow centre column (pane open on a mid-size window): smaller members
+   tucked closer under the hero's sides so the cluster stays inside it. */
+html:root[data-skin="monocode"] #conversationHeader.has-group-pals{container:phx-room-head/inline-size}
+@container phx-room-head (max-width:440px){
+  html:root[data-skin="monocode"] #conversationHeader #groupPals{--room-pal:40px;--room-in-x:94px;--room-in-y:56px;--room-out-x:min(146px,calc(50cqw - 24px));--room-out-y:34px;--room-more-x:min(146px,calc(50cqw - 24px));--room-more-y:-22px}
+}
+/* The cluster is anchored below the header. Reserve only its leader height
+   and a small gap so the transcript starts directly beneath the faces. */
+html:root[data-skin="monocode"] body:is(:not(.inspection-stacked),.inspection-expanded) #conversationStage:not(.mc-empty):has(#groupPals) #conversationBody{margin-top:calc(var(--room-hero) + 16px)!important}
+/* Stacked (narrow window, pane above the chat): once there are messages the
+   hero and member cluster collapse away; the header roster chip still shows
+   the members, and the transcript gets the whole column. */
+html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #conversationStage.has-thread:not(.mc-empty) :is(#fluffyHero,#groupPals){display:none!important}
+html:root[data-skin="monocode"] body.inspection-stacked:not(.inspection-expanded) #conversationStage.has-thread:not(.mc-empty) #conversationBody{margin-top:0!important}
+/* Transcript edge: one short soft fade at the top only. */
+html:root[data-skin="monocode"] #conversationBody{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 18px)!important;mask-image:linear-gradient(to bottom,transparent 0,#000 18px)!important}
+
+/* Window drag (frameless Electron window: Chromium reads -webkit-app-region).
+   Drag: the 10px top edge above the floating panels, the empty part of the
+   sidebar brand row, the chat header, and the empty part of the pane tab row.
+   Every control inside those strips opts back out with no-drag. */
+html:root[data-skin="monocode"] .window-chrome{display:block!important;position:fixed;left:0;right:0;top:0;height:var(--pane-inset,10px);
+  padding:0;border:0!important;background:transparent!important;z-index:2;-webkit-app-region:drag}
+html:root[data-skin="monocode"] .window-chrome>*{display:none!important}
+html:root[data-skin="monocode"] body:not(.sidebar-collapsed) #companySidebar .sidebar-header{-webkit-app-region:drag}
+html:root[data-skin="monocode"] body:not(.sidebar-collapsed) #companySidebar .phoenix-brand{flex:0 0 auto!important;width:auto!important;padding-right:12px!important;-webkit-app-region:no-drag}
+html:root[data-skin="monocode"] body:not(.sidebar-collapsed) #companySidebar .phoenix-brand .collapse-glyph{
+  position:absolute;right:10px;top:50%;width:16px!important;height:16px!important;box-sizing:content-box;padding:8px;margin:-16px 0 0!important;
+  border-radius:10px;transform:none;-webkit-app-region:no-drag}
+html:root[data-skin="monocode"] body:not(.sidebar-collapsed) #companySidebar .sidebar-header:hover .collapse-glyph{opacity:1}
+html:root[data-skin="monocode"] body:not(.sidebar-collapsed) #companySidebar .phoenix-brand .collapse-glyph:hover{background:var(--glass-hover);color:var(--soft-ink)}
+html:root[data-skin="monocode"] #conversationHeader{-webkit-app-region:drag}
+html:root[data-skin="monocode"] #conversationHeader :is(button,a,input,select,textarea,label,[role="button"],[role="tab"],[contenteditable],[tabindex]:not([tabindex="-1"]),.stage-avatar,.group-pals,.pal-seat,.pal-more){-webkit-app-region:no-drag}
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-tabbar,
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-tabbar :is(.inspection-tab-strip,.inspection-browser-tabs,.inspection-image-tabs,.browser-owner-chip,.inspection-tab-spacer){-webkit-app-region:drag}
+html:root[data-skin="monocode"] #inspectionSidebar .inspection-tabbar :is(button,a,input,select,textarea,label,[role="button"],[role="tab"],[contenteditable],[tabindex]:not([tabindex="-1"]),.inspection-panel-controls,.view-menu){-webkit-app-region:no-drag}
+html:root[data-skin="monocode"] :is(.mc-window-controls,.chrome-controls){-webkit-app-region:no-drag}
+html:root[data-skin="monocode"] :is(#sidebarResize,#inspectionResize,.sidebar-resize,.inspection-resize){-webkit-app-region:no-drag}

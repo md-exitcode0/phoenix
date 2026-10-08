@@ -34,20 +34,23 @@
     [1320, "#0d1124", "#161d3c", "#232a50", "rgb(110 116 210 / 14%)", "#aab4ff", 0.10, 0.07, .95],
     [1440, "#0b0e1f", "#131a35", "#1e2546", "rgb(96 110 200 / 12%)",  "#aab4ff", 0.10, 0.07, 1],
   ];
+  // Light keeps the same day, scenic rather than washed out: a saturated
+  // blue daytime sky with bright cloud bands, peach dawn, golden hour, violet
+  // dusk and a soft periwinkle night. White frosted glass carries the text.
   const LIGHT = [
-    [0,    "#b6bcda", "#c6c9e2", "#d4d2e8", "rgb(255 255 255 / 30%)", "#ffffff", .30, .22, .55],
-    [270,  "#b8bddb", "#c8cae3", "#d8d3e8", "rgb(255 255 255 / 32%)", "#ffffff", .30, .22, .5],
-    [330,  "#c0c2df", "#d2cbe3", "#e6d2de", "rgb(255 236 240 / 40%)", "#fff4f6", .34, .26, .3],
-    [390,  "#cbd1ec", "#e6d5e1", "#f6d6c6", "rgb(255 214 186 / 55%)", "#fff1e8", .40, .30, 0],
-    [480,  "#c6daf1", "#dce5f3", "#f1e8e4", "rgb(255 246 236 / 50%)", "#ffffff", .44, .32, 0],
-    [660,  "#bbd5f1", "#d5e4f5", "#ecf0f6", "rgb(255 255 255 / 55%)", "#ffffff", .46, .34, 0],
-    [930,  "#bdd5f0", "#d7e3f4", "#eeeff4", "rgb(255 255 255 / 50%)", "#ffffff", .46, .34, 0],
-    [1050, "#c3d4ee", "#dde0f0", "#f4e5da", "rgb(255 232 204 / 50%)", "#fff8ee", .44, .32, 0],
-    [1110, "#d0d0e9", "#eedad2", "#fbd8b2", "rgb(255 206 150 / 60%)", "#fff1de", .42, .30, 0],
-    [1170, "#c6c3e4", "#dbcde5", "#eed0d8", "rgb(246 200 222 / 50%)", "#fff4fa", .38, .28, .15],
-    [1230, "#bcbfdf", "#cec9e4", "#ddd3e8", "rgb(236 230 255 / 40%)", "#ffffff", .32, .24, .4],
-    [1320, "#b7bcda", "#c7c9e2", "#d5d2e8", "rgb(255 255 255 / 32%)", "#ffffff", .30, .22, .5],
-    [1440, "#b6bcda", "#c6c9e2", "#d4d2e8", "rgb(255 255 255 / 30%)", "#ffffff", .30, .22, .55],
+    [0,    "#2f3b6c", "#4a5789", "#7380ad", "rgb(170 180 240 / 22%)", "#dfe4ff", .26, .22, .6],
+    [270,  "#313e70", "#4d5a8c", "#7883b0", "rgb(176 184 240 / 24%)", "#e2e6ff", .28, .22, .55],
+    [330,  "#3a4780", "#76739f", "#c09bb0", "rgb(255 190 180 / 30%)", "#ffe6ee", .36, .28, .3],
+    [390,  "#4766a3", "#b096b3", "#f1b9a0", "rgb(255 200 160 / 46%)", "#fff0e6", .52, .42, 0],
+    [480,  "#3d76b9", "#82abd9", "#e5d7cf", "rgb(255 240 222 / 42%)", "#ffffff", .64, .52, 0],
+    [660,  "#2c6cb3", "#6aa0d5", "#c3dbef", "rgb(255 255 255 / 40%)", "#ffffff", .72, .58, 0],
+    [930,  "#2f6eb4", "#6fa3d6", "#c8ddee", "rgb(255 255 255 / 38%)", "#ffffff", .72, .58, 0],
+    [1050, "#3a6cab", "#8aa8cf", "#e8d3c1", "rgb(255 222 176 / 42%)", "#fff6ea", .66, .52, 0],
+    [1110, "#47629d", "#c39a8a", "#f2bf88", "rgb(255 190 120 / 56%)", "#ffe9cc", .6, .46, 0],
+    [1170, "#433d84", "#8671aa", "#d79ab2", "rgb(240 160 200 / 42%)", "#f6d6ee", .46, .36, .15],
+    [1230, "#383d76", "#5b6099", "#988cb8", "rgb(190 180 240 / 26%)", "#e6e2ff", .36, .28, .4],
+    [1320, "#323d6e", "#4c598c", "#7582ae", "rgb(176 184 240 / 22%)", "#e0e4ff", .28, .22, .55],
+    [1440, "#2f3b6c", "#4a5789", "#7380ad", "rgb(170 180 240 / 22%)", "#dfe4ff", .26, .22, .6],
   ];
 
   const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
@@ -119,6 +122,16 @@
     st.setProperty("--sky-glow", s.glow); st.setProperty("--sky-cloud", s.cloud);
     st.setProperty("--sky-cloud-far", s.cloudFar.toFixed(3)); st.setProperty("--sky-cloud-near", s.cloudNear.toFixed(3));
     st.setProperty("--sky-stars", s.stars.toFixed(3)); st.setProperty("--sky-sun-x", sunX(minute).toFixed(1) + "%");
+    // Text that sits straight on the sky (header title, empty heading) picks
+    // dark or light ink from how bright the sky is behind it, per band.
+    const lum = (h) => { const c = hex(h).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+    const onSky = (h) => (lum(h) > 0.32 ? "dark" : "light");
+    root.dataset.skyInkTop = theme === "dark" ? "light" : onSky(s.top);
+    root.dataset.skyInkMid = theme === "dark" ? "light" : onSky(s.mid);
+    // Paint the native window in the sky colour so nothing light shows at
+    // its corners or behind a still-loading browser view.
+    const invoke = window.__TAURI__?.core?.invoke;
+    if (invoke) Promise.resolve(invoke("plugin:window|set_background_color", { color: s.mid })).catch(() => {});
     root.dataset.skyPhase = phase(minute);
     // Stars stop animating entirely while they are invisible.
     root.dataset.skyStars = s.stars > 0.02 ? "on" : "off";

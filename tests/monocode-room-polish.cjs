@@ -94,12 +94,14 @@ async function main() {
       const t=window.MonocodeRoomTest,d=t.ui.state.view.directory,group=d.groups[0];
       const ids=d.members.filter(m=>m.group_id===group.group_id).map(m=>m.agent_id);
       group.leader_agent_id=ids.at(-1);
+      await t.ui.selectItem({kind:'agent',id:ids[0]});
+      await new Promise(resolve=>setTimeout(resolve,200));
+      const chatHeroSize=parseFloat(getComputedStyle(document.getElementById('fluffyHero')).width);
       await t.ui.selectItem({kind:'group',id:group.group_id});
       t.syncGroupPals({status:'working',active_agent_ids:[ids[0]]});
       const host=document.getElementById('groupPals');
       const leader=host.querySelector('[data-seat="leader"]').dataset.agent;
       const leaderSize=parseFloat(getComputedStyle(host.querySelector('[data-seat="leader"]')).width);
-      const chatHeroSize=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mc-hero-diameter'));
       const peerSize=parseFloat(getComputedStyle(host.querySelector('.pal-seat:not([data-seat="leader"])')).width);
       const before=[...host.querySelectorAll('.pal-seat')].map(n=>n.dataset.agent);
       const peerSpeaking=!!host.querySelector('.pal-seat.speaking[data-agent="'+ids[0]+'"]');
@@ -129,7 +131,7 @@ async function main() {
     console.log(JSON.stringify({motion},null,2));
     assert.equal(motion.leader,motion.expectedLeader,'Configured group leader owns the central seat');
     assert.equal(motion.leaderSize,motion.chatHeroSize,'Room leader matches the regular chat hero');
-    assert.equal(motion.peerSize,66,'Room coworkers are three times the original 22px');
+    assert.equal(motion.peerSize,56,'Room coworkers use the updated glass-backed size');
     assert.ok(motion.peerSpeaking&&motion.stableSeats,'Speaking highlights preserve stable seats');
     assert.equal(motion.pickerValue,motion.expectedLeader,'Configure dialog preserves the leader');
     assert.deepEqual(motion.pickerOptions.sort(),motion.expectedMembers.sort(),'Leader picker contains exactly the room members');
@@ -170,6 +172,43 @@ async function main() {
     await evaluate(`(async()=>{const t=window.MonocodeRoomTest;await t.ui.selectItem({kind:'group',id:t.ui.state.view.directory.groups[0].group_id});t.syncGroupPals();})()`);
     await sleep(200);
     assert.ok(await evaluate("!!document.getElementById('groupPals')&&!document.getElementById('fluffyHero')"),'A room uses its group avatar cluster without a second standalone chat hero');
+    const uiFix=await evaluate(`(async()=>{
+      const css=node=>getComputedStyle(node),root=document.documentElement;
+      const chrome=document.querySelector('.window-chrome'),header=document.getElementById('conversationHeader');
+      const dragRegions=css(chrome).getPropertyValue('-webkit-app-region')==='drag'&&css(header).getPropertyValue('-webkit-app-region')==='drag';
+      const controlsClickable=css(document.getElementById('stageMore')).getPropertyValue('-webkit-app-region')==='no-drag'&&css(document.querySelector('.pal-seat')).getPropertyValue('-webkit-app-region')==='no-drag';
+      const topStrip=css(chrome).display!=='none'&&chrome.getBoundingClientRect().height===10;
+      const onlyTopFade=css(document.getElementById('conversationBody')).maskImage.includes('18px')&&!css(document.getElementById('conversationBody')).maskImage.includes('100%');
+      const singleLeader=css(document.querySelector('.pal-seat[data-seat="leader"]>.pal-face')).visibility==='visible'&&!document.getElementById('fluffyHero');
+      const select=document.createElement('select');select.dataset.placeholder='No test desktop';select.disabled=true;document.body.append(select);
+      await new Promise(resolve=>setTimeout(resolve,50));
+      const trigger=select._phSelect;const firstPlaceholder=trigger.textContent==='No test desktop';
+      select.dataset.placeholder='Choose a test desktop';await new Promise(resolve=>setTimeout(resolve,50));
+      const livePlaceholder=trigger.textContent==='Choose a test desktop';
+      select.add(new Option('Test desktop','test'));select.disabled=false;select.value='test';
+      const selectedLabel=trigger.textContent==='Test desktop'&&!trigger.classList.contains('is-placeholder');select.remove();trigger.remove();
+      const theme=root.dataset.theme;root.dataset.theme='light';PhoenixSky.set('12:00');
+      const daylightInk=root.dataset.skyInkTop==='light'&&root.dataset.skyInkMid==='dark';
+      PhoenixSky.set('00:00');const nightInk=root.dataset.skyInkMid==='light';root.dataset.theme=theme;PhoenixSky.set(null);
+      const desktop=document.querySelector('[data-inspection-panel="desktop"]'),desktopTools=document.querySelector('[data-inspection-toolbar="desktop"]'),browserTools=document.querySelector('[data-inspection-toolbar="browser"]');
+      PhoenixConversation.showInspectionSidebar('desktop');await new Promise(resolve=>setTimeout(resolve,150));
+      const desktopOnly=css(desktop).display!=='none'&&css(desktopTools).display!=='none'&&css(browserTools).display==='none';
+      PhoenixConversation.showInspectionSidebar('sources');await new Promise(resolve=>setTimeout(resolve,150));
+      const desktopHidden=css(desktop).display==='none'&&css(desktopTools).display==='none'&&css(browserTools).display==='none';
+      PhoenixConversation.closeInspectionSidebar();
+      document.body.classList.add('inspection-stacked');const stage=document.getElementById('conversationStage');stage.classList.add('has-thread');
+      const stackedUsesTranscript=css(document.getElementById('groupPals')).display==='none'&&css(document.getElementById('conversationBody')).marginTop==='0px';document.body.classList.remove('inspection-stacked');
+      return {dragRegions,controlsClickable,topStrip,onlyTopFade,singleLeader,firstPlaceholder,livePlaceholder,selectedLabel,daylightInk,nightInk,desktopOnly,desktopHidden,stackedUsesTranscript};
+    })()`);
+    console.log(JSON.stringify({uiFix},null,2));
+    assert.ok(Object.values(uiFix).every(Boolean),'UI fixes keep drag controls clickable, dropdowns current, sky ink readable, and inspection tabs isolated: '+JSON.stringify(uiFix));
+    if(process.env.PHOENIX_TEST_PANE_SCREENSHOT){
+      await evaluate(`(()=>{document.documentElement.dataset.theme='light';PhoenixSky.set('12:00');PhoenixConversation.showInspectionSidebar('desktop');})()`);
+      await sleep(400);
+      const pane=await command("Page.captureScreenshot",{format:"png"});
+      fs.writeFileSync(process.env.PHOENIX_TEST_PANE_SCREENSHOT,Buffer.from(pane.data,"base64"));
+      await evaluate(`(()=>{PhoenixConversation.closeInspectionSidebar();document.documentElement.dataset.theme='dark';PhoenixSky.set(null);})()`);
+    }
     if (process.env.PHOENIX_TEST_SCREENSHOT) {
       await evaluate(`(async()=>{const t=window.MonocodeRoomTest;await t.ui.selectItem({kind:'group',id:t.ui.state.view.directory.groups[0].group_id});t.syncGroupPals();})()`);
       const screenshot=await command("Page.captureScreenshot",{format:"png"});
@@ -177,10 +216,10 @@ async function main() {
       if (process.env.PHOENIX_TEST_NARROW_SCREENSHOT) {
         await command("Emulation.setDeviceMetricsOverride",{width:480,height:900,deviceScaleFactor:1,mobile:false});
         await sleep(350);
-        const narrow=await evaluate(`(()=>{const host=document.getElementById('groupPals'),stage=document.getElementById('conversationStage').getBoundingClientRect(),body=document.getElementById('conversationBody').getBoundingClientRect(),nodes=[...host.querySelectorAll('.pal-seat')],faces=nodes.map(n=>n.getBoundingClientRect());return {stage:host.dataset.stage,inside:faces.every(r=>r.left>=stage.left&&r.right<=stage.right),aboveMessages:faces.every(r=>r.bottom<=body.top),heroSize:parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mc-hero-diameter')),sizes:nodes.map(n=>parseFloat(getComputedStyle(n).width)),bounds:{stage:[stage.left,stage.right],bodyTop:body.top,faces:faces.map(r=>[r.left,r.right,r.bottom])}};})()`);
+        const narrow=await evaluate(`(()=>{const host=document.getElementById('groupPals'),stage=document.getElementById('conversationStage').getBoundingClientRect(),body=document.getElementById('conversationBody').getBoundingClientRect(),nodes=[...host.querySelectorAll('.pal-seat')],faces=nodes.map(n=>n.getBoundingClientRect());return {stage:host.dataset.stage,inside:faces.every(r=>r.left>=stage.left&&r.right<=stage.right),aboveMessages:faces.every(r=>r.bottom<=body.top),heroSize:160,sizes:nodes.map(n=>parseFloat(getComputedStyle(n).width)),bounds:{stage:[stage.left,stage.right],bodyTop:body.top,faces:faces.map(r=>[r.left,r.right,r.bottom])}};})()`);
         assert.ok(narrow.inside&&narrow.aboveMessages,'Enlarged room avatars fit the narrow stage and stay above messages: '+JSON.stringify(narrow));
         assert.equal(narrow.sizes[0],narrow.heroSize,'Narrow room leader matches the responsive regular chat hero');
-        assert.ok(narrow.sizes.slice(1).every(size=>size===66),'Narrow room coworkers keep their enlarged size');
+        assert.ok(narrow.sizes.slice(1).every(size=>size===40),'Narrow room coworkers fit beside the hero');
         console.log(JSON.stringify({narrow},null,2));
         const narrowShot=await command("Page.captureScreenshot",{format:"png"});
         fs.writeFileSync(process.env.PHOENIX_TEST_NARROW_SCREENSHOT,Buffer.from(narrowShot.data,"base64"));

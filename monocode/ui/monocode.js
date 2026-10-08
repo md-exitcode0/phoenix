@@ -27,7 +27,7 @@
   const jump=$('jumpLatest');if(jump)zone.insertBefore(jump,$('taskBlock'));
   // No extra Write next message plus. Attachment and browser plus stay mounted.
   const label=document.createElement('h1');label.className='mc-empty-heading';label.textContent='What should we work on?';zone.prepend(label);
-  const head=document.createElement('div');head.className='mc-composer-head';head.innerHTML='<span class="mc-workspace"><svg viewBox="0 0 20 20"><path d="M2 5h6l2 2h8v10H2z"/></svg><span>Project Phoenix</span></span><span class="mc-context" id="mcContextUsage"></span>';composer.prepend(head);
+  const head=document.createElement('div');head.className='mc-composer-head';head.innerHTML='<span class="mc-context" id="mcContextUsage"></span>';composer.prepend(head);
   $('composerInput').dataset.placeholder='Ask, build, / for commands, @ for references...';
   const toolbar=composer.querySelector('.composer-toolbar'),options=$('composerOptions');
   // Reuse the mounted controls, outside <details>' closed-content behavior.

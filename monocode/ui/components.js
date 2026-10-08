@@ -33,7 +33,8 @@
     const button = select._phSelect;
     if (!button) return;
     button.disabled = select.disabled;
-    button.querySelector("span").textContent = labelOf(select.selectedOptions[0]) || "Choose option";
+    button.querySelector("span").textContent = labelOf(select.selectedOptions[0]) || select.dataset.placeholder || "Choose option";
+    button.classList.toggle("is-placeholder", !select.selectedOptions[0]);
   }
 
   function enhance(select) {
@@ -53,7 +54,7 @@
     select.after(button);
     // Programmatic `select.value = …` fires no event; keep the label honest.
     Object.defineProperty(select, "value", { configurable: true, get() { return valueSetter.get.call(this); }, set(v) { valueSetter.set.call(this, v); sync(this); } });
-    new MutationObserver(() => sync(select)).observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ["disabled"] });
+    new MutationObserver(() => sync(select)).observe(select, { childList: true, subtree: true, attributes: true, attributeFilter: ["disabled", "data-placeholder"] });
     select.addEventListener("change", () => sync(select));
     button.addEventListener("click", (event) => {
       event.preventDefault(); event.stopPropagation();
