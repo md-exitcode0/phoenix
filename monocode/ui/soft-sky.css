@@ -905,7 +905,7 @@ html:root[data-skin="phoenix"] #termPanel .term-tab[aria-selected="true"]{backgr
 
 /* Progress belongs to the scrolling conversation, never to the composer. */
 html:root[data-skin="phoenix"] #conversationTail{display:flex;flex-direction:column;gap:14px;padding:12px 0 8px;min-width:0}
-html:root[data-skin="phoenix"] #conversationTail:has(>#taskBlock[hidden]):not(:has(>#conversationThinking:not([hidden]))){display:none}
+html:root[data-skin="phoenix"] #conversationTail:not(:has(>#conversationThinking:not([hidden]))){display:none}
 html:root[data-skin="phoenix"] #conversationThinking{align-self:flex-start;width:40px;height:40px;margin:0 0 0 4px}
 html:root[data-skin="phoenix"] #conversationThinking canvas{width:40px;height:40px}
 html:root[data-skin="phoenix"] #taskBlock{margin:0!important;width:100%;box-sizing:border-box}
@@ -937,3 +937,21 @@ html:root[data-skin="phoenix"] body.sidebar-collapsed #companySidebar .sidebar-t
 html:root[data-skin="phoenix"] body.sidebar-collapsed #companySidebar .search-box{height:36px;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer}
 html:root[data-skin="phoenix"] body.sidebar-collapsed #companySidebar .search-box :is(input,kbd){display:none!important}
 html:root[data-skin="phoenix"] body.sidebar-collapsed #companySidebar .search-box svg{flex:0 0 16px;width:16px;height:16px;margin:0}
+
+/* Keep the interactive header outside Electron's native drag hit region. */
+html:root[data-skin="phoenix"] #conversationHeader{-webkit-app-region:no-drag!important}
+html:root[data-skin="phoenix"] :is(#stagePanelToggles,#inspectionPanelControls){position:relative;z-index:5;pointer-events:auto!important}
+html:root[data-skin="phoenix"] :is(#terminalToggle,#stageSidebarButton) svg{pointer-events:none}
+
+/* Soften scrolling messages where they meet the composer and its to-dos. */
+html:root[data-skin="phoenix"] #conversationStage:not(.mc-empty) #conversationBody{
+ --transcript-bottom-fade:64px;
+ -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 var(--transcript-edge-fade,18px),#000 max(var(--transcript-edge-fade,18px),calc(100% - var(--transcript-bottom-fade))),transparent 100%)!important;
+ mask-image:linear-gradient(to bottom,transparent 0,#000 var(--transcript-edge-fade,18px),#000 max(var(--transcript-edge-fade,18px),calc(100% - var(--transcript-bottom-fade))),transparent 100%)!important;
+}
+html:root[data-skin="phoenix"] #composerFade:not([hidden]){
+ display:block;bottom:0;height:64px;background:transparent!important;pointer-events:none;
+ -webkit-backdrop-filter:blur(12px)!important;backdrop-filter:blur(12px)!important;
+ -webkit-mask-image:linear-gradient(to bottom,transparent,#000)!important;
+ mask-image:linear-gradient(to bottom,transparent,#000)!important;
+}

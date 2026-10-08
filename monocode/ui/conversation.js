@@ -615,7 +615,9 @@
     $("conversationStage")?.classList.toggle("has-thread", hasAgent);
   }
   function syncComposerFade() {
-    setComposerThreadState(Boolean($("conversationFeed").querySelector(".agent-message,.group-message,.commentary-line,.work-cluster")));
+    const feed=$("conversationFeed");
+    setComposerThreadState(Boolean(feed.querySelector(".agent-message,.group-message,.commentary-line,.work-cluster")));
+    $("composerFade").hidden=!feed.querySelector(".message-row,.group-message,.commentary-line,.work-cluster");
   }
   function feedSlack(feed = $("conversationFeed")) {
     return feed.scrollHeight - feed.scrollTop - feed.clientHeight;
@@ -810,7 +812,7 @@
     const anchor=[...feed.children].filter(node=>node.dataset.turnId===value.turnId)[value.index||0]||null;restoreConversationScroll({...value,anchor});
   }
   function stashConversationView() {
-    const key=conversationIdentity();if(!key)return null;persistReadingPosition();
+    const key=conversationIdentity();if(!key)return null;window.PhoenixQuestionDrafts?.persistAll();persistReadingPosition();
     const feed=$("conversationFeed"),rail=$("conversationPromptRail"),approval=$("approvalStack"),bookmark=conversationScrollBookmark(feed);
     if(state.scrollFrame){cancelAnimationFrame(state.scrollFrame);state.scrollFrame=0;}
     clearTimeout(state.scrollIdle);state.scrollIdle=0;
@@ -2107,7 +2109,8 @@
     const key=answerKey(visibleText),meta=suppliedMeta||state.answerMeta.get(key)||(state.painting?{created_at:null,elapsed_ms:null}:{created_at:new Date().toISOString(),elapsed_ms:state.turnStartedAt?Date.now()-state.turnStartedAt:null});
     const turn=state.renderingTurnId||state.activeTurnId||"";
     const waiting=suppliedMeta?.awaiting_input||state.displayRows.some((entry)=>displayRole(entry)==="answer"&&displayTurnId(entry)===turn&&entry.value?.awaiting_input&&answerKey(entry.value.markdown||entry.value.text||"")===key);
-    if(waiting){const update=renderAgentUpdate(agent||state.item?.id||"phoenix",visibleText);if(update)update.classList.add("awaiting-input-update");return update;}
+    // A final reply remains public even when the agent also asks a question.
+    if(waiting){const update=renderAgentUpdate(agent||state.item?.id||"phoenix",visibleText,false,true);if(update)update.classList.add("awaiting-input-update");return update;}
     // Recover histories written by the old late-helper integration pass. A
     // status explicitly reporting no change cannot replace this turn's answer.
     if(/^Nothing new(?:[.:]|$)/i.test(visibleText)){
@@ -5257,6 +5260,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     }
     const card=document.createElement("article");card.className=`approval-card ${decision?"approval-decision-card":"approval-question-card"}`;card.dataset.askId=ask.id;
     card.dataset.agent=approval.details?.owner_agent_id||approval.details?.agent_id||ask.agent||"phoenix";card.dataset.login=login?"true":"false";card.dataset.teaching=teaching?"true":"false";card.dataset.site=approval.details?.site||"";card.dataset.startUrl=approval.details?.start_url||"";card.dataset.teachingScope=approval.details?.scope||"agent";card.dataset.groupId=approval.details?.group_id||"";
+    card._conversationScope={identity:conversationIdentity(),sessionId:state.sessionId,owner:canvasConversationOwner()};
     card._askState={ask,approval,questions,index:0,answers:Array(questions.length).fill(null),multiSelections:Array.from({length:questions.length},()=>new Set()),customAnswers:Array(questions.length).fill(""),decisionSelection:0,alternativesOpen:false,login,teaching,vault,decision,cardAgent:card.dataset.agent};
     const kit=window.PhoenixAgentKit;
     const custom=`<div class="approval-custom" hidden><label><span>Your answer</span><input data-ask-custom-input autocomplete="off" placeholder="Type an answer"></label><button class="primary" data-ask-custom-save>Continue</button></div>`;
@@ -5266,7 +5270,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     card.innerHTML=decision
       ?`<div class="ta-head"><span class="ta-tile">${kit.icon("shieldCheck")}</span><div class="ta-main"><div class="ta-row"><div class="ta-titles"><div class="approval-question ta-title"></div><div class="ta-tool"></div></div><span class="ta-badge">Approval required</span></div><p class="approval-decision-copy ta-desc"></p><button type="button" class="ta-details-toggle" data-ta-details aria-expanded="false" hidden>View details${kit.icon("chevronDown","ta-chevron")}</button></div></div><div class="ta-details" hidden><dl class="ta-params"></dl></div>${custom}${vaultForm}<footer class="approval-decision-footer ta-foot"></footer>`
       :`<div class="qa-main"><div class="qa-row"><h3 class="approval-question qa-title" tabindex="-1"></h3><span class="approval-position qa-pos"></span><button type="button" class="approval-dismiss qa-dismiss" data-ask-dismiss aria-label="Dismiss">${kit.icon("x")}</button></div><div class="qa-body"><p class="qa-desc" hidden></p><div class="approval-choice-list qa-options" role="radiogroup"></div></div>${custom}<div class="qa-foot"><button type="button" class="qa-back" data-ask-nav="back" aria-label="Previous question">${kit.icon("arrowLeft")}</button><span class="qa-dots"></span><label class="approval-inline-custom qa-custom"><input data-ask-custom-input autocomplete="off" placeholder="Add another response…" aria-label="Custom answer"></label><button type="button" class="qa-next primary" data-ask-continue></button></div></div>`;
-    renderApprovalQuestion(card);
+    window.PhoenixQuestionDrafts?.restore(card);renderApprovalQuestion(card);
     if(ask.recovered_unplaced){const provenance=document.createElement("small");provenance.className="saved-request-provenance";const date=new Date(ask.created_at);provenance.textContent="Saved request"+(Number.isFinite(date.getTime())?` · ${date.toLocaleString()}`:"");card.prepend(provenance);}
     if(!decision){
       const details=document.createElement("details"),summary=document.createElement("summary");details.className="pending-question-disclosure";
@@ -5296,6 +5300,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     const fieldNames=optional?fields.filter((field)=>field!=="totp"):fields;
     const card=document.createElement("article");
     card.className="approval-card pass-request-card";card.dataset.askId=ask.id;card.dataset.agent=details.agent_id||ask.agent||"phoenix";card.dataset.kind=kind;card.dataset.state="pending";
+    card._conversationScope={identity:conversationIdentity(),sessionId:state.sessionId,owner:canvasConversationOwner()};
     card._askState={ask,approval,questions,index:0,answers:Array(questions.length).fill(null),multiSelections:questions.map(()=>new Set()),customAnswers:questions.map(()=>""),decision:true,pass:true,cardAgent:card.dataset.agent};
     card.innerHTML=`<div class="pr-head"><span class="pr-tile pr-tile-${kind}">${P.icons[meta.icon]}</span><div class="pr-titles"><h3 class="pr-title" tabindex="-1">${escape(title)}</h3><p class="pr-reason">${escape(questions[0]?.question||`${name} needs this to continue.`)}</p></div><button type="button" class="approval-dismiss pr-dismiss" data-pass-cancel aria-label="Not now">${window.PhoenixAgentKit?.icon("x")||"×"}</button></div>
       <form class="pr-form" autocomplete="off" novalidate>
@@ -5394,9 +5399,10 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   // feed here cleared every approval card and the transcript and rebuilt
   // them, which read as the app reloading after each approval.
   function resolveAskDisplay(card,answer,status){
+    window.PhoenixQuestionDrafts?.discard(card);
     const siblings=status==="answered"?matchingApprovalCards(card):[],primaryAnswers=card._askState.answers;
     const entry=recordAskResolution(card,answer,status);
-    siblings.forEach((other)=>{other._askState.answers=other._askState.questions.map((_,index)=>primaryAnswers[index]??primaryAnswers.at(-1)??null);recordAskResolution(other,answer,status);});
+    siblings.forEach((other)=>{window.PhoenixQuestionDrafts?.discard(other);other._askState.answers=other._askState.questions.map((_,index)=>primaryAnswers[index]??primaryAnswers.at(-1)??null);recordAskResolution(other,answer,status);});
     replaceDisplayRows(trimDisplayRows(state.displayRows),true);
     const feed=$("conversationFeed"),bookmark=conversationScrollBookmark(),primaryId=String(card.dataset.askId||"");
     const anchor=[...feed.querySelectorAll(".decision-request")].find((request)=>request.dataset.decisionAskId===primaryId)||null;
@@ -5410,11 +5416,27 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   // A card whose decision was already made elsewhere (a sibling card, another
   // window, a turn that ended) is obsolete, not failed.
   const OBSOLETE_ASK=/no longer pending|already (?:answered|resolved)|different saved decision|no active participant|continuation is unavailable|submission is unavailable/i;
-  async function submitAsk(card,answer){const token=activeSelectionToken(),session_id=state.sessionId,owner=canvasConversationOwner();card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);try{await rpc({AnswerAsk:{ask_id:card.dataset.askId,answer,session_id,owner}},8000,token?.signal);if(selectionIsCurrent(token))resolveAskDisplay(card,answer,"answered");}catch(error){if(!selectionIsCurrent(token))return;if(card._askState?.decision&&OBSOLETE_ASK.test(String(error?.message||error))){resolveAskDisplay(card,answer,"answered");return;}card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);ui.toast(error.message,true);}}
+  async function submitAsk(card,answer){
+    const token=activeSelectionToken(),scope=card._conversationScope;
+    // The question keeps its original owner across cached views and callbacks.
+    if(scope&&scope.identity!==conversationIdentity()){
+      ui.toast("Open the conversation that asked this question to answer it.",true);return;
+    }
+    const session_id=scope?.sessionId||state.sessionId,owner=scope?.owner||canvasConversationOwner();
+    card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);
+    try{
+      await rpc({AnswerAsk:{ask_id:card.dataset.askId,answer,session_id,owner}},8000,token?.signal);
+      if(selectionIsCurrent(token))resolveAskDisplay(card,answer,"answered");
+    }catch(error){
+      if(!selectionIsCurrent(token))return;
+      if(card._askState?.decision&&OBSOLETE_ASK.test(String(error?.message||error))){resolveAskDisplay(card,answer,"answered");return;}
+      card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);ui.toast(error.message,true);
+    }
+  }
   async function dismissAsk(card){const token=activeSelectionToken(),session_id=state.sessionId,owner=canvasConversationOwner();card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);try{await rpc({DismissAsk:{ask_id:card.dataset.askId,session_id,owner}},8000,token?.signal);if(!selectionIsCurrent(token))return;card._askState.answers=card._askState.questions.map(()=>"Not now");resolveAskDisplay(card,"Not now","dismissed");}catch(error){if(!selectionIsCurrent(token))return;card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);ui.toast(error.message,true);}}
   function recordAskAnswer(card,answer){const model=card._askState;model.answers[model.index]=answer;if(model.index<model.questions.length-1){model.index+=1;renderApprovalQuestion(card);card.querySelector(".approval-question").focus?.();return;}submitAsk(card,formatAskAnswers(model));}
   async function unlockApprovalVault(card){const input=card.querySelector("[data-vault-password]"),password=input.value;if(password.length<12){input.reportValidity();return;}card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);try{await rpc({Vault:{action:"unlock_with_password",master_password:password}},20000);input.value="";card._askState.answers[card._askState.index]="Unlocked";await submitAsk(card,"A: Unlock here\nPasses is unlocked for this Phoenix session. Continue the blocked action now.");}catch(error){card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);input.focus();ui.toast(error.message,true);}}
-  function closeApproval(){$("approvalStack").replaceChildren();syncApprovalStack();}
+  function closeApproval(){window.PhoenixQuestionDrafts?.persistAll();$("approvalStack").replaceChildren();syncApprovalStack();}
   function answerApproval(button){const card=button.closest(".approval-card"),model=card._askState,answer=button.dataset.askOption;if(model.questions[model.index].multi_select){const selected=model.multiSelections[model.index];selected.has(answer)?selected.delete(answer):selected.add(answer);renderApprovalQuestion(card);return;}
     if(!model.decision){const index=model.index;model.answers[index]=answer;model.customAnswers[index]="";renderApprovalQuestion(card);clearTimeout(model.advanceTimer);if(index<model.questions.length-1)model.advanceTimer=setTimeout(()=>{if(card.isConnected&&model.index===index){model.index+=1;renderApprovalQuestion(card);card.querySelector(".approval-question")?.focus?.({preventScroll:true});}},240);return;}
     if(model.decision){card.dataset.state="approving";card.querySelector(".ta-badge")&&(card.querySelector(".ta-badge").textContent=DENY_OPTION.test(String(answer).trim())?"Denying":"Approving");}if(model.login&&/log in|sign in/i.test(answer)){state.loginAsk={answer,card};card.querySelectorAll("button").forEach((item)=>item.disabled=true);openBrowser(card.dataset.agent||state.item?.id||"phoenix","login",card.dataset.site?`https://${card.dataset.site}`:null).catch((error)=>{card.querySelectorAll("button").forEach((item)=>item.disabled=false);state.loginAsk=null;ui.toast(error.message||String(error),true);});return;}if(model.teaching&&answer===model.approval.approved_option){state.teachingAsk={answer,card};card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);startTeaching(card.dataset.agent||state.item?.id||"phoenix",card.dataset.startUrl||null,card.dataset.teachingScope||"agent",card.dataset.groupId||null);return;}recordAskAnswer(card,answer);}
@@ -6351,12 +6373,14 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     if(state.browserBoundKey===key&&state.browserOwnerId){if(state.browserActivationPromise)await state.browserActivationPromise;return;}
     if(state.inspectionBrowserResumePromise)return state.inspectionBrowserResumePromise;
     let settle;const pending=new Promise((resolve)=>{settle=resolve;});state.inspectionBrowserResumePromise=pending;
-    try{await openBrowser(saved.ownerAgentId||"phoenix",saved.mode||"browse",null,{restoring:true});}finally{settle();if(state.inspectionBrowserResumePromise===pending)state.inspectionBrowserResumePromise=null;}
+    try{await openBrowser(state.item?.kind==="agent"?state.item.id:(saved.ownerAgentId||"phoenix"),saved.mode||"browse",null,{restoring:true});}finally{settle();if(state.inspectionBrowserResumePromise===pending)state.inspectionBrowserResumePromise=null;}
   }
   async function openBrowser(ownerId,mode="login",startUrl=null,options={}){
     const token=activeSelectionToken(),requestedBoundKey=conversationKeyOf(state.item);if(!token||!requestedBoundKey)throw new Error("Select a conversation before opening its browser.");
+    const requestedOwner=canonicalAgentId(ownerId)||canonicalAgentId(state.item?.id)||"phoenix";
+    if(state.item?.kind==="agent"&&requestedOwner!==canonicalAgentId(state.item.id))throw new Error("This browser belongs to another conversation.");
+    const requestedProfile=agentProfile(requestedOwner),requestedInstance=requestedProfile?.browser_profile_id||(requestedOwner==="phoenix"?"agent-phoenix":`agent-${requestedOwner}`);
     state.inspectionBrowserOpening=true;try{showInspectionSidebar("browser");}finally{state.inspectionBrowserOpening=false;}
-    const requestedOwner=ownerId==="orchestrator"?"phoenix":ownerId,requestedProfile=agentProfile(requestedOwner),requestedInstance=requestedProfile?.browser_profile_id||(requestedOwner==="phoenix"?"agent-phoenix":`agent-${requestedOwner}`);
     if(state.browserOwnerId===requestedInstance&&state.browserBoundKey===requestedBoundKey){
       // Same coworker, same browser profile: keep the surface. Only the mode
       // may differ (browse -> teach when "Teach agent" is pressed). Tearing the
@@ -6782,7 +6806,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     context:()=>fluffyContext(),
     begin(event) { clearFeed();replaceDisplayRows([],false);state.activeTurnId=event.execution.turn_id;appendDisplay("story",{...event,turn_id:event.execution.turn_id},true,false);setWorking(true);const prompt=renderUser(event.text);beginTurnActivity(prompt,event.agent);consumeFluffyWire({Story:event},fluffyContext()); },
   });
-  window.PhoenixConversation=Object.freeze({openBrowser,closeBrowser,openImageInspector,showInspectionSidebar,closeInspectionSidebar:hideInspectionSidebar,openTeach,startTeaching,startTeachingRevision,renderApproval,refreshPromptRail:renderPromptRail,refreshPanelBounds:scheduleNativeBrowserBounds,applySettings,setInitialVisibleTurns,workspace:()=>state.workspace,flushPresentationState(){persistReadingPosition();persistComposerDraft();captureInspectionConversation();}});
+  window.PhoenixConversation=Object.freeze({openBrowser,closeBrowser,openImageInspector,showInspectionSidebar,closeInspectionSidebar:hideInspectionSidebar,openTeach,startTeaching,startTeachingRevision,renderApproval,refreshPromptRail:renderPromptRail,refreshPanelBounds:scheduleNativeBrowserBounds,applySettings,setInitialVisibleTurns,workspace:()=>state.workspace,flushPresentationState(){window.PhoenixQuestionDrafts?.persistAll();persistReadingPosition();persistComposerDraft();captureInspectionConversation();}});
   new MutationObserver(syncMessageGroups).observe($("conversationFeed"),{childList:true});
   bind(); renderVoiceState(); autosize();void recoverVoiceCapture();
   if (ui.state.view) selectConversationWithInspection({item:ui.state.selected,sessionId:ui.activityFor(ui.state.selected)?.canonical_session_id});

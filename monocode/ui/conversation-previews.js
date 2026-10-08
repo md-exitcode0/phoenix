@@ -132,8 +132,17 @@ export function installConversationPreviews({
       checks.historyDraftsHidden=!feed.textContent.includes("EARLY DRAFT");
       renderAnswer("Choose the stubborn problem you finally solved.","phoenix");
       checks.oneFinalAnswer=feed.querySelectorAll(".agent-message:not(.commentary-message)").length===1;
+      const beforeQuestion=feed.querySelectorAll('.awaiting-input-update').length;
+      renderAnswer("You have enough detail now. Choose the change you want to describe.","phoenix",{awaiting_input:true});
+      checks.finalReplyWithQuestionVisible=feed.querySelectorAll('.awaiting-input-update').length===beforeQuestion+1&&feed.textContent.includes("enough detail now");
+      const selectedBefore=state.item,openedBefore=state.inspectionOpen;
+      let foreignBrowserRejected=false;try{await window.PhoenixConversation.openBrowser("school_coach","browse");}catch{foreignBrowserRejected=true;}
+      checks.foreignBrowserCannotOpen=foreignBrowserRejected&&state.item===selectedBefore&&state.inspectionOpen===openedBefore;
+      await sleep(20);
+      checks.bottomEdgeBlur=getComputedStyle($("composerFade")).backdropFilter==='blur(12px)'&&!$("composerFade").hidden;
+
       state.tasks=[{task:"Check the prompt",status:"completed"},{task:"Choose one example",status:"in-progress"}];renderTasks();await sleep(100);
-      checks.progressFollowsMessages=feed.lastElementChild===tail&&tail.contains($("taskBlock"))&&tail.contains($("conversationThinking"))&&!$("composerZone").contains($("taskBlock"));
+      checks.progressFollowsMessages=feed.lastElementChild===tail&&!tail.contains($("taskBlock"))&&tail.contains($("conversationThinking"))&&$("composerZone").contains($("taskBlock"));
       const orb=$("conversationThinking");
       for(let i=0;i<20;i++)renderUser(`Earlier message ${i}: ${"Transcript content. ".repeat(20)}`);
       feed.scrollTop=feed.scrollHeight;await sleep(40);const orbAtLatest=orb.getBoundingClientRect().top;
@@ -146,6 +155,14 @@ export function installConversationPreviews({
       const card=$("approvalStack").lastElementChild;card.querySelector("[data-vault-open]").click();await sleep(20);
       checks.unlockFormHasOneActionRow=!card.querySelector(".approval-vault").hidden&&getComputedStyle(card.querySelector(".approval-decision-footer")).display==="none";
       checks.unlockFormMatchesGlass=getComputedStyle(card.querySelector(".approval-vault")).backgroundColor==="rgba(0, 0, 0, 0)";
+      closeApproval();
+      const ask={kind:"ask_pending",id:"clean-answer-draft",agent:"phoenix",questions:[{header:"Example",question:"What did the swimming lesson feel like?",options:[],multi_select:false}]};
+      renderApproval(ask);const first=$("approvalStack").lastElementChild,answer=first.querySelector(".approval-inline-custom input");
+      answer.value="Unsent answer with specific details.";answer.dispatchEvent(new Event("input",{bubbles:true}));await sleep(20);
+      closeApproval();renderApproval(ask);const restored=$("approvalStack").lastElementChild;
+      checks.unsentAnswerSurvivesReentry=restored.querySelector(".approval-inline-custom input").value==="Unsent answer with specific details.";
+      checks.questionKeepsConversationOwner=restored._conversationScope.owner.id===state.item.id&&restored._conversationScope.sessionId===state.sessionId;
+      PhoenixQuestionDrafts.discard(restored);closeApproval();
       document.body.classList.add("sidebar-collapsed");await sleep(250);
       const sidebar=$("companySidebar").getBoundingClientRect();checks.railIconsContained=[...document.querySelectorAll("#sidebarList .company-row")].every(row=>{const r=row.getBoundingClientRect();return r.left>=sidebar.left&&r.right<=sidebar.right});
       checks.railNoLongEmptyColumn=sidebar.height<innerHeight-30;
