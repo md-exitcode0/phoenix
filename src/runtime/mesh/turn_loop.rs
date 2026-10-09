@@ -2241,10 +2241,26 @@ impl MeshRunner {
                             // actionable or FYI framing for this member.
                             let content =
                                 crate::runtime::postbox::user_steer_content_for(&note);
+                            let one_to_one =
+                                crate::runtime::postbox::room_steer_parts(&note.subject).is_none();
                             session.push_message(Message::User {
                                 content: content.clone(),
                             });
-                            native_tool_messages.push(ChatMessage::user(content));
+                            // Every mid-task message gets a reply in the agent's
+                            // own words, not just a "Delivered mid-task" label.
+                            // The note rides only on this turn's model request
+                            // (a mid-conversation system message is hoisted or
+                            // rejected by some providers); the durable transcript
+                            // keeps the user's message exactly once, without it.
+                            let model_content = if one_to_one {
+                                format!(
+                                    "{content}\n\n{}",
+                                    crate::runtime::postbox::USER_STEER_REPLY_NOTE
+                                )
+                            } else {
+                                content
+                            };
+                            native_tool_messages.push(ChatMessage::user(model_content));
                             self.emit(CliEvent::SteerDelivered {
                                 to: addr.label(),
                                 subject: note.subject.clone(),
@@ -3221,10 +3237,15 @@ impl MeshRunner {
                     });
                 }
             }
+            // Prose written alongside tool calls is working narration. The
+            // conversation shows only deliberate `user_update`s and the final
+            // answer, so narration folds into the activity log as thinking
+            // instead of printing as a chat message (it used to repeat what the
+            // update and the final answer already said).
             if !response.tool_calls.is_empty() && !response.content.trim().is_empty() {
                 let visible = strip_visible_reasoning_blocks(&response.content);
                 if !visible.trim().is_empty() {
-                    self.emit(CliEvent::AgentMessage {
+                    self.emit(CliEvent::AgentThinking {
                         agent: agent_display_name(&spec.name),
                         text: visible,
                     });
@@ -3663,7 +3684,8 @@ impl MeshRunner {
                         &mut last_final_rejection,
                     );
                     if !rationale.trim().is_empty() {
-                        self.emit(CliEvent::AgentMessage {
+                        // Narration, not a chat message (see above).
+                        self.emit(CliEvent::AgentThinking {
                             agent: agent_display_name(&spec.name),
                             text: rationale.clone(),
                         });

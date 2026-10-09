@@ -32,7 +32,7 @@
 :root[data-skin="phoenix"] .work-cluster > .work-progress {display:block!important}
 :root[data-skin="phoenix"] .work-cluster.group-work-expanded :is(.agent-update,.reasoning-subgroup,.reasoning-cluster) {display:block!important}
 /* Keep the compact rail, header and chat visible beside a stacked workspace.
-   MonoCode's full-height ID rule otherwise overrides the native stack layout. */
+   The skin's full-height ID rule otherwise overrides the native stack layout. */
 :root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar {left:var(--workspace-left)!important;right:0;top:34px;height:var(--inspection-stack-height)!important;width:auto!important}
 :root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) #conversationStage {margin-top:0!important;margin-right:0!important;height:100%;width:auto!important}
 :root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) #conversationStage::before {content:"";flex:0 0 var(--inspection-stack-height);order:0}

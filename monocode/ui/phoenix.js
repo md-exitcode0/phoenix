@@ -1,4 +1,4 @@
-/* Presentation adapter on the copied Phoenix UI, derived from pinned MonoCode v0.3.0.
+/* Presentation adapter on the copied Phoenix UI, derived from a pinned v0.3.0 skin.
    Uses existing controls, never replaces controller/command implementations. */
 (function(root){
  'use strict';const $=id=>document.getElementById(id),mono=document.documentElement.dataset.skin==='phoenix';

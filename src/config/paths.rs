@@ -172,6 +172,10 @@ fn archive_seeded_prompt(home: &Path, name: &str, bytes: &[u8]) -> Result<()> {
 const HISTORICAL_PROMPT_SEEDS: &[(&str, &str)] = &[
     // Older defaults currently found in long-lived Phoenix homes.
     (
+        "orchestrator_system.md",
+        "74b439d0e22ca3b8570933e86810cd2b5f753c718da25418b705a9107cf96ca7",
+    ),
+    (
         "browser_system.md",
         "f27b1dd27a494280f555e033d9d679b5b5317317b5b4595b7cb3d9f263949526",
     ),

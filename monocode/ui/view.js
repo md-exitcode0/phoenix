@@ -133,7 +133,13 @@
     if (state.listening || preview || !window.__TAURI__?.event?.listen) return;
     state.listening = true;
     await window.__TAURI__.event.listen("term-data", (event) => {
-      const id=event.payload?.id,tab=state.tabs.find((candidate)=>candidate.id===id);if(tab)ingest(tab,event.payload.data);else state.orphanOutput.set(id,`${state.orphanOutput.get(id)||""}${event.payload?.data||""}`);
+      const id=event.payload?.id,tab=state.tabs.find((candidate)=>candidate.id===id);if(tab)ingest(tab,event.payload.data);else{
+        // Output that arrives before term_open resolves is held briefly. Output for a
+        // shell no tab will ever claim (e.g. from before a renderer reload) must not
+        // grow without bound (#278 memory): keep the tail and only a few shells.
+        const held=`${state.orphanOutput.get(id)||""}${event.payload?.data||""}`;state.orphanOutput.delete(id);state.orphanOutput.set(id,held.length>262144?held.slice(-262144):held);
+        while(state.orphanOutput.size>8)state.orphanOutput.delete(state.orphanOutput.keys().next().value);
+      }
     });
     await window.__TAURI__.event.listen("term-exit", (event) => {
       const id=event.payload?.id,tab=state.tabs.find((candidate)=>candidate.id===id);if(!tab)return;tab.id=0;tab.exited=true;ingest(tab,"\r\n\x1b[2m[process exited]\x1b[0m\r\n");renderTabs();ui.invoke("term_close",{id}).catch(()=>{});

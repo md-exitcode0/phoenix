@@ -1023,6 +1023,38 @@ export function installConversationPreviews({
     renderAnswer("Yes. I’ll package it after one last pass on contrast, and you can try it before anything is applied.","phoenix",{created_at:at(1),elapsed_ms:6000});
     document.title="Phoenix soft chat preview";
   }
+  // Repro of Mike's Oct 8 screenshots (?shot=mike-repro[&view=chat]).
+  async function runMikeReproPreview(){
+    const pause=ms=>new Promise(r=>setTimeout(r,ms)),params=new URLSearchParams(location.search);
+    state.inspectionExpanded=false;clearFeed();replaceDisplayRows([],false);state.activeTools.clear();state.toolRows=[];$("queueBlock").hidden=true;
+    const owner=state.item?.id||"phoenix",label=`${knownAgentProfile(owner)?.display_name||"Phoenix"} (${owner})`;
+    renderUser("Earlier question about the LA 2-1 plans.");
+    renderAnswer("This is still the confirmation copy. Nothing has been put in the Doc or submitted.",owner,{created_at:new Date().toISOString(),elapsed_ms:59000});
+    renderUser("ok bro assemble it all, and come to me for confirmation.");
+    const prompt=$("conversationFeed").querySelector(":scope > .user-message:last-of-type");
+    setWorking(true);beginTurnActivity([...$("conversationFeed").querySelectorAll(":scope > .user-message")].at(-1),owner);
+    renderStory({kind:"commentary",agent:owner,text:"MID-TASK NARRATION I am now checking the doc."});
+    for(const [i,word] of ["orchestarting","conundrum","rescueing"].entries()){
+      renderStory({kind:"tool_start",agent:owner,tool:"recall",target:word,call_id:"recall-"+i});
+      renderStory({kind:"tool",agent:owner,tool:"recall",target:word,call_id:"recall-"+i,ok:true,detail:"found"});
+      renderStory({kind:"tool",agent:label,tool:"recall",target:word,call_id:"recall-"+i,ok:true,detail:"found"},true);
+    }
+    renderUser("give me an update, you close?",[],null,{steered:true});
+    renderUser("also in the website I mean",[],null,{steered:true});
+    renderStory({kind:"answer",agent:owner,markdown:"message delivered to Avery (school_coach)"});renderHistory({role:"answer",agent:owner,text:"message delivered to Avery (school_coach)"});
+    renderStory({kind:"tool",agent:owner,tool:"user_update",ok:true,detail:"Almost there: both plans are drafted."});
+    renderStory({kind:"narration",agent:owner,text:"MID-TASK NARRATION two"});
+    renderAnswer("Done, both plans and both paragraphs are filled in your LA 2-1 Doc, using the version you approved.\n\nOpen it to check the wording.",owner,{created_at:new Date().toISOString(),elapsed_ms:61000});
+    if(params.get("working")!=="1")setWorking(false);
+    state.tasks=[{task:"Draft plan",status:"completed"},{task:"Fill Doc",status:"completed"},{task:"Confirm",status:"in-progress"}];renderTasks();
+    if(params.get("ask")==="late"){$("conversationFeed").scrollTop=$("conversationFeed").scrollHeight;await pause(400);state.pinToLatest=false;}
+    if(params.get("ask")!=="0")renderApproval({kind:"ask_pending",id:"mike-repro-ask",agent:owner,questions:[{header:"Approve",question:"Approve this assembled version for the answer boxes in your LA 2-1 Doc?",options:["Approve","Not now"],multi_select:false}]});
+    if(params.get("draft")==="1")renderComposerText("Whether to compress high school or go the middle route.\nFinal university list: Waterloo, Toronto, Stanford, plus one or two more.\nFamily money conversation about US schools.\nWhich social activity to add first.\n\nOk Avery, btw that is ready to submit, submit it.");
+    if(params.get("view"))document.documentElement.dataset.conversationView=params.get("view");
+    syncConversationDetail();
+    await pause(300);if(params.get("ask")!=="late")$("conversationFeed").scrollTop=$("conversationFeed").scrollHeight;
+    document.title="Phoenix mike repro";
+  }
   function runSoftGroupPreview(){
     state.inspectionExpanded=false;clearFeed();replaceDisplayRows([],false);state.activeTools.clear();state.toolRows=[];$("taskBlock").hidden=true;$("queueBlock").hidden=true;
     const prompt=renderUser("@everyone What should make the first public Linux build feel finished?");
@@ -1386,6 +1418,7 @@ export function installConversationPreviews({
     runPreviewWhenDirectoryReady(runImageCommentsProofPreview,420);
   }
   if(preview&&(previewShot==="soft"||new URLSearchParams(location.search).get("scene")==="soft")){runPreviewWhenDirectoryReady(()=>setTimeout(()=>{(previewShot==="group"?runSoftGroupPreview:runSoftChatPreview)();setTimeout(()=>{$("taskBlock").hidden=true;},400);},1200),0);}
+  if(preview&&previewShot==="mike-repro"){runPreviewWhenDirectoryReady(runMikeReproPreview,200);}
   if(preview&&previewShot==="compact-errors-proof"){runPreviewWhenDirectoryReady(runCompactErrorsProof,160);}
   if(preview&&previewShot==="agent-components"){runPreviewWhenDirectoryReady(runAgentComponentsProof,160);}
   if(preview&&previewShot==="worker-presence-proof"){runPreviewWhenDirectoryReady(runWorkerPresenceProof,160);}

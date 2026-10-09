@@ -1689,10 +1689,16 @@ fn effective_turn_delivery(_target_group: Option<&str>, _requested: TurnDelivery
 }
 
 /// Acknowledgement for a user message delivered into a running turn.
-fn steered_turn_summary(session_id: &str, final_markdown: String) -> TurnSummary {
+///
+/// A steer acknowledgement is a delivery receipt, never the agent's answer:
+/// its `final_markdown` stays empty so no client can render the receipt as a
+/// reply ("message delivered to Avery" once showed up as Avery's answer).
+/// The receipt text goes to the gateway log instead.
+fn steered_turn_summary(session_id: &str, receipt: String) -> TurnSummary {
+    glog(&format!("turn [{session_id}]: steer acknowledged ({receipt})"));
     TurnSummary {
         completion: TurnCompletion::Steered,
-        final_markdown,
+        final_markdown: String::new(),
         main_session_id: session_id.to_string(),
         run_id: String::new(),
         trace_path: String::new(),
@@ -3935,6 +3941,47 @@ async fn confirm_direct_channel_response(
     response
 }
 
+/// Remove queued (not yet running) answered-question continuations owned by
+/// the stopped agent (or every one, for "stop all"). Group continuations keep
+/// their own reservation lifecycle and are left to the group cancel path.
+fn drop_queued_answer_continuations(session_id: &str, target: Option<&str>) -> usize {
+    let queued = match super::turn_queue::list(session_id) {
+        Ok(queued) => queued,
+        Err(error) => {
+            glog(&format!("session {session_id}: could not read queued answers on stop: {error:#}"));
+            return 0;
+        }
+    };
+    let mut dropped = 0;
+    for row in queued {
+        if row.state != "queued" || row.target_group.is_some() {
+            continue;
+        }
+        if !matches!(row.origin, Some(crate::runtime::TurnOrigin::AskAnswer { .. })) {
+            continue;
+        }
+        let owned = match (target, row.target_agent.as_deref()) {
+            (None, _) => true,
+            (Some(target), Some(owner)) => crate::runtime::postbox::base_agent(owner) == target,
+            (Some(_), None) => false,
+        };
+        if !owned {
+            continue;
+        }
+        match super::turn_queue::cancel(session_id, &row.queue_id) {
+            Ok(_) => dropped += 1,
+            Err(error) => glog(&format!(
+                "session {session_id}: queued answer {} could not be dropped on stop: {error:#}",
+                row.queue_id
+            )),
+        }
+    }
+    if dropped > 0 {
+        glog(&format!("session {session_id}: stop dropped {dropped} queued answer continuation(s)"));
+    }
+    dropped
+}
+
 /// The caller has already passed the ordinary wire owner check. Removal and
 /// any group settlement commit together before wake; a lost acknowledgement
 /// must not leave other saved prompts behind a stopped queue lane.
@@ -5896,7 +5943,7 @@ async fn handle_connection(stream: UnixStream, turn_locks: TurnLocks) -> Result<
                 &mut write_half,
                 &WireResponse::Done(TurnSummary {
                     completion: TurnCompletion::Steered,
-                    final_markdown: "queued message steered into the current turn".to_string(),
+                    final_markdown: String::new(), // receipt, not an answer: see steered_turn_summary
                     main_session_id: session_id,
                     run_id: queue_id,
                     trace_path: String::new(),
@@ -5925,11 +5972,16 @@ async fn handle_connection(stream: UnixStream, turn_locks: TurnLocks) -> Result<
                 crate::runtime::postbox::cancel_background_agent(&session_id, agent)
             });
             let terminal_cancelled=crate::tools::terminal_jobs::cancel_session(&session_id,target.as_deref())>0;
+            // An answered question can be waiting behind the run being stopped.
+            // Drop it BEFORE the run releases its lane, or it starts seconds
+            // later and the stopped agent "starts working again". Done here so
+            // every Stop (desktop, Esc, TUI) gets it, not only one client.
+            let answers_dropped = drop_queued_answer_continuations(&session_id, target.as_deref());
             let foreground_aborted = {
                 let registry = running_turns().lock().unwrap_or_else(|p| p.into_inner());
                 registry.cancel(&session_id, target.as_deref())
             };
-            let aborted = background_aborted || foreground_aborted;
+            let aborted = background_aborted || foreground_aborted || answers_dropped > 0;
             if target.is_none() {
                 // "Stop all" also drops handoffs still waiting to be delivered,
                 // so the next turn cannot quietly restart the stopped work.
@@ -6136,7 +6188,7 @@ async fn handle_connection(stream: UnixStream, turn_locks: TurnLocks) -> Result<
                                     // Already in the room (delivered or running):
                                     // a retry is acknowledged, never re-run.
                                     completion: TurnCompletion::Steered,
-                                    final_markdown: "message already accepted".to_string(),
+                                    final_markdown: String::new(), // receipt, not an answer: see steered_turn_summary
                                     main_session_id: session_id,
                                     run_id: client_turn_id.to_string(),
                                     trace_path: String::new(),
@@ -6198,11 +6250,12 @@ async fn handle_connection(stream: UnixStream, turn_locks: TurnLocks) -> Result<
                             &steer_body,
                         );
                         let persona = crate::runtime::delegation::agent_display_name(base);
+                        glog(&format!("turn [{session_id}]: message delivered to {persona}"));
                         let _ = send(
                             &mut write_half,
                             &WireResponse::Done(TurnSummary {
                                 completion: TurnCompletion::Steered,
-                                final_markdown: format!("message delivered to {persona}"),
+                                final_markdown: String::new(), // receipt, not an answer: see steered_turn_summary
                                 main_session_id: session_id.clone(),
                                 run_id: String::new(),
                                 trace_path: String::new(),
@@ -6476,11 +6529,12 @@ async fn handle_connection(stream: UnixStream, turn_locks: TurnLocks) -> Result<
                     // what lets the coordinator adopt and route it.
                     crate::runtime::postbox::wake(&session_id);
                     let persona = crate::runtime::delegation::agent_display_name(base);
+                    glog(&format!("turn [{session_id}]: message delivered to {persona}"));
                     let _ = send(
                         &mut write_half,
                         &WireResponse::Done(TurnSummary {
                             completion: TurnCompletion::Steered,
-                            final_markdown: format!("message delivered to {persona}"),
+                            final_markdown: String::new(), // receipt, not an answer: see steered_turn_summary
                             main_session_id: session_id.clone(),
                             run_id: String::new(),
                             trace_path: String::new(),

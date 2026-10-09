@@ -1599,6 +1599,10 @@ pub fn take_steer(session_id: &str, agent: &str) -> Vec<SteerNote> {
 /// renderers hide: this is an authored user message.
 pub const USER_STEER_MARKER: &str = "[New message from the user while you were working — read it now; it may correct, add to, or replace the current task]";
 
+/// Turn-local instruction that follows a one-to-one mid-task user message in
+/// the model request (never persisted). Group rooms use their own framing.
+pub const USER_STEER_REPLY_NOTE: &str = "The user sent the message above while you were working. Before your next work step, reply to it once with a short `user_update` in your own words: answer what they asked (for example where things stand and roughly what is left), or confirm the change or addition and what you will do with it. No canned acknowledgement, and do not repeat that reply in your final answer. If they asked you to stop, wrap up with final_answer instead.";
+
 const USER_STEER_ID_CAP: usize = 256;
 
 /// The durable/model form of a mid-turn user message.

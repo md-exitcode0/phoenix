@@ -832,7 +832,9 @@ function rowMatches(row) {
 
 function humanActivityText(value) {
   // Chat-app messages carry a "[via Telegram · Name]" marker for the coworker.
-  let text=String(value||"").trim().replace(/^\[via (?:Telegram|Discord) · [^\]\n]{1,80}\]\s*/,"").replace(/^\[background return\]\s*/i,"").replace(/\bbackground specialist\b/gi,"coworker").replace(/\bspecialist\b/gi,"coworker");
+  // Notifications are plain text: drop markdown emphasis and a leading
+  // "[role_id]" tag ("**[school_coach]** **You've got...**" showed raw).
+  let text=String(value||"").trim().replace(/\*\*|__|`/g,"").replace(/^\[[a-z0-9_-]{2,40}\]\s*/i,"").replace(/^\[via (?:Telegram|Discord) · [^\]\n]{1,80}\]\s*/,"").replace(/^\[background return\]\s*/i,"").replace(/\bbackground specialist\b/gi,"coworker").replace(/\bspecialist\b/gi,"coworker");
   if(/^\[late ask answer\]/i.test(text))return"Question answered · ready to continue";
   if(/^\[queued wake\]/i.test(text)||/^queued prompt queued_/i.test(text))return"Queued work is ready";
   if(/^Initiating\s+[a-z0-9_-]+\s+call\.?$/i.test(text))return"Starting the next action";
@@ -1445,6 +1447,8 @@ function showZoomLevel(factor) {
   showZoomLevel.timer = setTimeout(() => pill.classList.remove("visible"), 1200);
 }
 window.__TAURI__?.event?.listen?.("app-zoom", (event) => showZoomLevel(Number(event.payload?.factor)));
+// Remember the last keyboard/pointer input inside the window (see below).
+for(const type of ["keydown","pointerdown"])document.addEventListener(type,()=>{window.__phoenixLastLocalInput=Date.now();},true);
 // A clicked notification opens its conversation.
 window.__TAURI__?.event?.listen?.("open-conversation", (event) => {
   const kind = String(event.payload?.kind || ""), id = String(event.payload?.id || "");
@@ -1454,7 +1458,12 @@ window.__TAURI__?.event?.listen?.("open-conversation", (event) => {
   // Finishing a question must not lose focus to an unrelated notification.
   // Offer its destination explicitly; never replay it after the submission.
   const focusedRequest=document.activeElement?.closest?.(".approval-card"),busyRequest=document.querySelector("#approvalStack .approval-card[aria-busy='true']");
-  if(!sameItem(item,state.selected)&&(focusedRequest||busyRequest)){
+  // A desktop-notification "open" that lands right after the user typed or
+  // clicked inside Phoenix is not theirs (Enter on a question or the vault
+  // unlock used to jump to whichever coworker had just notified). Offer it
+  // as an in-app notice instead of switching conversations under them.
+  const recentLocalInput=Date.now()-(window.__phoenixLastLocalInput||0)<2500;
+  if(!sameItem(item,state.selected)&&(focusedRequest||busyRequest||recentLocalInput)){
     notify({title:`Open ${displayName(item)||"conversation"}`,body:"You’re answering another coworker. Open this notification when you’re ready.",item,key:`open:${kind}:${id}`});return;
   }
   selectItem(item);

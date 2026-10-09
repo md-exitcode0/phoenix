@@ -817,7 +817,7 @@ fn render_user_intent(lines: &[String]) -> String {
         return String::new();
     }
     format!(
-        "\n\n{USER_INTENT_HEADER}\nDeterministic excerpts from the user's own prompts. User-reported completions and corrections are authoritative state: never reopen completed work merely because an older external row or summary is stale. Preserve scope and constraints; use `recall` when an excerpt ends in `...`.\n{}",
+        "\n\n{USER_INTENT_HEADER}\nDeterministic excerpts from the user's own prompts. User-reported completions and corrections are authoritative state: never reopen completed work merely because an older external row or summary is stale. Preserve scope and constraints; when an excerpt ends in `...` and the cut-off part matters for your next step, use one targeted `recall` for it.\n{}",
         lines.join("\n")
     )
 }

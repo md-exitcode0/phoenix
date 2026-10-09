@@ -1,4 +1,4 @@
-/* User-directed correction on the existing MonoCode skin. */
+/* User-directed correction on the existing Phoenix skin. */
 /* Layered important radius wins legacy component-specific pills/squares.
    Avatar artwork remains circular; only the working activity button is exempt. */
 @layer mc-control-radius {
@@ -16,7 +16,7 @@
 :root[data-skin="phoenix"] .mc-window-controls {position:fixed;top:0;right:0;left:auto;height:34px;display:flex!important;z-index:1500;margin:0;align-self:auto;transform:none}
 :root[data-skin="phoenix"] #conversationHeader {padding-right:114px}
 :root[data-skin="phoenix"] :is(.ph-tab-pill,.row-glide) {border-radius:var(--mc-button-radius)}
-/* MonoCode's neutral pill uses one label. The inverted cloned label belongs
+/* The neutral pill uses one label. The inverted cloned label belongs
    to the original ink-filled skin and produced a second misaligned Dark. */
 :root[data-skin="phoenix"] .ph-tabs .ph-tab-label {display:none!important}
 :root[data-skin="phoenix"] .ph-tabs .ph-tab-pill {background:var(--mc-selection)!important}

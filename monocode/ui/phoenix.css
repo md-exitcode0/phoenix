@@ -1,4 +1,4 @@
-/* MonoCode v0.3.0 presentation adaptation for Phoenix's actual DOM/controllers.
+/* Phoenix presentation layer (originally adapted from a v0.3.0 skin) for Phoenix's actual DOM/controllers.
    Derived spacing/tokens: source tree c9cdc577, MIT; legal notices in reference/.
    This stylesheet never changes gateway/config/profile state. */
 :root[data-skin="phoenix"]{--mc-bg:#171717;--mc-ink:#ebebeb;--mc-muted:#a4a4a4;--mc-line:rgb(235 235 235 / 9%);--mc-selection:rgb(235 235 235 / 8%);--sidebar-width:264px;--bg:transparent;--surface:#202020;--surface-raised:#262626;--surface-muted:#202020;--hover:#2c2c2c;--ink:var(--mc-ink);--ink-soft:var(--mc-muted);--ink-faint:#939393;--line:var(--mc-line);--line-strong:#555;--font:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--ember:#b2b2b2;--feed-max:896px;--composer-max:896px;--chrome-h:0px}
@@ -138,3 +138,9 @@
 [data-skin="phoenix"] #permissionButton strong{display:inline!important}
 @media(max-width:760px){[data-skin="phoenix"] .mc-empty #fluffyHero{transform:translate(-50%,-256px)}[data-skin="phoenix"] .settings-sidebar{width:auto;border-right:0;padding:12px 16px}[data-skin="phoenix"] #termPanel{grid-column:1/-1;width:100%}}
 @media(prefers-reduced-motion:reduce){[data-skin="phoenix"] *,[data-skin="phoenix"] *::before,[data-skin="phoenix"] *::after{transition:none!important;animation:none!important}}
+/* Toasts used to sit at top:10px right:18px, exactly over the terminal and
+   sidebar toggles and the window minimize/maximize/close buttons, so clicks on
+   those controls hit the toast instead (#135/#216/#258/#260). Keep them below
+   the top control row, and over the chat column while the side panel is open. */
+[data-skin="phoenix"] .toast-region{top:62px;right:18px}
+[data-skin="phoenix"] body.inspection-open:not(.inspection-expanded):not(.inspection-stacked) .toast-region{right:calc(min(var(--inspection-width,520px),100vw - var(--workspace-left,0px)) + 10px)}

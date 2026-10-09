@@ -437,6 +437,10 @@ fn everyone_mission_converges_once_after_all_members_report() {
         member("critic", State::Done, Some("r-remy")),
         member("marketing", State::Done, Some("r-rory")),
     ]);
+    // Only members the leader's posted plan woke owe it a result.
+    for member in record.members.iter_mut().skip(1) {
+        member.source_receipt_id = Some("r-tibo".into());
+    }
     assert!(coord::convergence_inputs(&record, "phoenix").is_none(), "Robin still working");
     record.members[2].state = State::Done;
     record.members[2].receipt_id = Some("r-robin".into());
@@ -453,6 +457,9 @@ fn a_member_that_errors_or_times_out_does_not_wedge_the_room() {
         member("critic", State::Done, Some("r-remy")),
         member("marketing", State::Done, Some("r-rory")),
     ]);
+    for member in record.members.iter_mut().skip(1) {
+        member.source_receipt_id = Some("r-tibo".into());
+    }
     // The leader converges with what it has (Robin's failure is on the ledger).
     assert_eq!(coord::convergence_inputs(&record, "phoenix").unwrap().len(), 4);
     // If the leader itself failed, nothing converges and nobody loops.

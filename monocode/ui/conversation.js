@@ -941,6 +941,9 @@
     const value=String(text||"").trim().toLowerCase();
     return value.startsWith("[late ask answer]") || value.startsWith("[queued wake]") || value.startsWith("queued prompt queued_") || /^leader convergence for turn (?:turn_|leader[-_])/.test(value) || /^initiating\s+[a-z0-9_-]+\s+call\.?$/i.test(value);
   }
+  // The gateway answers a message delivered into a coworker's running turn
+  // with "message delivered to Avery". That is a receipt, never a reply.
+  function isDeliveryReceiptText(text){return /^message delivered to [^\n]{1,80}$/i.test(String(text||"").trim());}
   function askAnswerPrompt(value) {
     const row=value&&typeof value==="object"?value:{text:value},origin=row.origin||null;
     if(origin?.kind==="ask_answer")return{detail:String(origin.display||row.text||"").trim(),askId:origin.ask_id||"",agentId:origin.agent_id||""};
@@ -1974,8 +1977,18 @@
       // archive receipts into the newest turn.
       const lastBoundary=recovered.findLastIndex(({entry,match})=>match&&displayRole(entry)==="user");
       if(lastBoundary<0)return{added:[],reordered:false};
+      // A receipt already on screen for this turn is the same call even when
+      // its saved copy carries a different turn id (a mid-task message moves
+      // the recovered turn). Consume it one-for-one instead of printing every
+      // tool a second time without its details.
+      const boundaryRow=state.displayRows.indexOf(recovered[lastBoundary].match.entry);
+      const liveTools=available.filter(({entry,used})=>!used&&displayRole(entry)==="tool"&&state.displayRows.indexOf(entry)>boundaryRow);
       recovered.slice(lastBoundary+1).forEach(({entry,match})=>{
         if(match||isCompactionEvent(entry.value))return;
+        if(displayRole(entry)==="tool"){
+          const row=entry.value||{},same=liveTools.find(candidate=>!candidate.used&&String(candidate.entry.value?.tool||"")===String(row.tool||"")&&(candidate.entry.value?.ok!==false)===(row.ok!==false)&&compatibleToolTargets(candidate.entry.value?.target,row.target));
+          if(same){same.used=true;return;}
+        }
         state.displayRows.push(entry);added.push(entry);
       });
       if(added.length)replaceDisplayRows(ensureDisplayTurnIds(trimDisplayRows(state.displayRows)),true);
@@ -3061,6 +3074,9 @@
       feed?.querySelectorAll(".answer-work-toggle").forEach((button)=>button.setAttribute("aria-expanded",String(visible)));
     }
     feed?.querySelectorAll(".work-tool").forEach((row)=>setToolRowDisclosure(row,detailedConversationView()));
+    // Chat only hides work rows between messages; regroup so consecutive
+    // prompts sit close together in either mode.
+    syncMessageGroups();
     const saved=visualScrollBookmark;visualScrollBookmark=null;
     if(saved&&saved.key===conversationIdentity())restoreConversationScroll(saved.bookmark,saved.key);
   }
@@ -3911,7 +3927,7 @@
       case "diff": break;
       case "ask_pending": renderApproval(event); break;
       case "answer":
-        if(isInternalRuntimeText(event.markdown))break;
+        if(isInternalRuntimeText(event.markdown)||isDeliveryReceiptText(event.markdown))break;
         if(runtimeFailureSummary(event.markdown)){renderRuntimeFailure(event.markdown,event.agent);break;}
         if(isTransientProviderBoundary(event.markdown)){clearProviderRetry();break;}
         if(!replay&&!state.painting)finishTurnActivity();
@@ -3947,7 +3963,7 @@
     const owner=row.agent||state.item?.id||"phoenix";
     const askAnswer=askAnswerPrompt(row);if(isInternalRuntimeText(row.text)&&!askAnswer)return;
     if (row.role === "user") {if(!renderGroupContinuationTurn(row)&&!renderAskAnswerTurn(row)&&!renderScheduledTurn(row)){const node=renderUser(row.text,Array.isArray(row.attachments)?row.attachments:[],row.queued_id?{id:row.queued_id,canonical:Boolean(row.queued_canonical)}:null,{steered:Boolean(row.steered)});if(node&&row.steer_id)node.dataset.steerId=row.steer_id;}}
-    else if (row.role === "answer") {if(state.item?.kind==="group")return;renderAnswer(row.text, row.agent, row.meta);}
+    else if (row.role === "answer") {if(state.item?.kind==="group"||isDeliveryReceiptText(row.text))return;renderAnswer(row.text, row.agent, row.meta);}
     else if (row.role === "narration" && !isReasoningSummaryText(row.text)) renderAgentUpdate(owner, row.text, true);
     else if (row.role === "commentary" && !isReasoningSummaryText(row.text)) renderAgentUpdate(owner, row.text);
     else if (row.role === "context") return;
@@ -5046,7 +5062,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   // (the gateway then runs it as a normal turn on that same socket).
   function bindTurnSocket(socket,request,turnToken,submittedDraft=null){
     const session=turnToken.sessionId;
-    socket.onmessage=async(message)=>{if(state.turnSocket!==socket||!selectionIsCurrent(turnToken))return;try{const value=JSON.parse(message.data);if(value.Error&&!value.Story&&!value.Done)restoreUnackedDraft(request,turnToken);if(value.Story||value.Done)acknowledgeSubmission(request,submittedDraft,turnToken);consumeFluffyWire(value,fluffyContext());if(value.Done && ["completed","canceled","stopped"].includes(value.Done.completion)) window.PhoenixFluffies?.terminal(value.Done.completion === "canceled" ? "canceled" : value.Done.completion === "completed" ? "turn_completed" : "stopped", {agentId:turnToken.owner.kind==="agent"?turnToken.owner.id:null,owner:turnToken.owner,sessionId:session,execution:window.PhoenixFluffies.activity.snapshot(turnToken.owner.id).execution,turnId:request.turnId},value.Done);if(value.Error)window.PhoenixFluffies?.terminal("error",{agentId:turnToken.owner.kind==="agent"?turnToken.owner.id:null,owner:turnToken.owner,sessionId:session,execution:window.PhoenixFluffies.activity.snapshot(turnToken.owner.id).execution,turnId:request.turnId},value.Error);if(consumeVolumeWorkerLifecycle(value))return;if(value.Story)renderStory(value.Story);if(value.Done?.completion==="queued"){finishTurn(socket,true,turnToken);return;}if(value.Done){const final=value.Done.final_markdown;if(state.item?.kind!=="group"&&final&&!isCompactionText(final)&&state.pendingAnswer?.text!==visibleAnswerText(final,targetAgent()||"phoenix")&&appendDisplay("history",{role:"answer",text:final,agent:targetAgent()||"phoenix"},true))renderAnswer(final);await settleAnswerMeta();if(!selectionIsCurrent(turnToken))return;if(state.item?.kind!=="group"&&!state.turnUsageSeen&&value.Done.context_window){const selected=selectedModelContext().effective,reported=value.Done.context_window[1],limit=selected?Math.min(selected,reported):reported;updateContext(value.Done.context_window[0],limit);}finishTurn(socket,terminalPreservesUnfinished(value.Done),turnToken);}if(value.Error){renderStory(turnFailureCard(value.Error,targetAgent()||"phoenix"));finishTurn(socket,true,turnToken);}}catch(error){if(selectionIsCurrent(turnToken))ui.toast(String(error),true);}};
+    socket.onmessage=async(message)=>{if(state.turnSocket!==socket||!selectionIsCurrent(turnToken))return;try{const value=JSON.parse(message.data);if(value.Error&&!value.Story&&!value.Done)restoreUnackedDraft(request,turnToken);if(value.Story||value.Done)acknowledgeSubmission(request,submittedDraft,turnToken);consumeFluffyWire(value,fluffyContext());if(value.Done && ["completed","canceled","stopped"].includes(value.Done.completion)) window.PhoenixFluffies?.terminal(value.Done.completion === "canceled" ? "canceled" : value.Done.completion === "completed" ? "turn_completed" : "stopped", {agentId:turnToken.owner.kind==="agent"?turnToken.owner.id:null,owner:turnToken.owner,sessionId:session,execution:window.PhoenixFluffies.activity.snapshot(turnToken.owner.id).execution,turnId:request.turnId},value.Done);if(value.Error)window.PhoenixFluffies?.terminal("error",{agentId:turnToken.owner.kind==="agent"?turnToken.owner.id:null,owner:turnToken.owner,sessionId:session,execution:window.PhoenixFluffies.activity.snapshot(turnToken.owner.id).execution,turnId:request.turnId},value.Error);if(consumeVolumeWorkerLifecycle(value))return;if(value.Story)renderStory(value.Story);if(value.Done?.completion==="queued"){finishTurn(socket,true,turnToken);return;}if(value.Done?.completion==="steered"){const entry=state.displayRows.find((row)=>displayRole(row)==="user"&&displayTurnId(row)===request.turnId);if(entry){entry.value.steered=true;state.displayDirty=true;scheduleDisplayPersist();}markSteeredNode([...$("conversationFeed").querySelectorAll(":scope > .user-message")].find((node)=>node.dataset.turnId===request.turnId),true);finishTurn(socket,true,turnToken);syncSelectedLiveActivity();return;}if(value.Done){const final=value.Done.final_markdown;if(state.item?.kind!=="group"&&final&&!isCompactionText(final)&&state.pendingAnswer?.text!==visibleAnswerText(final,targetAgent()||"phoenix")&&appendDisplay("history",{role:"answer",text:final,agent:targetAgent()||"phoenix"},true))renderAnswer(final);await settleAnswerMeta();if(!selectionIsCurrent(turnToken))return;if(state.item?.kind!=="group"&&!state.turnUsageSeen&&value.Done.context_window){const selected=selectedModelContext().effective,reported=value.Done.context_window[1],limit=selected?Math.min(selected,reported):reported;updateContext(value.Done.context_window[0],limit);}finishTurn(socket,terminalPreservesUnfinished(value.Done),turnToken);}if(value.Error){renderStory(turnFailureCard(value.Error,targetAgent()||"phoenix"));finishTurn(socket,true,turnToken);}}catch(error){if(selectionIsCurrent(turnToken))ui.toast(String(error),true);}};
     socket.onerror=()=>{restoreUnackedDraft(request,turnToken);if(state.turnSocket!==socket||!selectionIsCurrent(turnToken))return;renderStory({kind:"card",agent:targetAgent()||"phoenix",subject:"Connection lost",body:"Phoenix could not reach the local runtime. Your message remains visible here.",ok:false});finishTurn(socket,true,turnToken);};
     socket.onclose=()=>{
       restoreUnackedDraft(request,turnToken);
@@ -6767,9 +6783,20 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
       if(preview||document.hidden||!state.item||state.quietCatchUpBusy)return;
       const activity=ui.activityFor?.(state.item);
       if(!LIVE_CONVERSATION_STATUSES.has(activity?.status))return;
+      // This window's own turn streams over its turn socket; re-reading the
+      // whole saved history every few seconds on top of it froze the UI and
+      // printed receipts twice.
+      if(state.turnSocket)return;
       if(Date.now()-(state.lastJournalEventAt||0)<4000)return;
+      // Each read parses the whole saved history. Back off while reads find
+      // nothing new (4s, 8s, 16s, then every 30s) so a long quiet task does
+      // not stall the window every few seconds.
+      const key=conversationIdentity(),quiet=state.quietCatchUpBackoff?.key===key?state.quietCatchUpBackoff:{key,misses:0,at:0};
+      if(Date.now()-quiet.at<Math.min(30000,4000*2**quiet.misses))return;
+      quiet.at=Date.now();state.quietCatchUpBackoff=quiet;
+      const before=state.displayRows.length;
       state.quietCatchUpBusy=true;
-      catchUpConversation(activeSelectionToken(),{quiet:true}).finally(()=>{state.quietCatchUpBusy=false;});
+      catchUpConversation(activeSelectionToken(),{quiet:true}).finally(()=>{state.quietCatchUpBusy=false;quiet.misses=state.displayRows.length===before?Math.min(quiet.misses+1,3):0;});
     },4000);
   }
   function bind(){
@@ -6935,6 +6962,11 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     if ("ResizeObserver" in window) {
       let composerResizeFrame=0,lastComposerWidth=-1;const composerObserver=new ResizeObserver(entries=>{const width=entries[0]?.contentRect.width;if(Math.abs(width-lastComposerWidth)<.5)return;lastComposerWidth=width;if(composerResizeFrame)return;composerResizeFrame=requestAnimationFrame(()=>{composerResizeFrame=0;syncComposerDensity();autosize();});});composerObserver.observe($("composer"));addEventListener("pagehide",()=>{composerObserver.disconnect();cancelAnimationFrame(composerResizeFrame);},{once:true});
       let endResizeFrame=0;const endObserver=new ResizeObserver(()=>{if(endResizeFrame)return;endResizeFrame=requestAnimationFrame(()=>{endResizeFrame=0;syncComposerEnd();});});endObserver.observe($("composerZone"));addEventListener("pagehide",()=>{endObserver.disconnect();cancelAnimationFrame(endResizeFrame);},{once:true});
+      // A question card, the to-dos or a long draft grows the composer and
+      // shrinks the transcript from below. If the reader was at the newest
+      // message, keep it there instead of leaving the final answer cut off
+      // behind the card.
+      let feedViewHeight=-1;const feedObserver=new ResizeObserver(()=>{const feed=$("conversationFeed"),height=feed.clientHeight,shrink=feedViewHeight-height;feedViewHeight=height;if(shrink<=0||feed.hasAttribute("aria-busy"))return;if(state.working&&performance.now()<state.turnFocusUntil)return;if(feedSlack(feed)-shrink<48){feed.scrollTop=feed.scrollHeight-height;state.pinToLatest=true;}});feedObserver.observe($("conversationFeed"));addEventListener("pagehide",()=>feedObserver.disconnect(),{once:true});
       new ResizeObserver(scheduleBrowserResize).observe($("browserViewport"));
       new ResizeObserver(()=>{if(state.activeInspectionImageId)renderImageCommentState();}).observe($("inspectionImageCanvas"));
       new ResizeObserver(()=>{syncWorkspaceLeft();if(state.inspectionOpen&&state.inspectionExpanded)scheduleNativeBrowserBounds();}).observe($("companySidebar"));

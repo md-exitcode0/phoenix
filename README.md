@@ -59,7 +59,7 @@ agent's latest observation.
 | `vendor/` | vendored memory, browser, and TasteCode design runtime dependencies |
 | `desktop/` | GNOME helpers (AT-SPI bridge, shell extension) |
 | `canvas-app/` | native desktop services and Chromium/Electron shell |
-| `monocode/` | Phoenix frontend, pinned character assets, and source launcher |
+| `monocode/` | Phoenix frontend, pinned character assets, and source launcher (legacy folder name only; the app is Phoenix) |
 | `tests/` | integration tests |
 | `scripts/` | runtime helpers and verification scripts |
 | `examples/` | standalone runtime examples and diagnostics |

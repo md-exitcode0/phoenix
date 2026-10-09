@@ -1126,8 +1126,11 @@ fn activity_for(
 ) -> Result<SidebarActivity> {
     live_jobs.sort_by_key(|job| job.as_of_seq);
     live_activity.sort_by_key(|activity| activity.updated_at.as_str());
+    // The sidebar polls this view every few seconds. Parse each transcript
+    // only when its file changed instead of re-reading every coworker's whole
+    // history on every poll.
     let session = canonical_session_id
-        .map(read_session)
+        .map(session_digest)
         .transpose()?
         .flatten();
     let transcript_revision = session
@@ -1135,7 +1138,10 @@ fn activity_for(
         .map(|session| session.transcript_revision)
         .unwrap_or(0);
     let last_read_revision = markers.get(&item).copied().unwrap_or(0);
-    let recent_prompts = session.as_ref().map(recent_prompts).unwrap_or_default();
+    let recent_prompts = session
+        .as_ref()
+        .map(|session| session.recent_prompts.clone())
+        .unwrap_or_default();
     let title = recent_prompts
         .last()
         .map(|prompt| prompt.preview.clone())
@@ -1219,6 +1225,64 @@ fn read_session(session_id: &str) -> Result<Option<crate::session::Session>> {
         &crate::config::paths::phoenix_sessions_root(),
         session_id,
     )
+}
+
+/// The few transcript facts the sidebar activity view needs.
+#[derive(Debug, Clone)]
+struct SessionDigest {
+    transcript_revision: u64,
+    recent_prompts: Vec<PromptRailEntry>,
+    title: Option<String>,
+    model: String,
+}
+
+const MAX_SESSION_DIGESTS: usize = 512;
+
+fn session_digest(session_id: &str) -> Result<Option<SessionDigest>> {
+    use std::sync::{Mutex, OnceLock};
+    type DigestCache = HashMap<std::path::PathBuf, (u64, std::time::SystemTime, SessionDigest)>;
+    static CACHE: OnceLock<Mutex<DigestCache>> = OnceLock::new();
+    let path = crate::config::paths::phoenix_sessions_root().join(format!("{session_id}.json"));
+    // Stat BEFORE reading: a write that lands in between yields a newer stamp
+    // on the next poll, so a cached digest can never hide a later change.
+    let stamp = std::fs::symlink_metadata(&path)
+        .ok()
+        .filter(|metadata| metadata.is_file() && !metadata.file_type().is_symlink())
+        .and_then(|metadata| metadata.modified().ok().map(|modified| (metadata.len(), modified)));
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    // Two saves inside the filesystem's timestamp granularity can share a
+    // stamp, so only a file that has been quiet for a moment is trusted to
+    // the cache; a session being written right now is always re-read.
+    let settled = stamp.is_some_and(|(_, modified)| {
+        modified
+            .elapsed()
+            .is_ok_and(|age| age >= std::time::Duration::from_secs(2))
+    });
+    if let Some((len, modified)) = stamp.filter(|_| settled) {
+        let cached = cache.lock().unwrap_or_else(|p| p.into_inner()).get(&path).cloned();
+        if let Some((cached_len, cached_modified, digest)) = cached {
+            if cached_len == len && cached_modified == modified {
+                return Ok(Some(digest));
+            }
+        }
+    }
+    let Some(session) = read_session(session_id)? else {
+        return Ok(None);
+    };
+    let digest = SessionDigest {
+        transcript_revision: session.transcript_revision,
+        recent_prompts: recent_prompts(&session),
+        title: session.title.clone(),
+        model: session.model.clone(),
+    };
+    if let Some((len, modified)) = stamp {
+        let mut cache = cache.lock().unwrap_or_else(|p| p.into_inner());
+        if cache.len() >= MAX_SESSION_DIGESTS && !cache.contains_key(&path) {
+            cache.clear();
+        }
+        cache.insert(path, (len, modified, digest.clone()));
+    }
+    Ok(Some(digest))
 }
 
 fn canonical_session(store: &CompanyStore, item: &SidebarItemKey) -> Result<Option<String>> {

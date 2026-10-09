@@ -42,13 +42,13 @@ body.sidebar-collapsed .sidebar-wake .phoenix-raster-logo{width:18px!important;h
 .inspection-browser-tabs .browser-owner-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;height:24px;margin-right:4px;padding:0 9px 0 3px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);font-size:11px;font-weight:600;white-space:nowrap}
 .inspection-browser-tabs .browser-owner-chip svg{width:18px;height:18px;flex:0 0 18px;stroke:none}
 
-/* Keep the answer's explicit work toggle authoritative in all MonoCode views. */
+/* Keep the answer's explicit work toggle authoritative in all Phoenix views. */
 :root[data-skin="phoenix"][data-conversation-view] body #conversationFeed .work-cluster.work-folded{display:none!important}
 :root[data-skin="phoenix"][data-conversation-view] body #conversationFeed .work-cluster.group-work-expanded:not(.work-folded){display:block!important}
 :root[data-skin="phoenix"][data-conversation-view] body #conversationFeed .work-cluster.group-work-expanded:not(.work-folded)>.work-trace{display:block!important}
 :root[data-skin="phoenix"][data-conversation-view] body #conversationFeed .work-cluster:not(.team-work-row)>.group-work-agent{display:none!important}
 
-/* Motion patch: anchor the retained MonoCode control above all composer cards. */
+/* Motion patch: anchor the retained Phoenix control above all composer cards. */
 :root[data-skin="phoenix"] #composerZone #jumpLatest{position:absolute;z-index:40;left:50%;right:auto;top:auto;bottom:calc(100% + 10px);margin:0;transform:translateX(-50%);pointer-events:auto}
 :root[data-skin="phoenix"] #conversationHeader.has-group-pals{z-index:3;overflow:visible}
 

@@ -66,7 +66,7 @@
  .fluffy-preview-picture img,.fluffy-preview-picture canvas{width:110px;height:110px}
  .avatar-studio[data-avatar-mode="fluffy"] .avatar-studio-preview>i,.fluffy-studio-mirror{width:104px;height:104px;flex-basis:104px}
 }
-/* Override the later MonoCode compact-dialog rules only for this editor. */
+/* Override the later compact-dialog rules only for this editor. */
 #modalLayer .modal:has(.avatar-fluffy-controls){width:min(980px,calc(100vw - 40px));max-width:980px}
 #modalLayer #editForm .fluffy-preview-grid button{grid-template-rows:136px auto;padding:10px}
 #modalLayer #editForm .fluffy-preview-picture{height:136px}

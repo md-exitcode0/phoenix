@@ -479,7 +479,10 @@ html:root[data-skin="phoenix"] #fluffyHero::before{background:var(--glass-1)!imp
 html:root[data-skin="phoenix"][data-theme="light"] #fluffyHero::before{box-shadow:0 10px 36px rgb(60 66 120 / 12%)!important}
 html:root[data-skin="phoenix"] #conversationStage.mc-empty.has-fluffy #fluffyHero{margin-bottom:22px!important}
 /* Steered messages keep their label stacked over the bubble. */
-html:root[data-skin="phoenix"] #conversationFeed .user-message.steered-message>.message-content{flex-direction:column;align-items:flex-end;gap:4px}
+/* Mid-task messages keep delete beside the bubble (not on its own row above
+   it) and put "Delivered mid-task" on a short second line. */
+html:root[data-skin="phoenix"] #conversationFeed .user-message.steered-message>.message-content{flex-direction:row;flex-wrap:wrap;justify-content:flex-end;align-items:center;column-gap:6px;row-gap:2px}
+html:root[data-skin="phoenix"] #conversationFeed .user-message.steered-message>.message-content>.steered-label{flex:0 0 100%;text-align:right;line-height:1.2}
 html:root[data-skin="phoenix"] #conversationFeed .user-message .steered-label{font:500 11px var(--soft-font);color:var(--soft-ink-3);margin-right:8px}
 /* Delete controls stay out of sight until the row is hovered or focused. */
 html:root[data-skin="phoenix"] #conversationFeed .work-cluster>.work-delete-button{opacity:0!important;transition:opacity .18s}

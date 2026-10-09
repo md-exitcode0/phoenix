@@ -1221,6 +1221,12 @@ pub fn queue_leader_convergence(store: &super::company::CompanyStore, group: &Gr
     let Some(leader) = group.leader_agent_id.clone() else { return Ok(false) };
     let Some(ledger) = store.group_turn(&group.canonical_session_id, turn_id)? else { return Ok(false) };
     let Some(receipts) = convergence_inputs(&ledger, &leader) else { return Ok(false) };
+    let single_dispatch = ledger
+        .members
+        .iter()
+        .filter(|member| member.participant.agent_id != leader && member.source_receipt_id.is_some())
+        .count()
+        == 1;
     let snapshot = store.directory_snapshot()?;
     let intent = super::group_conversation::preview_group_activation(&snapshot, &group.group_id, &format!("@{leader}"))?.intent();
     anyhow::ensure!(intent.active_agent_ids == vec![leader.clone()], "leader convergence could not target the leader alone");
@@ -1230,6 +1236,17 @@ pub fn queue_leader_convergence(store: &super::company::CompanyStore, group: &Gr
         let now = Utc::now().to_rfc3339();
         ensure_mission_row(connection, &group.group_id, &now)?;
         let board = load_board(connection, &group.group_id)?;
+        // A quick ask the leader handed to ONE member (no blind diverge round,
+        // no plan item behind it) is already answered by that member's room
+        // reply. A convergence turn would only restate it: the "why converge?
+        // that was just a simple question" leftover and the double delivery.
+        let plan_work = board.results.iter().any(|entry| {
+            entry.plan_item_id.is_some()
+                && receipts.iter().any(|receipt| entry.text.ends_with(receipt.as_str()))
+        });
+        if !chained && single_dispatch && receipts.len() == 1 && !board.diverge.open && !plan_work {
+            return Ok(false);
+        }
         let cycles = if chained { board.leader_cycles + 1 } else { 1 };
         if cycles > MAX_LEADER_CYCLES {
             append_entry(connection, &group.group_id, "decision", &leader,
