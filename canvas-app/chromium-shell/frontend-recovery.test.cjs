@@ -39,3 +39,13 @@ test("accepted renderer recovery reattaches the same native surface exactly once
 test("recovery does not reveal a hidden or minimized window",async()=>{for(const property of ["visible","minimized"]){const f=fixture();f.stall();f.tick();f.answer(0);await flush();f.window[property]=property==="minimized";f.contents.emit("did-finish-load");assert.deepEqual(f.window.actions,[]);f.control.dispose();}});
 test("recovery preserves another window's focus",async()=>{const f=fixture();f.window.focused=false;f.stall();f.tick();f.answer(0);await flush();f.contents.emit("did-finish-load");assert.deepEqual(f.window.actions,["hide","showInactive"]);f.control.dispose();});
 test("ordinary navigation never remaps the native window",()=>{const f=fixture();f.contents.emit("did-finish-load");assert.deepEqual(f.window.actions,[]);f.control.dispose();});
+test("crash diagnostics retain the original renderer, reason and exit code after recovery",async()=>{
+ const f=fixture();f.contents.emit("did-finish-load");f.contents.pid=0;f.contents.crashed=true;
+ f.contents.emit("render-process-gone",{}, {reason:"crashed",exitCode:133});
+ const failure=f.control.status().lastFailure;
+ assert.equal(failure.pid,42);assert.equal(failure.reason,"crashed");assert.equal(failure.exitCode,133);
+ assert.ok(Number.isFinite(Date.parse(failure.at)));
+ f.tick();f.answer(0);await flush();f.contents.pid=44;f.contents.crashed=false;f.contents.emit("did-finish-load");
+ assert.deepEqual(f.control.status().lastFailure,failure);assert.equal(f.control.status().stalled,false);
+ assert.deepEqual(f.other.actions,[]);f.control.dispose();
+});

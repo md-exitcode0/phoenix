@@ -84,6 +84,8 @@ Phoenix rooms include a configurable leader, coworker avatars, and messages deli
 
 Settings → Passes manages encrypted logins, cards, and keys. Coworkers can request and use passes through typed tools; see [docs/passes.md](docs/passes.md). Closing the desktop window hides Phoenix to the tray, where **Quit Phoenix** stops the runtime.
 
+For frontend development, save changes and load them through an ordinary interface reload after the user authorizes it. Do not replace running function bindings through `Debugger.evaluateOnCallFrame` or `Debugger.setScriptSource`. An interface reload retains the gateway and private browser tabs; restarting the app or gateway requires separate authorization while coworkers are working. The native recovery dialog handles a stalled or crashed interface independently of its renderer.
+
 ## Cross-platform
 
 Linux is the current release target. The core runtime and Tauri UI are structured for Windows and macOS ports; native desktop control, notification delivery, process supervision, and credential integration have platform-specific implementations.

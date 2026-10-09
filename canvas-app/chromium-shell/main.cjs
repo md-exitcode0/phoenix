@@ -6,6 +6,7 @@ const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const frontendRecovery = require("./frontend-recovery.cjs");
 const rendererResources = require("./renderer-resources.cjs");
+const rendererEvents = require("./renderer-events.cjs");
 const { WebSocketServer, WebSocket } = require("ws");
 const { captureScreenshot, prepareInput, restoreViewport } = require("./browser-capture.cjs");
 const {
@@ -180,7 +181,8 @@ function surfaceStatus(entry, reason = null) {
 }
 
 function emit(name, payload) {
-  if (!mainWindow?.isDestroyed()) mainWindow.webContents.send("phoenix:event", name, payload);
+  const contents = mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents : null;
+  return rendererEvents.send(contents, name, payload);
 }
 
 function rejectBridgeRequests(message, socket = null) {

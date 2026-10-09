@@ -14,6 +14,7 @@ function install(window, {
   let closed = false, stalled = false, prompted = false, recovering = false;
   let generation = 0, timer = null, question = null, lastError = null;
   let remapAfterLoad = false;
+  let lastRendererPid = contents.getOSProcessId(), lastFailure = null;
 
   function clearPending() {
     generation++;
@@ -81,6 +82,7 @@ function install(window, {
     recovering = false;
   }
   function onLoaded() {
+    lastRendererPid = contents.getOSProcessId();
     // On Wayland a replaced renderer can have a healthy DOM but receive no
     // animation frames until the existing native surface is mapped again.
     // Retain the window and all child views; only refresh its mapping after
@@ -107,7 +109,9 @@ function install(window, {
     void offerRecovery(generation);
   }
   function onGone(_event, details) {
-    log("interface renderer ended (" + (details?.reason || "unknown") + ")");
+    lastFailure = { reason:details?.reason || "unknown", exitCode:details?.exitCode ?? null,
+      pid:contents.getOSProcessId() || lastRendererPid, at:new Date().toISOString() };
+    log("interface renderer ended " + JSON.stringify(lastFailure));
     if (!recovering) onStalled();
   }
   function dispose() {
@@ -123,7 +127,8 @@ function install(window, {
     delete contents[RECOVERY];
   }
   const control = Object.freeze({
-    status: () => ({ stalled, prompted, recovering, lastError }), dispose,
+    status: () => ({ stalled, prompted, recovering, lastError,
+      lastFailure:lastFailure ? {...lastFailure} : null }), dispose,
   });
   contents[RECOVERY] = control;
   contents.on("unresponsive", onStalled);
