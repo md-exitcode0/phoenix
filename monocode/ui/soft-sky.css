@@ -33,7 +33,7 @@ html:root[data-skin="phoenix"]{
   --soft-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
   --soft-text:15px;--soft-leading:1.5;--soft-small:12.5px;--soft-tiny:11.5px;
   /* Layout */
-  --soft-column:760px;--soft-bubble:min(680px,84%);--soft-radius:20px;--soft-tail:7px;
+  --soft-column:760px;--soft-bubble:min(calc(var(--soft-column) - 80px),84%);--soft-radius:20px;--soft-tail:7px;
   --soft-ease:cubic-bezier(.2,.75,.25,1);
 
   /* Map onto the skin's own tokens so untouched components follow along. */
@@ -192,7 +192,7 @@ html:root[data-skin="phoenix"] .mc-window-controls button:hover{background:var(-
 html:root[data-skin="phoenix"] .mc-window-controls button:last-child:hover{background:rgb(225 80 96 / 85%);color:#fff}
 
 /* ── Feed column ─────────────────────────────────────────────────────── */
-html:root[data-skin="phoenix"] #conversationFeed{max-width:calc(var(--soft-column) + 76px)!important;margin:0 auto;padding:20px 38px 28px!important;font-family:var(--soft-font)}
+html:root[data-skin="phoenix"] #conversationFeed{max-width:calc(var(--soft-column) + 76px)!important;margin:0 auto;padding:20px 38px 92px!important;font-family:var(--soft-font)}
 html:root[data-skin="phoenix"] #conversationFeed .message-row{margin-bottom:18px}
 html:root[data-skin="phoenix"] #conversationFeed .message-row.message-group-start{margin-bottom:6px}
 
@@ -961,13 +961,13 @@ html:root[data-skin="phoenix"] :is(#stagePanelToggles,#inspectionPanelControls){
 html:root[data-skin="phoenix"] :is(#terminalToggle,#stageSidebarButton) svg{pointer-events:none}
 
 /* Soften scrolling messages where they meet the composer and its to-dos. */
-html:root[data-skin="phoenix"] #conversationStage:not(.mc-empty) #conversationBody{
+html:root[data-skin="phoenix"][data-feed][data-conversation-view] body #conversationStage.has-thread:not(.mc-empty) #conversationBody{
  --transcript-bottom-fade:64px;
  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 var(--transcript-edge-fade,18px),#000 max(var(--transcript-edge-fade,18px),calc(100% - var(--transcript-bottom-fade))),transparent 100%)!important;
  mask-image:linear-gradient(to bottom,transparent 0,#000 var(--transcript-edge-fade,18px),#000 max(var(--transcript-edge-fade,18px),calc(100% - var(--transcript-bottom-fade))),transparent 100%)!important;
 }
 html:root[data-skin="phoenix"] #composerFade:not([hidden]){
- display:block;bottom:0;height:64px;background:transparent!important;pointer-events:none;
+ display:block!important;bottom:0;height:64px;background:transparent!important;pointer-events:none;
  -webkit-backdrop-filter:blur(12px)!important;backdrop-filter:blur(12px)!important;
  -webkit-mask-image:linear-gradient(to bottom,transparent,#000)!important;
  mask-image:linear-gradient(to bottom,transparent,#000)!important;
@@ -985,3 +985,12 @@ html:root[data-skin="phoenix"] .modal-close>*{pointer-events:none}
 html:root[data-skin="phoenix"] .button.primary{background:var(--soft-ink)!important;color:var(--accent-contrast)!important;border-color:transparent!important}
 /* Reserve an action column so delete never covers a tool disclosure. */
 html:root[data-skin="phoenix"] #conversationFeed .work-cluster{padding-right:34px!important;box-sizing:border-box}
+
+/* The shared reading column follows Appearance instead of a fixed sky width. */
+html:root[data-skin="phoenix"][data-feed="regular"]{--soft-column:960px}
+html:root[data-skin="phoenix"][data-feed="wide"]{--soft-column:1200px}
+html:root[data-skin="phoenix"] #conversationStage,
+html:root[data-skin="phoenix"] #conversationFeed{--feed-max:var(--soft-column)}
+html:root[data-skin="phoenix"][data-conversation-width="full"] #conversationFeed{max-width:none!important;padding-inline:24px!important}
+html:root[data-skin="phoenix"][data-conversation-width="full"] #composerZone{max-width:none!important}
+html:root[data-skin="phoenix"][data-conversation-width="full"] #conversationFeed :is(.user-bubble,.message-content>.markdown){max-width:84%!important}

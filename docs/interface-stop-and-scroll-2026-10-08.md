@@ -50,3 +50,18 @@ refresh also removes any existing obsolete warning nodes without deleting the
 saved transcript or error records. The real Chromium fixture verifies repeated
 notice replay, a single real failed entry, retained failure details, and clearing
 both warning nodes and the drawer when the queue becomes empty.
+
+## Reading width and composer edge
+
+The sky column now follows the Narrow (760px), Regular (960px), and Wide
+(1200px) choices for both messages and composer. Selecting one exits the
+separate full-width override. Narrow retains the previous sky column width.
+Full width also now overrides the sky's fixed maximum. The composer-edge
+blur explicitly overrides the legacy hidden style; its 64px opacity fade
+also overrides the more specific hero mask, with extra transcript bottom
+padding to keep the latest answer legible.
+
+Verified live: content/composer widths 760/960/1200, 64px blur directly above
+To-dos, non-interactive overlay, Avery selection retained. Applied CSS live
+while Avery was working, without reloading the interface. The question,
+Stop, draft, browser, and scroll regression suite passed.

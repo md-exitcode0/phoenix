@@ -1485,7 +1485,7 @@ function applyTheme(choice) {
   if (/^(transparent|rgba\(0, 0, 0, 0\))$/.test(color)) return;
   win.setBackgroundColor?.(color)?.catch?.(() => {});
 }
-const VISUAL_DEFAULTS = Object.freeze({ conversationView:"compact", density:"comfortable", radius:"soft", fire:"full", contrast:"standard", feed:"regular", accent:"ember", stageFire:"full", flicker:"on", rail:"bold", type:"regular", glow:"ember", conversationText:"default", conversationWidth:"default" });
+const VISUAL_DEFAULTS = Object.freeze({ conversationView:"compact", density:"comfortable", radius:"soft", fire:"full", contrast:"standard", feed:"narrow", accent:"ember", stageFire:"full", flicker:"on", rail:"bold", type:"regular", glow:"ember", conversationText:"default", conversationWidth:"default" });
 function visualPrefs() {
   try { return { ...VISUAL_DEFAULTS, ...JSON.parse(localStorage.getItem("phoenix-visual") || "{}") }; }
   catch { return { ...VISUAL_DEFAULTS }; }
