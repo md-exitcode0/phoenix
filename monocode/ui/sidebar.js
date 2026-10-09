@@ -1492,6 +1492,7 @@ function visualPrefs() {
 }
 function applyVisualPrefs(next = visualPrefs()) {
   const prefs = { ...VISUAL_DEFAULTS, ...next };
+  window.dispatchEvent(new CustomEvent("phoenix:visual-prefs-changing",{detail:prefs}));
   prefs.conversationText = ["default","small","smaller"].includes(prefs.conversationText) ? prefs.conversationText : "default";
   prefs.conversationWidth = prefs.conversationWidth === "extra" ? "full" : ["default","full"].includes(prefs.conversationWidth) ? prefs.conversationWidth : "default";
   localStorage.setItem("phoenix-visual", JSON.stringify(prefs));

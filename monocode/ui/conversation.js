@@ -1114,17 +1114,20 @@
   // describe the same reply (the history row may lack the ask id).
   function findAnswerBubble(askId,text){
     const clean=(value)=>String(value||"").replace(/\s+/g," ").trim();
-    return [...$("conversationFeed").querySelectorAll(":scope > .answer-resume-message")].reverse().slice(0,4)
-      .find((node)=>(askId&&node.dataset.askId===askId)||(text&&clean(node.querySelector(".answer-resume-prompt")?.textContent)===clean(text)))||null;
+    const nodes=[...$("conversationFeed").querySelectorAll(":scope > .answer-resume-message")].reverse();
+    return(askId&&nodes.find(node=>node.dataset.askId===askId))||nodes.slice(0,4)
+      .find(node=>(!askId||!node.dataset.askId)&&text&&clean(node.querySelector(".answer-resume-prompt")?.textContent)===clean(text))||null;
   }
   function renderAskAnswerTurn(value) {
     const answer=askAnswerPrompt(value);if(!answer)return null;
-    // The resumed turn marks when the user really answered; a bubble drawn
-    // earlier at the question's position moves here instead of doubling.
-    findAnswerBubble(answer.askId,answer.detail)?.remove();
     beginAuthoredBoundary();
+    // A resumed turn acknowledges an already displayed reply. Keep that
+    // bubble where the user sent it, with its question context intact.
+    const existing=findAnswerBubble(answer.askId,answer.detail);
+    if(existing){if(answer.askId)existing.dataset.askId=answer.askId;return existing;}
     const target=agentLabel(answer.agentId||state.item?.id||"phoenix");
-    const node=feedNode("message-row user-message answer-resume-message",`<div class="message-content"><button type="button" class="turn-delete-button prompt-delete-button" data-delete-prompt aria-label="Permanently delete this answer and its complete response" title="Delete answer and response">${deleteIcon()}</button><div class="user-bubble answer-resume-bubble"><div class="answer-resume-marker"><span>${icons.reply||QUEUE_GLYPH}</span><strong>Answer to ${escape(target)}</strong></div><div class="answer-resume-prompt">${markdown(answer.detail)}</div></div></div>`,{slot:"message",from:"user",askId:answer.askId});
+    const questions=value?.questions||[],context=questions.length?`<details class="answer-question-context"><summary>View question</summary><div class="markdown">${questions.map(question=>markdown(question.question||"")).join("")}</div></details>`:"";
+    const node=feedNode("message-row user-message answer-resume-message",`<div class="message-content"><button type="button" class="turn-delete-button prompt-delete-button" data-delete-prompt aria-label="Permanently delete this answer and its complete response" title="Delete answer and response">${deleteIcon()}</button><div class="user-bubble answer-resume-bubble"><div class="answer-resume-marker"><span>${icons.reply||QUEUE_GLYPH}</span><strong>Answer to ${escape(target)}</strong></div>${context}<div class="answer-resume-prompt">${markdown(answer.detail)}</div></div></div>`,{slot:"message",from:"user",askId:answer.askId});
     if(!state.painting)renderPromptRail();
     return node;
   }
@@ -1486,6 +1489,7 @@
     // published delivery. Match original turn and route IDs before legacy text
     // keys; a reply's delivery ID can differ from the handoff it answers.
     const saved=left?.value||{},other=right?.value||{};
+    if(leftRole==="user"&&rightRole==="user"&&saved.origin?.kind==="ask_answer"&&other.origin?.kind==="ask_answer"&&saved.origin.ask_id&&other.origin.ask_id)return saved.origin.ask_id===other.origin.ask_id;
     if(leftRole==="user"&&rightRole==="user"&&((saved.steer_id&&saved.steer_id===other.turn_id)||(other.steer_id&&other.steer_id===saved.turn_id)))return true;
     if(state.item?.kind==="group"&&(saved.historical===true||other.historical===true)){
       const turn=displayTurnId(left);
@@ -1911,7 +1915,23 @@
   function reconcileHistory(rows,{appendOnly=false}={}) {
     const available=state.displayRows.map((entry)=>({entry,used:false}));
     const added=[];let reordered=false,canonicalTurn="";
-    const canonicalRows=(rows||[]).filter((row)=>!(state.item?.kind==="group"&&row.role==="answer")&&historyVisibleInConversation(row));
+    // Older desktop history strips the ask id out of the wake envelope.
+    // Recover it only from one unambiguous saved question in this chat.
+    const clean=value=>String(value||"").replace(/\s+/g," ").trim(),seenAnswers=new Set();
+    const canonicalRows=(rows||[]).map(row=>{
+      if(row.origin?.kind!=="ask_answer"||row.origin.ask_id)return row;
+      const matching=state.displayRows.filter(entry=>{
+        const ask=entry.value;if(ask?.kind!=="ask_pending"||!ask.answer)return false;
+        const lines=[...String(ask.answer).matchAll(/^\s*A:\s*(.*)$/gm)].map(match=>match[1].trim()).filter(Boolean);
+        return clean(lines.length?lines.join("\n\n"):ask.answer)===clean(row.origin.display||row.text);
+      });
+      const ids=[...new Set(matching.map(entry=>String(entry.value.id||entry.value.ask_id||"")).filter(Boolean))];
+      return ids.length===1?{...row,origin:{...row.origin,ask_id:ids[0]}}:row;
+    }).filter(row=>{
+      if((state.item?.kind==="group"&&row.role==="answer")||!historyVisibleInConversation(row))return false;
+      const id=row.role==="user"&&row.origin?.kind==="ask_answer"&&row.origin.ask_id;
+      if(id){if(seenAnswers.has(id))return false;seenAnswers.add(id);}return true;
+    });
     const answersByTurn=new Map();
     available.forEach(({entry})=>{if(displayRole(entry)!=="answer")return;const turn=displayTurnId(entry),keys=answersByTurn.get(turn)||new Set();keys.add(canonicalAnswerText(entry.value?.text||entry.value?.markdown||""));answersByTurn.set(turn,keys);});
     const recovered=canonicalRows.map((row,position)=>{
@@ -2992,6 +3012,19 @@
   function detailedConversationView() { return document.documentElement.dataset.conversationView==="detailed"; }
   function toolActivityView() { return ["compact","detailed"].includes(document.documentElement.dataset.conversationView); }
   let conversationDetailMode=null;
+  let visualScrollBookmark=null;
+  function captureVisualScroll(){
+    const feed=$("conversationFeed");if(!feed||feed.hasAttribute("aria-busy"))return;
+    const bookmark=conversationScrollBookmark(feed);
+    if(!bookmark.pin){
+      // Work rows can disappear in Chat only. Anchor to a message that exists
+      // in both modes, including one just above the viewport.
+      const messages=[...feed.children].filter(node=>node.matches(".message-row")&&node.offsetHeight);
+      const anchor=messages.find(node=>node.offsetTop+node.offsetHeight>=bookmark.top)||messages.at(-1);
+      if(anchor){bookmark.anchor=anchor;bookmark.offset=anchor.offsetTop-bookmark.top;}
+    }
+    visualScrollBookmark={bookmark,key:conversationIdentity()};
+  }
   function setToolRowDisclosure(row,open) {
     const summary=row?.querySelector(".work-tool-summary"),detail=row?.querySelector(".work-tool-detail"),hasDetail=Boolean(detail);
     const expanded=Boolean(open&&hasDetail);if(expanded)row._renderToolDetail?.();row?.classList.toggle("open",expanded);summary?.setAttribute("aria-expanded",String(expanded));if(detail)detail.hidden=!expanded;
@@ -3009,6 +3042,8 @@
       feed?.querySelectorAll(".answer-work-toggle").forEach((button)=>button.setAttribute("aria-expanded",String(visible)));
     }
     feed?.querySelectorAll(".work-tool").forEach((row)=>setToolRowDisclosure(row,detailedConversationView()));
+    const saved=visualScrollBookmark;visualScrollBookmark=null;
+    if(saved&&saved.key===conversationIdentity())restoreConversationScroll(saved.bookmark,saved.key);
   }
   // Tool rows follow beUI's ToolResult (and FileDiff for edits): a one-line
   // trigger — kind icon, title, mono tool/target, status, chevron — over a
@@ -4988,19 +5023,31 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   }
   function terminalPreservesUnfinished(summary){return["incomplete","canceled","unknown"].includes(summary?.completion)||Boolean(runtimeFailureSummary(summary?.final_markdown));}
   function finishTurn(socket,preserveWork=false,token=activeSelectionToken()){if(state.turnSocket===socket)state.turnSocket=null;try{socket.close();}catch{}if(!selectionIsCurrent(token))return;if(!state.queuedWakeTurnId){state.activeGroupAgentIds=[];setWorking(false,preserveWork);}refreshQueue(token);refreshTasks(token);}
+  let stoppingTurn=false;
   async function stopTurn(){
     if(!state.working)return;
-    const token=activeSelectionToken(),owner=canvasConversationOwner(),delegate=liveDelegate();
+    if(stoppingTurn)return;stoppingTurn=true;
+    const token=activeSelectionToken(),owner=canvasConversationOwner(),delegate=liveDelegate(),sessionId=state.sessionId,agentId=targetAgent();
     const cancel=async(sessionId,agentId,scope)=>{
       const reply=await rpc({Cancel:{session_id:sessionId,target_agent:agentId,owner:scope}},8000,token?.signal);
       if(reply.Done?.completion!=="canceled"||reply.Done?.route!=="cancel"||reply.Done?.main_session_id!==sessionId)throw new Error("Stop was not confirmed for this conversation.");
     };
     try{
-      await cancel(state.sessionId,targetAgent(),owner);
+      // An answered question can be waiting behind the foreground run. Stop
+      // it before releasing that run's lane, otherwise it starts immediately.
+      const queued=await rpc({QueuedTurns:{session_id:sessionId,owner}},8000,token?.signal);
+      for(const row of queued.QueuedTurns||[]){
+        if(row.state!=="queued"||row.origin?.kind!=="ask_answer")continue;
+        if(owner.kind==="agent"&&row.target_agent&&canonicalAgentId(row.target_agent)!==canonicalAgentId(owner.id))continue;
+        await rpc({CancelQueuedTurn:{session_id:token.sessionId,queue_id:row.queue_id,owner}},8000,token?.signal);
+      }
+      await cancel(sessionId,agentId,owner);
       if(delegate)await cancel(delegate.sessionId,delegate.agentId,{kind:"agent",id:delegate.agentId});
     }catch(error){
       if(selectionIsCurrent(token))ui.toast("Phoenix could not confirm that work stopped. Check the current activity before retrying.",true);
       return;
+    }finally{
+      stoppingTurn=false;
     }
     if(!selectionIsCurrent(token))return;
     appendDisplay("story",{kind:"settled",agent:targetAgent()||"phoenix",ok:false},true);
@@ -5228,6 +5275,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     // Every answer to a question looks the same: the user's reply on the
     // right, "Answer to <agent>", with the agent's continuing work below it.
     if(!skipped&&answers.some(Boolean)){
+      if(state.displayRows.some(entry=>displayRole(entry)==="user"&&entry.value?.origin?.kind==="ask_answer"&&entry.value.origin.ask_id===String(ask.id||ask.ask_id||"")))return findAnswerBubble(String(ask.id||ask.ask_id||""),"");
       const text=answers.filter(Boolean).join("\n\n"),existing=findAnswerBubble(String(ask.id||""),text);
       if(existing)return existing;
       const target=agentLabel(ask.agent||state.item?.id||"phoenix");
@@ -5432,23 +5480,29 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   // siblings too, so the client closes them with the decision.
   function outsideCallScope(model){const approval=model?.approval||{},details=approval.details||{};return approval.action==="outside_group_call"&&details.group_id&&details.target_agent_id?`${details.group_id}\u0000${details.target_agent_id}`:"";}
   function matchingApprovalCards(card){const scope=outsideCallScope(card._askState);if(!scope)return[];return[...$("approvalStack").querySelectorAll(".approval-card")].filter((other)=>other!==card&&outsideCallScope(other._askState)===scope);}
-  function recordAskResolution(card,answer,status){const id=card.dataset.askId,model=card._askState;let entry=state.displayRows.find((row)=>row.source==="story"&&row.value?.kind==="ask_pending"&&(row.value.id||row.value.ask_id)===id);if(!entry){entry={source:"story",value:cloneDisplayValue(model.ask)};state.displayRows.push(entry);}Object.assign(entry.value,{id,status,answer,display_answers:model.answers.map((value)=>value==null?null:String(value)),resolved_at:new Date().toISOString()});return entry;}
+  function recordAskResolution(card,answer,status){const id=card.dataset.askId,model=card._askState;let entry=state.displayRows.find((row)=>row.source==="story"&&row.value?.kind==="ask_pending"&&(row.value.id||row.value.ask_id)===id);if(!entry){entry={source:"story",value:cloneDisplayValue(model.ask)};state.displayRows.push(entry);}Object.assign(entry.value,{kind:"ask_pending",id,status,answer,display_answers:model.answers.map((value)=>value==null?null:String(value)),resolved_at:new Date().toISOString()});return entry;}
   // Resolving a card updates only that card's own nodes. Repainting the whole
   // feed here cleared every approval card and the transcript and rebuilt
   // them, which read as the app reloading after each approval.
-  function resolveAskDisplay(card,answer,status){
+  function resolveAskDisplay(card,answer,status,receipt=null){
     window.PhoenixQuestionDrafts?.discard(card);
     const siblings=status==="answered"?matchingApprovalCards(card):[],primaryAnswers=card._askState.answers;
     const entry=recordAskResolution(card,answer,status);
+    let replyEntry=null;
+    if(status==="answered"&&!state.displayRows.some(row=>displayRole(row)==="user"&&row.value?.origin?.ask_id===card.dataset.askId)){
+      const model=card._askState,text=model.answers.filter(Boolean).join("\n\n")||answer;
+      replyEntry={source:"history",turn_id:receipt?.continuation_turn_id||state.activeTurnId||`ask_reply_${card.dataset.askId}`,value:{role:"user",text,questions:model.questions,origin:{kind:"ask_answer",ask_id:card.dataset.askId,agent_id:model.ask.agent||state.item?.id,display:text}}};
+      state.displayRows.push(replyEntry);
+    }
     siblings.forEach((other)=>{window.PhoenixQuestionDrafts?.discard(other);other._askState.answers=other._askState.questions.map((_,index)=>primaryAnswers[index]??primaryAnswers.at(-1)??null);recordAskResolution(other,answer,status);});
     replaceDisplayRows(trimDisplayRows(state.displayRows),true);
     const feed=$("conversationFeed"),bookmark=conversationScrollBookmark(),primaryId=String(card.dataset.askId||"");
     const anchor=[...feed.querySelectorAll(".decision-request")].find((request)=>request.dataset.decisionAskId===primaryId)||null;
     [card,...siblings].forEach((node)=>{const id=String(node.dataset.askId||"");feed.querySelectorAll(".decision-request").forEach((request)=>{if(request!==anchor&&request.dataset.decisionAskId===id)request.remove();});node.remove();});
-    // The answer takes the question's own place in the transcript, exactly
-    // where a full repaint would put it, without rebuilding the feed.
-    const resolved=renderAskHistory(entry.value);
-    if(anchor){if(resolved&&resolved!==anchor&&resolved.classList.contains("answer-resume-message"))anchor.replaceWith(resolved);else anchor.remove();}
+    // The answer belongs at the time it was sent, after the newest messages.
+    // Remove the original question placeholder without moving this reply back.
+    if(replyEntry)renderDisplayEntry(replyEntry);else renderAskHistory(entry.value);
+    anchor?.remove();
     syncApprovalStack();restoreConversationScroll(bookmark);scheduleDisplayPersist(true);
   }
   // A card whose decision was already made elsewhere (a sibling card, another
@@ -5473,8 +5527,8 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     card.setAttribute("aria-busy","true");
     card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);
     try{
-      await rpc({AnswerAsk:{ask_id:card.dataset.askId,answer,session_id,owner}},8000,token?.signal);
-      if(selectionIsCurrent(token))resolveAskDisplay(card,answer,"answered");
+      const reply=await rpc({AnswerAsk:{ask_id:card.dataset.askId,answer,session_id,owner}},8000,token?.signal);
+      if(selectionIsCurrent(token))resolveAskDisplay(card,answer,"answered",reply.AskAnswered);
     }catch(error){
       if(!selectionIsCurrent(token))return;
       if(card._askState?.decision&&OBSOLETE_ASK.test(String(error?.message||error))){resolveAskDisplay(card,answer,"answered");return;}
@@ -6824,6 +6878,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     // A hidden window must not keep a GL loop alive.
     document.addEventListener("visibilitychange",()=>{if(document.hidden)state.sendOrb?.stop();else syncSendOrb();});
     addEventListener("phoenix:theme-changed",()=>state.sendOrb?.syncColor());
+    addEventListener("phoenix:visual-prefs-changing",captureVisualScroll);
     addEventListener("phoenix:visual-prefs-changed",syncConversationDetail);
     addEventListener("phoenix:select-conversation",(event)=>selectConversationWithInspection(event.detail));
     addEventListener("phoenix:directory-ready",(event)=>selectConversationWithInspection(event.detail));

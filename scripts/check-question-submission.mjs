@@ -18,7 +18,7 @@ const server=createServer(async(req,res)=>{
     let body=await readFile(path);
     if(process.env.PHOENIX_QUESTION_BASELINE&&['/conversation.js','/sidebar.js'].includes(pathname))body=execFileSync('git',['show',(process.env.PHOENIX_QUESTION_BASELINE==='1'?'HEAD':process.env.PHOENIX_QUESTION_BASELINE)+':monocode/ui'+pathname],{cwd:resolve(root,'../..'),maxBuffer:2*1024*1024});
     if(pathname==='/index.html')body=Buffer.from(body.toString().replace('<head>','<head><script>window.__nativeHandlers=new Map();window.__TAURI__={event:{listen:(name,fn)=>{__nativeHandlers.set(name,fn);return Promise.resolve(()=>{})}}};</script>'));
-    if(pathname==='/conversation.js')body=Buffer.from(body.toString().replace('  bind(); renderVoiceState();','  window.__questions={state,renderStory,renderDisplayEntry,repaintOwnedTurn,hideInspectionSidebar,showInspectionSidebar,renderApproval,closeApproval,renderQueue,submitAsk,unlockApprovalVault,setRpc(fn){rpc=fn}};\n  bind(); renderVoiceState();'));
+    if(pathname==='/conversation.js')body=Buffer.from(body.toString().replace('  bind(); renderVoiceState();','  window.__questions={state,renderStory,renderDisplayEntry,repaintOwnedTurn,reconcileHistory,renderAskAnswerTurn,stopTurn,hideInspectionSidebar,showInspectionSidebar,renderApproval,closeApproval,renderQueue,submitAsk,unlockApprovalVault,setRpc(fn){rpc=fn}};\n  bind(); renderVoiceState();'));
     res.setHeader('content-type',types[extname(path)]||'application/octet-stream');res.end(body);
   }catch{res.writeHead(404);res.end();}
 });
@@ -110,6 +110,38 @@ try{
   assert.equal(await evaluate('document.activeElement===__draftInput&&__draftInput.value==="Still composing my answer"'),true,'late receipt repairs preserve the focused unsent answer');
   await evaluate(`__receiptObserver.disconnect();__questions.closeApproval();`);
 
+  await evaluate(`__questions.state.working=true;__requests.length=0;void __questions.stopTurn();void __questions.stopTurn();`);
+  await until('__requests.some(request=>request.QueuedTurns)');
+  await evaluate(`__respond('QueuedTurns',{QueuedTurns:[{queue_id:'waiting-unlock',state:'queued',target_agent:'school_coach',origin:{kind:'ask_answer'}},{queue_id:'authored-prompt',state:'queued'},{queue_id:'other-agent-answer',state:'queued',target_agent:'critic',origin:{kind:'ask_answer'}},{queue_id:'running-answer',state:'running',origin:{kind:'ask_answer'}}]});`);
+  await until('__requests.some(request=>request.CancelQueuedTurn)');
+  assert.equal(await evaluate('__requests.some(request=>request.Cancel)'),false,'pending unlock is retired before Stop releases the active lane');
+  assert.equal(await evaluate('__requests.find(request=>request.CancelQueuedTurn).CancelQueuedTurn.queue_id'),'waiting-unlock','Stop only retires pending question continuations for this owner');
+  await evaluate(`__respond('CancelQueuedTurn',{Done:{completion:'canceled'}});`);
+  await until('__requests.some(request=>request.Cancel)');
+  assert.equal(await evaluate('__requests.filter(request=>request.QueuedTurns).length'),1,'repeated Stop is single flight');
+  assert.equal(await evaluate('__requests.find(request=>request.Cancel).Cancel.target_agent'),'school_coach','Stop keeps the captured owner');
+  await evaluate(`__respond('Cancel',{Done:{completion:'canceled',route:'cancel',main_session_id:'agent-school_coach'}});`);
+  await until('!__questions.state.working');
+
+  await evaluate(`{__requests.length=0;__ask('placement-fixture');const newer={source:'history',turn_id:'newer-message-fixture',value:{role:'answer',text:'A newer message before the reply'}};__questions.state.displayRows.push(newer);__questions.renderDisplayEntry(newer);window.__newerMessage=[...document.querySelectorAll('#conversationFeed > .agent-message')].at(-1);document.querySelector('.pending-question-disclosure').open=true;const input=document.querySelector('.approval-inline-custom [data-ask-custom-input]');input.value='My saved reply';input.dispatchEvent(new Event('input',{bubbles:true}));void __questions.submitAsk(document.querySelector('.approval-card'),'My saved reply');}`);
+  await until('__requests.some(request=>request.AnswerAsk)');
+  await evaluate(`__respond('AnswerAsk',{AskAnswered:{disposition:'late_answer_queued:placement',continuation_turn_id:'placement-wake-fixture'}});`);
+  await until('!document.querySelector(".approval-card")');
+  assert.equal(await evaluate(`!!(__newerMessage.compareDocumentPosition(document.querySelector('[data-ask-id="placement-fixture"].answer-resume-message'))&Node.DOCUMENT_POSITION_FOLLOWING)`),true,'reply is placed after the newest message, not back at the question');
+  await evaluate(`window.__replyBubble=document.querySelector('[data-ask-id="placement-fixture"].answer-resume-message');window.__replyBefore=__replyBubble.previousElementSibling;__questions.renderAskAnswerTurn({origin:{kind:'ask_answer',ask_id:'placement-fixture',display:'My saved reply'}});`);
+  assert.equal(await evaluate('__replyBubble.isConnected&&__replyBubble.previousElementSibling===__replyBefore'),true,'wake acknowledgement leaves the original reply attached and in place');
+  const recovery=await evaluate(`__questions.reconcileHistory([{role:'user',text:'My saved reply',origin:{kind:'ask_answer',ask_id:'',display:'My saved reply'}},{role:'user',text:'My saved reply',origin:{kind:'ask_answer',ask_id:'',display:'My saved reply'}}],{appendOnly:true})`);
+  assert.equal(recovery.added.length,0,'legacy history copies of one saved question cannot append another reply');
+
+  await evaluate(`{const style=document.createElement('style');style.textContent='*{animation:none!important;transition:none!important}';document.head.append(style);const feed=document.getElementById('conversationFeed');window.__scrollSpacer=document.createElement('div');__scrollSpacer.className='work-cluster';__scrollSpacer.style.height='2400px';feed.insertBefore(__scrollSpacer,__newerMessage);window.__scrollTail=document.createElement("div");__scrollTail.style.height="1400px";feed.insertBefore(__scrollTail,document.getElementById("conversationTail"));PhoenixUI.applyVisualPrefs({...PhoenixUI.visualPrefs(),conversationView:'chat'});__questions.state.pinToLatest=true;feed.scrollTop=feed.scrollHeight;document.getElementById('conversationDetailToggle').click();}`);
+  await evaluate(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+  assert.equal(await evaluate(`(()=>{const f=document.getElementById('conversationFeed');return f.scrollHeight-f.clientHeight-f.scrollTop<2})()`),true,'showing tools at the latest message keeps the latest message visible');
+  await evaluate(`{const feed=document.getElementById('conversationFeed');__questions.state.pinToLatest=false;feed.scrollTop=__newerMessage.offsetTop-80;window.__messageOffset=__newerMessage.getBoundingClientRect().top-feed.getBoundingClientRect().top;document.getElementById('conversationDetailToggle').click();}`);
+  await evaluate(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+  const position=await evaluate(`({before:__messageOffset,after:__newerMessage.getBoundingClientRect().top-document.getElementById('conversationFeed').getBoundingClientRect().top})`);
+  assert.ok(Math.abs(position.after-position.before)<2,'hiding older tools preserves the message being read: '+JSON.stringify(position));
+  await evaluate(`__scrollSpacer.remove();__scrollTail.remove();`);
+
   await evaluate(`__requests.length=0;__ask('stale-vault',{action:'vault_unlock',approved_option:'Unlock here'});document.querySelector('[data-vault-open]').click();document.querySelector('[data-vault-password]').value='fixture-password-only';window.__staleCard=document.querySelector('.approval-card');void __questions.unlockApprovalVault(__staleCard);`);
   await until('__requests.some(request=>request.Vault)');
   await evaluate(`__questions.state.loadGeneration++;__questions.state.item={kind:'agent',id:'phoenix'};__questions.state.sessionId='company-phoenix';__respond('Vault',{Vault:{result:'unlocked'}});`);
@@ -123,7 +155,7 @@ try{
     assert.notEqual(await evaluate('getComputedStyle(__contrastButton).color'),'rgba(0, 0, 0, 0)','primary label is visible in '+theme);
     assert.notEqual(await evaluate('getComputedStyle(__contrastButton).color'),await evaluate('getComputedStyle(__contrastButton).backgroundColor'),'primary label contrasts with the button in '+theme);
   }
-  console.log('PASS: Enter/form single delivery, Avery ownership, notification focus, secret wiping, queue deduplication, manual browser opening, delegated activity, lazy large diffs, unobstructed delete controls, visible primary labels, focused draft preservation and stale selection.');
+  console.log('PASS: Enter/form single delivery, owner routing, pending-unlock Stop, stable reply position, tool-mode scroll anchoring, queue deduplication, browser controls, delegated activity, lazy diffs, primary labels, and focused draft preservation.');
 }finally{
   ws?.close();chrome.kill();server.close();
   await new Promise(r=>chrome.exitCode!==null?r():chrome.once('exit',r));
