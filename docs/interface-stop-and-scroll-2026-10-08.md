@@ -65,3 +65,27 @@ Verified live: content/composer widths 760/960/1200, 64px blur directly above
 To-dos, non-interactive overlay, Avery selection retained. Applied CSS live
 while Avery was working, without reloading the interface. The question,
 Stop, draft, browser, and scroll regression suite passed.
+
+## Periodic stalls and rejected design output
+
+A live CPU profile reproduced 399–443ms heartbeat delays at four-second
+intervals in Leon's conversation. Samples concentrated in history matching
+and repeated agent identity resolution. Catch-up now skips a transcript
+revision already recovered, shares overlapping reads, caches canonical
+agent identities against directory replacement/revision, and groups possible
+history matches by compatible role/tool before applying the existing exact
+matching rules. The 1,800-receipt browser fixture completes reconciliation in
+18.3ms, imports no duplicate receipts, performs one read for concurrent and
+unchanged checks, and reads again after a revision change. Existing ownership,
+Stop, scroll, draft and question regression checks pass.
+
+The design bridge's output validation now runs inside phase correction.
+Empty, blank or oversized phase output is rejected with an inspectable
+validation error and the existing bounded correction opportunity, instead
+of escaping as a fatal bridge exception. All 30 runtime tests pass, including
+successful recovery after each rejected form. The package integrity manifest
+binds the updated adapter. No model calls or agent messages were issued.
+
+The conversation script requires an interface reload. It has not been
+reloaded while Theo is working; live installation remains pending until all
+agents are idle, as requested.

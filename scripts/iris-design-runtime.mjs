@@ -362,8 +362,8 @@ function correction(state, error, api) {
 
 function advance(state, output, api) {
   requireValue(state.status === 'running' && !state.awaitingCapture, 'This phase is not awaiting model output', 'INVALID_STATE');
-  const text = fillVersion(typeof output === 'string' ? string(output, 'output', 2_000_000) : boundedJson(object(output, 'output')), state.phase);
   try {
+    const text = fillVersion(typeof output === 'string' ? string(output, 'output', 2_000_000) : boundedJson(object(output, 'output')), state.phase);
     validateApproved(state, api);
     if (state.phase === 'brief') {
       const result = api.parseBriefingOutput(text);

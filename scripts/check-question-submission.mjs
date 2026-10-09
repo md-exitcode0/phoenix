@@ -18,7 +18,7 @@ const server=createServer(async(req,res)=>{
     let body=await readFile(path);
     if(process.env.PHOENIX_QUESTION_BASELINE&&['/conversation.js','/sidebar.js'].includes(pathname))body=execFileSync('git',['show',(process.env.PHOENIX_QUESTION_BASELINE==='1'?'HEAD':process.env.PHOENIX_QUESTION_BASELINE)+':monocode/ui'+pathname],{cwd:resolve(root,'../..'),maxBuffer:2*1024*1024});
     if(pathname==='/index.html')body=Buffer.from(body.toString().replace('<head>','<head><script>window.__nativeHandlers=new Map();window.__TAURI__={event:{listen:(name,fn)=>{__nativeHandlers.set(name,fn);return Promise.resolve(()=>{})}}};</script>'));
-    if(pathname==='/conversation.js')body=Buffer.from(body.toString().replace('  bind(); renderVoiceState();','  window.__questions={state,renderStory,renderDisplayEntry,repaintOwnedTurn,reconcileHistory,renderAskAnswerTurn,stopTurn,hideInspectionSidebar,showInspectionSidebar,renderApproval,closeApproval,renderQueue,submitAsk,unlockApprovalVault,setRpc(fn){rpc=fn}};\n  bind(); renderVoiceState();'));
+    if(pathname==='/conversation.js')body=Buffer.from(body.toString().replace('const ui = window.PhoenixUI;','const ui = {...window.PhoenixUI};').replace('  bind(); renderVoiceState();','  window.__questions={state,renderStory,renderDisplayEntry,repaintOwnedTurn,reconcileHistory,catchUpConversation,historyCatchUps,canonicalAgentId,renderAskAnswerTurn,stopTurn,hideInspectionSidebar,showInspectionSidebar,renderApproval,closeApproval,renderQueue,submitAsk,unlockApprovalVault,setInvoke(fn){ui.invoke=fn},setRpc(fn){rpc=fn}};\n  bind(); renderVoiceState();'));
     res.setHeader('content-type',types[extname(path)]||'application/octet-stream');res.end(body);
   }catch{res.writeHead(404);res.end();}
 });
@@ -51,6 +51,26 @@ try{
     document.querySelector('.pending-question-disclosure').open=true;
     const input=document.querySelector('.approval-inline-custom [data-ask-custom-input]');input.value='Fixture answer';input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();
   })()`);
+  const recoveryPerformance=await evaluate(`(async()=>{
+    const saved=__questions.state.displayRows;
+    const rows=[{role:'user',text:'Performance fixture',turn_id:'perf-turn'},...Array.from({length:1800},(_,i)=>({role:'tool',tool:'fixture-'+(i%90),target:'item-'+i,ok:true,turn_id:'perf-turn'}))];
+    __questions.state.displayRows=rows.map(value=>({source:'history',turn_id:value.turn_id,value}));
+    const start=performance.now(),result=__questions.reconcileHistory(rows,{appendOnly:true}),elapsed=performance.now()-start;
+    __questions.state.displayRows=saved;
+    const invoke=PhoenixUI.invoke,activity=PhoenixUI.activityFor(PhoenixUI.state.selected),revision=activity.transcript_revision;
+    let calls=0,resolve;__questions.setInvoke(()=>{calls++;return new Promise(r=>{resolve=r})});__questions.historyCatchUps.clear();
+    try{
+      const first=__questions.catchUpConversation();const overlapping=__questions.catchUpConversation();resolve([]);await Promise.all([first,overlapping]);
+      await __questions.catchUpConversation();const unchangedCalls=calls;
+      activity.transcript_revision=Number(revision||0)+1;const changed=__questions.catchUpConversation();resolve([]);await changed;
+      return {elapsed,added:result.added.length,unchangedCalls,changedCalls:calls};
+    }finally{__questions.setInvoke(invoke);activity.transcript_revision=revision;__questions.historyCatchUps.clear();}
+  })()`);
+  console.log('History recovery fixture:',JSON.stringify(recoveryPerformance));
+  assert.equal(recoveryPerformance.added,0,'large catch-up does not duplicate receipts');
+  assert.ok(recoveryPerformance.elapsed<150,'1800-row recovery stays below the visible freeze budget: '+JSON.stringify(recoveryPerformance));
+  assert.equal(recoveryPerformance.unchangedCalls,1,'overlapping and unchanged history checks share one read');
+  assert.equal(recoveryPerformance.changedCalls,2,'a newer transcript revision is recovered');
   await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r',unmodifiedText:'\r'});
   await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
   await until('__requests.length===1');

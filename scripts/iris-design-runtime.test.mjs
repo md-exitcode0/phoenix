@@ -96,6 +96,20 @@ test('malformed briefing gets one correction, then an inspectable failed state',
   await assert.rejects(dispatch({ action: 'advance', state, output: briefing }), /not awaiting model output/);
 });
 
+test('empty or oversized model output uses phase correction instead of crashing the bridge', async (t) => {
+  const f = await fixture(t);
+  for (const output of ['', ' '.repeat(10), 'x'.repeat(2_000_001)]) {
+    const corrected = await dispatch({ action: 'advance', state: structuredClone(f.state), output });
+    assert.equal(corrected.phase, 'brief');
+    assert.equal(corrected.status, 'running');
+    assert.equal(corrected.error.code, 'PHASE_VALIDATION');
+    assert.match(corrected.error.message, /nonempty bounded string/);
+    const recovered = await dispatch({ action: 'advance', state: corrected, output: briefing });
+    assert.equal(recovered.phase, 'brand');
+    assert.equal(recovered.correcting, false);
+  }
+});
+
 test('autonomous briefing refuses questions and unrelated tasks have an explicit terminal outcome', async (t) => {
   const f = await fixture(t);
   const question = { status: 'questions', message: 'Clarify.', brief: null, questions: [{ id: 'subject', header: 'Subject', question: 'What subject?', allowOther: true, options: [{ label: 'One', description: 'First option' }] }] };

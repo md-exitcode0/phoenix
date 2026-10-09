@@ -16,8 +16,8 @@
     },
     {
       "path": "scripts/iris-design-runtime.mjs",
-      "bytes": 37775,
-      "sha256": "48f3c640bbc86d661f7192bd14f84a3c2ff4aadbc384037fe4e6562484108b11"
+      "bytes": 37777,
+      "sha256": "2efa3cf405b3a09784b3f61e5dc3476abee560b8ccb2d2a2a0676cc741483b78"
     },
     {
       "path": "vendor/tastecode-design/ADAPTER.md",

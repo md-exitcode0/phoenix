@@ -527,15 +527,20 @@
     if(/^(?:orchestrator|phoenix)$/i.test(raw))values.push("phoenix","orchestrator");
     return[...new Set(values.map((value)=>String(value||"").trim().toLowerCase()).filter(Boolean))];
   }
+  let identityDirectory=null,identityRevision=null,identityCount=0,canonicalIdentities=new Map();
   function knownAgentProfile(id) {
     const candidates=agentIdentityCandidates(id);
     return ui.state.view?.directory.agents.find((agent)=>[agent.agent_id,agent.internal_role,agent.display_name].some((value)=>candidates.includes(String(value||"").trim().toLowerCase())));
   }
   function canonicalAgentId(id) {
-    const profile=knownAgentProfile(id);if(profile)return profile.agent_id;
-    const candidate=agentIdentityCandidates(id)[0]||"";
-    if(isEphemeralVolumeAgent(candidate))return "volume_worker";
-    return /^(?:orchestrator|phoenix)$/.test(candidate)?"phoenix":candidate;
+    const directory=ui.state.view?.directory,agents=directory?.agents;
+    if(identityDirectory!==agents||identityRevision!==directory?.as_of_seq||identityCount!==agents?.length){
+      identityDirectory=agents;identityRevision=directory?.as_of_seq;identityCount=agents?.length;canonicalIdentities.clear();
+    }
+    const key=String(id||"");if(canonicalIdentities.has(key))return canonicalIdentities.get(key);
+    const profile=knownAgentProfile(id),candidate=agentIdentityCandidates(id)[0]||"";
+    const value=profile?profile.agent_id:isEphemeralVolumeAgent(candidate)?"volume_worker":/^(?:orchestrator|phoenix)$/.test(candidate)?"phoenix":candidate;
+    if(canonicalIdentities.size>512)canonicalIdentities.clear();canonicalIdentities.set(key,value);return value;
   }
   function isEphemeralVolumeAgent(value) {
     return /volume[\s_-]*worker/i.test(String(value||""));
@@ -1200,7 +1205,7 @@
     return new Set(values.filter(Boolean).flatMap((value)=>[String(value).trim().toLowerCase(),canonicalAgentId(value)]));
   }
   function isIncomingAgentTalk(row) {
-    return Boolean(row&&state.item?.kind==="agent"&&[String(row.to||"").trim().toLowerCase(),canonicalAgentId(row.to)].some((address)=>currentConversationAddresses().has(address)));
+    return Boolean(row?.to&&state.item?.kind==="agent"&&[String(row.to||"").trim().toLowerCase(),canonicalAgentId(row.to)].some((address)=>currentConversationAddresses().has(address)));
   }
   const OWNER_SCOPED_STORY_KINDS=new Set(["narration","commentary","reasoning","thinking","tool_start","tool","receipt","brief","settled","context","context_compaction","diff","usage","answer"]);
   // Canonical history from older builds labels legitimate owner tool rows as
@@ -1919,8 +1924,15 @@
     if(state.sessionId===sessionId)state.displayDirty=false;
     state.displayPersistChain=Promise.resolve();
   }
+  function historyMatchBucket(entry){
+    const role=displayRole(entry);
+    if(["talk","handoff","return"].includes(role))return "delivery";
+    if(["narration","commentary"].includes(role))return "update";
+    return role==="tool"?`tool:${entry.value?.tool||""}`:role;
+  }
   function reconcileHistory(rows,{appendOnly=false}={}) {
-    const available=state.displayRows.map((entry)=>({entry,used:false}));
+    const available=state.displayRows.map((entry)=>({entry,used:false})),byRole=new Map();
+    for(const candidate of available){const key=historyMatchBucket(candidate.entry),bucket=byRole.get(key)||[];bucket.push(candidate);byRole.set(key,bucket);}
     const added=[];let reordered=false,canonicalTurn="";
     // Older desktop history strips the ask id out of the wake envelope.
     // Recover it only from one unambiguous saved question in this chat.
@@ -1945,7 +1957,7 @@
       const incoming=row.role==="talk"&&isIncomingAgentTalk(row),agentThread=state.item?.kind!=="group";
       const stableTurn=row.turn_id||(agentThread&&row.role!=="user"&&!incoming?canonicalTurn:"");
       const entry={source:"history",value:row,turn_id:stableTurn};
-      const candidates=available.filter((candidate)=>!candidate.used&&equivalentDisplayRows(candidate.entry,entry)&&(row.role!=="user"||attachmentIdentity(candidate.entry.value)===attachmentIdentity(row)));
+      const candidates=(byRole.get(historyMatchBucket(entry))||[]).filter((candidate)=>!candidate.used&&equivalentDisplayRows(candidate.entry,entry)&&(row.role!=="user"||attachmentIdentity(candidate.entry.value)===attachmentIdentity(row)));
       let match;
       if(agentThread&&row.role==="user"&&!row.turn_id){
         const tail=canonicalRows.slice(position+1),boundary=tail.findIndex((value)=>value.role==="user"),block=boundary<0?tail:tail.slice(0,boundary);
@@ -4123,6 +4135,7 @@
     state.historyLoadFailed=false;state.historyHydrating=true;state.historyLiveRows=[];state.displayJournalUnsafe=true;
     // Live events must not wait behind a slow native history projection.
     subscribeJournal(token);
+    const hydrationRevision=currentHistoryRevision();
     let rows=[],feeds={},journalRecovered=true,historyRecovered=true,asksRequest=null;
     if(preview)rows=mockHistory();
     else{
@@ -4159,6 +4172,7 @@
     replaceDisplayRows(repairedDisplay.rows,priorDirty||repairedDisplay.changed||state.displayMigrationDirty);
     state.displayMigrationDirty=false;
     reconcileHistory(rows);
+    if(historyRecovered)historyCatchUpState(token).revision=hydrationRevision;
     if(!cached||!displayRowsEqual(priorRows,state.displayRows))repaintConversation(bookmark,!cached,!cached);
     else feed.removeAttribute("aria-busy");
     if(state.historyLoadFailed)renderConversationLoadError();
@@ -4686,8 +4700,19 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     }catch(error){ui.toast(`Browser control failed: ${error.message||error}`,true);}
   }
 
+  const historyCatchUps=new Map();
+  function historyCatchUpState(token){
+    let value=historyCatchUps.get(token.key);
+    if(!value){value={revision:null,pending:null};historyCatchUps.set(token.key,value);while(historyCatchUps.size>24)historyCatchUps.delete(historyCatchUps.keys().next().value);}
+    return value;
+  }
+  function currentHistoryRevision(){const revision=ui.activityFor?.(state.item)?.transcript_revision;return Number.isFinite(revision)?revision:null;}
   async function catchUpConversation(token=activeSelectionToken(),{quiet=true}={}) {
-    if(!token)return;
+    if(!token||!selectionIsCurrent(token))return;
+    const cached=historyCatchUpState(token),revision=currentHistoryRevision();
+    if(cached.pending)return cached.pending;
+    if(quiet&&revision!==null&&cached.revision===revision)return;
+    const job=(async()=>{
     try {
       const rows=await ui.invoke("session_context_get",{sessionId:token.sessionId,owner:token.owner});
       if(!selectionIsCurrent(token))return;
@@ -4695,6 +4720,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
       // being compacted its saved history is rewritten; reconciling against it
       // redrew the whole conversation every few seconds.
       const {added,reordered}=reconcileHistory(rows,{appendOnly:quiet});
+      cached.revision=revision;
       if(!added.length&&!reordered){flushOwnedStories();return;}
       $("conversationFeed").querySelector(".conversation-empty")?.remove();
       if(reordered)repaintConversation(conversationScrollBookmark(),false);
@@ -4705,6 +4731,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
       scheduleDisplayPersist(true);
       flushOwnedStories();
     } catch {}
+    })();cached.pending=job;try{await job;}finally{if(cached.pending===job)cached.pending=null;}
   }
   function subscribeJournal(candidate=activeSelectionToken()) {
     const token=candidate?.key?candidate:activeSelectionToken(Number.isFinite(candidate)?candidate:state.loadGeneration);
