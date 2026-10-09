@@ -6,6 +6,17 @@
   const $ = (id) => document.getElementById(id);
   const conversationTail = $("conversationTail");
   const lastConversationRow = () => conversationTail.previousElementSibling;
+  // Status pill: one small line under the latest message saying what the
+  // agent is doing right now. It replaced the bottom orb, which only mirrored
+  // `composerZone.working` and could spin forever after the turn ended.
+  const statusPillHost=(()=>{
+    let host=document.getElementById("conversationThinking");
+    if(!host){host=document.createElement("div");host.id="conversationThinking";conversationTail.prepend(host);}
+    host.className="status-pill";host.hidden=true;host.dataset.mode="idle";
+    host.setAttribute("role","status");host.setAttribute("aria-live","polite");
+    host.innerHTML='<span class="status-pill-dot" aria-hidden="true"></span><span class="status-pill-label">Working</span>';
+    return host;
+  })();
   const preview = !ui.TAURI || ui.SIDEBAR_PREVIEW;
   const previewShot = new URLSearchParams(location.search).get("shot") || "";
   const state = {
@@ -1234,6 +1245,19 @@
     if(state.item?.kind!=="agent")return rows;
     return rows.filter((entry)=>entry?.source==="story"?storyVisibleInConversation(entry.value):historyVisibleInConversation(entry?.value));
   }
+  // The owner's turn that is running right now in this one-to-one chat.
+  function liveOwnerTurnId(){return state.item?.kind==="agent"&&state.working&&state.activeTurnId?String(state.activeTurnId):"";}
+  // A coworker's message that lands while the owner is still working belongs
+  // to that running turn, exactly like a mid-task user message. Giving it a
+  // fresh turn id made it the "current" turn: the owner's later replies were
+  // filed above it as late output of an old turn, and the owner's own
+  // completion event was dropped as foreign, leaving the indicator stuck.
+  function joinLiveTurnIfMidTask(entry){
+    const live=liveOwnerTurnId();
+    if(!live||!entry?.value||displayRole(entry)!=="talk"||!isIncomingAgentTalk(entry.value)||isCompletedAgentReturn(entry.value))return entry;
+    entry.turn_id=live;entry.value={...entry.value,mid_turn_of:live};
+    return entry;
+  }
   function isAuthoredBoundaryEntry(entry) {
     const role=displayRole(entry);
     // A coworker's completed result belongs to the owner's existing turn. It
@@ -1639,6 +1663,9 @@
   function syncSelectedLiveActivity() {
     syncWorkingElsewhere();
     syncTeamPresence();
+    try{return syncSelectedLiveActivityInner();}finally{syncStatusPill();}
+  }
+  function syncSelectedLiveActivityInner() {
     if(!selectedConversationIsLive()){
       // "Working" adopted from the gateway (after a reload, or a turn started
       // from Telegram) ends when the gateway says the coworker stopped; this
@@ -1709,6 +1736,7 @@
     const boundary=role==="user"||(role==="talk"&&isIncomingAgentTalk(copy)&&!isCompletedAgentReturn(copy));
     const ownedTurn=ownedStoryTurn(copy);
     const entry={source,value:copy,turn_id:ownedTurn||(boundary?(copy.turn_id||newTurnId()):lastTurn)},last=state.displayRows.at(-1);
+    if(!recovered&&!ownedTurn&&boundary&&role==="talk")joinLiveTurnIfMidTask(entry);
     // Never put an unanchored old execution under the latest prompt. The
     // authoritative history catch-up owns introducing its missing boundary.
     if(ownedTurn&&!boundary&&!ownedStoryHasBoundary(copy)){deferOwnedStory(copy,recovered);return false;}
@@ -1736,7 +1764,7 @@
       const ownerIndex=state.displayRows.findIndex((row)=>isAuthoredBoundaryEntry(row)&&displayTurnId(row)===ownedTurn);
       // A message sent mid-task (a steer) shares this turn's id and is not
       // the next turn: later work belongs after it, in the order it happened.
-      const nextIndex=state.displayRows.findIndex((row,index)=>index>ownerIndex&&isAuthoredBoundaryEntry(row)&&displayTurnId(row)!==ownedTurn);
+      const nextIndex=state.displayRows.findIndex((row,index)=>index>ownerIndex&&isAuthoredBoundaryEntry(row)&&displayTurnId(row)!==ownedTurn&&row.value?.mid_turn_of!==ownedTurn);
       if(nextIndex>=0)recoveredIndex=nextIndex;
     }
     if(recoveredIndex<0)state.displayRows.push(entry);else state.displayRows.splice(recoveredIndex,0,entry);
@@ -1989,6 +2017,7 @@
           const row=entry.value||{},same=liveTools.find(candidate=>!candidate.used&&String(candidate.entry.value?.tool||"")===String(row.tool||"")&&(candidate.entry.value?.ok!==false)===(row.ok!==false)&&compatibleToolTargets(candidate.entry.value?.target,row.target));
           if(same){same.used=true;return;}
         }
+        joinLiveTurnIfMidTask(entry);
         state.displayRows.push(entry);added.push(entry);
       });
       if(added.length)replaceDisplayRows(ensureDisplayTurnIds(trimDisplayRows(state.displayRows)),true);
@@ -2095,7 +2124,7 @@
   function renderDisplayEntry(entry) {
     if(state.item?.kind==="group"&&entry?.source==="story"&&["steer","steer_delivered","brief"].includes(entry.value?.kind))return;
     const previous=state.renderingTurnId,role=displayRole(entry);state.renderingTurnId=entry.turn_id||"";
-    if(isAuthoredBoundaryEntry(entry)&&(!entry.value?.queued_id||entry.value?.queued_canonical))state.activeTurnId=entry.turn_id||"";
+    if(isAuthoredBoundaryEntry(entry)&&!entry.value?.mid_turn_of&&(!entry.value?.queued_id||entry.value?.queued_canonical))state.activeTurnId=entry.turn_id||"";
     try { if(entry?.source==="story")renderStory(entry.value,true); else if(entry?.source==="history")renderHistory(entry.value); }
     finally { state.renderingTurnId=previous; }
   }
@@ -3209,6 +3238,7 @@
     // asked Phoenix to perform. Surfacing it as a failed tool fabricated a
     // scary “Adjusted the approach” error after otherwise successful work.
     if(toolName==="response_validation")return;
+    if(event.kind==="tool_start"&&!replay&&!state.painting)noteStatusAction(event);
     if(toolName==="user_update"){
       if(event.kind==="tool_start"||event.ok===false)return;
       return renderAgentUpdate(event.agent,event.detail||"",false,true);
@@ -3793,7 +3823,15 @@
   function renderStory(event, replay = false) {
     if (!event?.kind) return;
     window.PhoenixFluffies?.wireInput(event, fluffyContext(replay));
-    if (event.kind === "execution_ended") return;
+    if(!replay&&!state.painting)state.lastRuntimeEventAt=Date.now();
+    if (event.kind === "execution_ended") {
+      // The whole run for this conversation is over. Its owner-turn
+      // completion may have been filtered as another turn's; do not leave the
+      // indicator running when the gateway agrees nothing is live.
+      if(!replay&&!state.painting&&state.working&&!selectedConversationIsLive()&&(!state.turnSocket||Date.now()-(state.turnStartedAt||0)>5000))setWorking(false);
+      else syncStatusPill();
+      return;
+    }
     event=normalizeGroupOperationalAgent(event);
     if(!state.painting&&event.kind==="user"&&ownedStoryTurn(event)&&ownedStoryHasBoundary(event)){
       const boundaryIndex=(id)=>state.displayRows.findIndex((row)=>isAuthoredBoundaryEntry(row)&&displayTurnId(row)===id);
@@ -5176,7 +5214,41 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     const visible=state.sendOrb.set(hasDraft?"arrow":(state.sendOrbHovered||button.matches(":focus-visible"))?"stop":"liquid");
     button.classList.toggle("orb-live",visible);
   }
-  function setWorking(value, preserveWork = false) { state.working=value; $("composerZone").classList.toggle("working",value); $("taskBlock").classList.toggle("live",value&&Boolean(state.tasks?.length)); syncSendMode(); if(!value){finishTurnActivity(preserveWork);document.querySelectorAll(".work-cluster.live").forEach((node)=>node.classList.remove("live"));requestAnimationFrame(()=>scrollLatest());}renderTasks();syncActivitySummary(); }
+  function statusPillFacts(){
+    const activity=ui.activityFor?.(state.item),delegate=state.item?.kind==="agent"?liveDelegate():null;
+    return{
+      ownerLive:LIVE_CONVERSATION_STATUSES.has(activity?.status),
+      socketOpen:Boolean(state.working),
+      waitingFor:delegate?agentLabel(delegate.agentId):"",
+      waitingPeer:activity?.status==="waiting_peer",
+      waitingUser:activity?.status==="waiting_user",
+      lastEventAt:state.lastRuntimeEventAt||state.turnStartedAt||0,
+      now:Date.now(),
+      action:state.statusAction||"",
+    };
+  }
+  // The single source of truth for the bottom indicator: running → the
+  // current action, waiting on a coworker/user → a waiting pill, idle → gone.
+  // A `working` flag nobody cleared (a lost completion event, a socket that
+  // never closed) is dropped once the gateway says idle and nothing has
+  // happened for a while.
+  function syncStatusPill(){
+    const pill=window.PhoenixStatusPill;if(!pill||!statusPillHost)return;
+    let view;try{view=pill.indicatorState(statusPillFacts());}catch{return;}
+    if(view.stale&&state.working&&!state.clearingStaleWork){state.clearingStaleWork=true;try{setWorking(false);}finally{state.clearingStaleWork=false;}return;}
+    statusPillHost.dataset.mode=view.mode;
+    statusPillHost.hidden=view.mode==="idle";
+    const label=statusPillHost.querySelector(".status-pill-label");
+    if(label&&label.textContent!==view.label)label.textContent=view.label||"";
+    statusPillHost.setAttribute("aria-label",view.label||"Idle");
+  }
+  function noteStatusAction(event){
+    const pill=window.PhoenixStatusPill;if(!pill)return;
+    state.statusAction=pill.toolLabel(event.tool,event.target,(raw)=>agentLabel(raw));
+    syncStatusPill();
+  }
+  if(!state.statusPillTimer)state.statusPillTimer=setInterval(()=>{if(!document.hidden)syncStatusPill();},5000);
+  function setWorking(value, preserveWork = false) { if(value&&!state.working){state.lastRuntimeEventAt=Date.now();state.statusAction="";}if(!value)state.statusAction=""; state.working=value; $("composerZone").classList.toggle("working",value); $("taskBlock").classList.toggle("live",value&&Boolean(state.tasks?.length)); syncSendMode(); if(!value){finishTurnActivity(preserveWork);document.querySelectorAll(".work-cluster.live").forEach((node)=>node.classList.remove("live"));requestAnimationFrame(()=>scrollLatest());}renderTasks();syncActivitySummary();syncStatusPill(); }
   function updateTaskHeadline(_text, live) { $("taskBlock").classList.toggle("live",Boolean(live)&&Boolean(state.tasks?.length)); }
   let taskTimer=null; function refreshTasksSoon(){clearTimeout(taskTimer);taskTimer=setTimeout(refreshTasks,250);}
   async function refreshTasks(token=null){

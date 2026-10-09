@@ -381,6 +381,7 @@ pub mod context_compiler;
 pub(crate) mod default_goal;
 pub mod delegation;
 pub mod gateway;
+pub mod handoff_promise;
 pub mod group_conversation;
 pub mod group_coordination;
 pub mod journal;

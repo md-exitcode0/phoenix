@@ -130,6 +130,16 @@ impl<H: AgentTurnHandler> Gateway<H> {
         anyhow::ensure!(!task_id.trim().is_empty() && task_id.len() <= 256, "invalid gateway task identity");
         self.durable_session_id = Some(session_id.to_string());
         self.durable_task_id = Some(task_id.to_string());
+        self.adopt_pending_company_messages(session_id)?;
+        Ok(self)
+    }
+
+    /// Route every accepted-but-unclaimed coworker message of this session
+    /// into the bus. Runs at construction (recovery after a restart) and again
+    /// whenever a turn in this run accepts a message for an idle recipient, so
+    /// "Leon → Avery" wakes Avery in this run instead of waiting for the
+    /// user's next message to build a new gateway. Claims make it idempotent.
+    fn adopt_pending_company_messages(&mut self, session_id: &str) -> anyhow::Result<()> {
         let company = crate::runtime::company::global()?;
         for pending in company.pending_company_messages(session_id)? {
             if same_agent_identity(&pending.from, &pending.to) {
@@ -159,8 +169,55 @@ impl<H: AgentTurnHandler> Gateway<H> {
                 self.bus.send(message)?;
             }
         }
-        self.durable_session_id = Some(session_id.to_string());
-        Ok(self)
+        Ok(())
+    }
+
+    /// Input that arrived while this run was busy with other agents.
+    ///
+    /// A user message steered to an agent whose turn already yielded (the
+    /// owner waiting on a coworker's mode-1 reply, while this run is busy
+    /// with that coworker) has no round top to drain it, and the daemon's
+    /// safety wake waits for this run's session lock: before this, "still
+    /// busy?" waited for the whole coworker turn and got no reply. Start a
+    /// short turn for that agent with the message; the coworker's return is
+    /// still routed to it afterwards. Agents with a live turn are left alone:
+    /// their next round reads the steer.
+    fn adopt_mid_run_input(
+        &mut self,
+        active: &std::collections::HashSet<AgentAddress>,
+    ) -> anyhow::Result<()> {
+        let Some(session_id) = self.durable_session_id.clone() else {
+            return Ok(());
+        };
+        for lane in crate::runtime::postbox::user_steer_lanes(&session_id) {
+            if crate::runtime::postbox::agent_turn_active(&session_id, &lane)
+                || crate::runtime::postbox::agent_turn_starting(&session_id, &lane)
+            {
+                continue;
+            }
+            let Some(addr) = canonical_talk_address(&lane) else { continue };
+            // In flight in this run: its own round top drains the steer.
+            if addr == AgentAddress::User || active.contains(&addr) {
+                continue;
+            }
+            let Some(note) = crate::runtime::postbox::take_first_user_steer(&session_id, &lane)
+            else {
+                continue;
+            };
+            crate::runtime::company::mirror_message_injected(&session_id, &note.message_id, &lane);
+            crate::runtime::postbox::forward(
+                &session_id,
+                crate::runtime::CliEvent::SteerDelivered {
+                    to: lane.clone(),
+                    subject: note.subject.clone(),
+                },
+            );
+            self.bus.send(AgentMessage::user_input(
+                addr,
+                crate::runtime::postbox::user_steer_content(&note.body),
+            ))?;
+        }
+        self.adopt_pending_company_messages(&session_id)
     }
 
     fn claim_delivery(&mut self, message: &AgentMessage) -> anyhow::Result<bool> {
@@ -318,6 +375,10 @@ impl<H: AgentTurnHandler> Gateway<H> {
         use futures_util::{future::FutureExt, stream::FuturesUnordered, StreamExt};
         let mut results = FuturesUnordered::new();
         let mut active = std::collections::HashSet::new();
+        let nudge = self
+            .durable_session_id
+            .as_deref()
+            .map(crate::runtime::postbox::gateway_nudge);
 
         while self.bus.has_pending() || !results.is_empty() {
             if let Some(max_turns) = max_turns {
@@ -411,7 +472,22 @@ impl<H: AgentTurnHandler> Gateway<H> {
             }
 
             let mut timed_out_agents = Vec::new();
-            if let Some((addr, result)) = results.next().await {
+            // Wait for the next finished turn, or for new input addressed to an
+            // agent that is not running (see `adopt_mid_run_input`).
+            let finished = match nudge.as_ref() {
+                Some(nudge) if !results.is_empty() => tokio::select! {
+                    finished = results.next() => Some(finished),
+                    _ = nudge.notified() => None,
+                },
+                _ => Some(results.next().await),
+            };
+            let Some(finished) = finished else {
+                if let Err(error) = self.adopt_mid_run_input(&active) {
+                    tracing::warn!("gateway could not adopt mid-run input: {error:#}");
+                }
+                continue;
+            };
+            if let Some((addr, result)) = finished {
                 active.remove(&addr);
                 match result {
                     Ok(outbound) => {

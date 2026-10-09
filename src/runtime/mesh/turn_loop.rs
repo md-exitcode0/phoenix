@@ -214,6 +214,86 @@ fn clear_provider_compaction_transaction(
     )
 }
 
+/// Wait for an ask card's answer, but stop waiting as soon as the user sends
+/// a message into this turn. The card stays open; ending the wait early lets
+/// the next round read the message and reply instead of sitting silent for
+/// up to five minutes behind a pass or unlock card.
+async fn await_answer_unless_user_writes(
+    mut rx: tokio::sync::oneshot::Receiver<String>,
+    limit: std::time::Duration,
+    session_id: &str,
+    agent: &str,
+) -> std::result::Result<std::result::Result<String, tokio::sync::oneshot::error::RecvError>, ()> {
+    let deadline = tokio::time::Instant::now() + limit;
+    loop {
+        let slice = deadline
+            .saturating_duration_since(tokio::time::Instant::now())
+            .min(std::time::Duration::from_millis(500));
+        if slice.is_zero() {
+            return Err(());
+        }
+        match tokio::time::timeout(slice, &mut rx).await {
+            Ok(answer) => return Ok(answer),
+            Err(_) if crate::runtime::postbox::has_pending_user_steer(session_id, agent) => {
+                return Err(())
+            }
+            Err(_) => {}
+        }
+    }
+}
+
+/// Last gate before a turn ends, shared by every finish path.
+///
+/// 1. A steer (a user's mid-task message or a coworker's note) that landed
+///    after this round's drain would otherwise sit in the lane: the turn ends,
+///    the sender was told it was delivered, and nobody reads it until some
+///    later wake. Grant a bounded extra round; its round-top drain hands the
+///    message to the model before it finishes.
+/// 2. A reply that promises to contact a coworker ("I'll tell Leon…") while
+///    nothing reached that coworker this turn gets one corrective round.
+fn finish_gate_feedback(
+    session_id: &str,
+    addr: &AgentAddress,
+    final_text: &str,
+    tool_results: &[ToolCallResult],
+    contacted: &std::collections::HashSet<String>,
+    promise_checked: &mut bool,
+    late_steer_rounds: &mut u8,
+) -> Option<(&'static str, String)> {
+    if matches!(addr, AgentAddress::Specialist(agent) if crate::sub_agents::volume_worker::is_agent(*agent)) {
+        return None;
+    }
+    if *late_steer_rounds < 3
+        && crate::runtime::postbox::has_pending_steer(session_id, &addr.label())
+    {
+        *late_steer_rounds += 1;
+        return Some((
+            "new message",
+            "A new message arrived just before you finished. It is in your next input: read it and respond to it (a short user_update for a user message), then finish.".to_string(),
+        ));
+    }
+    if !*promise_checked {
+        *promise_checked = true;
+        let mut texts: Vec<&str> = vec![final_text];
+        texts.extend(
+            tool_results
+                .iter()
+                .filter(|result| result.success && result.tool_name == "user_update")
+                .map(|result| result.output.as_str()),
+        );
+        let coworkers = crate::runtime::handoff_promise::coworkers_from_directory(&addr.label());
+        if let Some(coworker) =
+            crate::runtime::handoff_promise::unfulfilled_promise(&texts, &coworkers, contacted)
+        {
+            return Some((
+                "promised handoff",
+                crate::runtime::handoff_promise::corrective_feedback(coworker),
+            ));
+        }
+    }
+    None
+}
+
 fn reset_final_rejection_streak_for_tool_work(
     tool_calls: &[RequestedToolCall],
     consecutive_final_rejections: &mut u32,
@@ -508,6 +588,9 @@ pub(super) struct TurnState<'a> {
     /// One Codex/Pi-style compact-and-retry is allowed after a provider reports
     /// context overflow. A second overflow is surfaced instead of looping.
     pub(super) overflow_recovery_attempted: bool,
+    /// One "reply too large, use smaller steps" recovery per turn. A second
+    /// oversized reply ends the turn with preserved evidence instead of looping.
+    pub(super) oversize_recovery_attempted: bool,
     /// Named turns share one absolute deadline. Disposable volume workers are
     /// intentionally `None`: they have no per-item wall-clock cap, while each
     /// provider/tool action remains independently bounded and parent Stop
@@ -548,6 +631,17 @@ pub(super) struct TurnState<'a> {
     /// purpose: an old begin receipt from an endless transcript cannot stand
     /// in for starting today's run.
     pub(super) begun_routine_ids: std::collections::HashSet<String>,
+    /// Coworkers this turn actually reached through message_agent, talk, or
+    /// agent_control (lowercase role ids and the names the call used). A
+    /// reply that promises a handoff is checked against this, not against
+    /// the model's own words.
+    pub(super) contacted_coworkers: std::collections::HashSet<String>,
+    /// The promised-handoff correction runs at most once per turn so a model
+    /// that keeps the wording can never loop.
+    pub(super) handoff_promise_checked: bool,
+    /// Extra rounds granted because a steer arrived just as the turn was
+    /// about to finish. Bounded; each round drains the lane.
+    pub(super) late_steer_rounds: u8,
 }
 
 /// How one [`MeshRunner::run_rounds`] call ended. Every variant is one of the
@@ -1625,6 +1719,7 @@ impl MeshRunner {
         //
         let transport_retries: u32 = 0;
         let overflow_recovery_attempted = false;
+        let oversize_recovery_attempted = false;
         let last_input_tokens: u64 = 0;
         // Refresh connected-app context off the first-token path. The prompt
         // uses the last cached snapshot immediately; a cold or slow network
@@ -1745,6 +1840,7 @@ impl MeshRunner {
             workspace_index_dirty,
             transport_retries,
             overflow_recovery_attempted,
+            oversize_recovery_attempted,
             turn_deadline,
             tool_calls_seen: 0,
             economy_guard: crate::runtime::efficiency::guard_for_turn(
@@ -1775,6 +1871,9 @@ impl MeshRunner {
                 )
             },
             begun_routine_ids: std::collections::HashSet::new(),
+            contacted_coworkers: std::collections::HashSet::new(),
+            handoff_promise_checked: false,
+            late_steer_rounds: 0,
         };
         phase.step("build turn state");
         if phase.total_secs() >= 1.0 {
@@ -1994,6 +2093,7 @@ impl MeshRunner {
             workspace_index_dirty,
             transport_retries,
             overflow_recovery_attempted,
+            oversize_recovery_attempted,
             turn_deadline: provider_turn_deadline,
             tool_calls_seen,
             economy_guard,
@@ -2009,6 +2109,9 @@ impl MeshRunner {
             abandoned_calls,
             required_routine_id,
             begun_routine_ids,
+            contacted_coworkers,
+            handoff_promise_checked,
+            late_steer_rounds,
             ..
         } = st;
         // Each binding above is an `&mut Field`. The moved-verbatim body still
@@ -3060,8 +3163,42 @@ impl MeshRunner {
                     }
                     return Err(error);
                 }
+                Err(error)
+                    if !*oversize_recovery_attempted && is_response_size_limit_error(&error) =>
+                {
+                    // The model's reply (usually one giant `write`) was larger
+                    // than Phoenix accepts. Re-sending the same request would
+                    // regenerate the same reply, so tell the model why and
+                    // let it redo the step in smaller pieces, once per turn.
+                    round_log.provider_failed(provider_started.elapsed().as_millis() as u64);
+                    *oversize_recovery_attempted = true;
+                    let cause = first_line(&format!("{error:#}")).to_string();
+                    crate::runtime::gwlog(&format!(
+                        "  provider reply too large [{}] after {}s: {cause} (asking for smaller steps, retrying once)",
+                        spec.name,
+                        provider_started.elapsed().as_secs()
+                    ));
+                    self.emit(CliEvent::GatewayNotice(format!(
+                        "{}'s last reply was too large to receive; asking it to redo that step in smaller parts",
+                        spec.name
+                    )));
+                    push_round_feedback(
+                        &mut session,
+                        &mut native_tool_messages,
+                        None,
+                        "response size limit",
+                        OVERSIZED_REPLY_FEEDBACK,
+                    );
+                    continue;
+                }
                 Err(error) if is_transient_provider_error(&error) => {
                     round_log.provider_failed(provider_started.elapsed().as_millis() as u64);
+                    crate::runtime::gwlog(&format!(
+                        "  provider error [{}] after {}s (will retry): {}",
+                        spec.name,
+                        provider_started.elapsed().as_secs(),
+                        first_line(&format!("{error:#}"))
+                    ));
                     let mut delay = prepare_transient_provider_retry(
                         transport_retries,
                         round_cursor,
@@ -3082,7 +3219,11 @@ impl MeshRunner {
                     }
                     continue;
                 }
-                Err(_error) if request_used_native_replay && !*overflow_recovery_attempted => {
+                Err(error)
+                    if request_used_native_replay
+                        && !*overflow_recovery_attempted
+                        && !is_response_size_limit_error(&error) =>
+                {
                     round_log.provider_failed(provider_started.elapsed().as_millis() as u64);
                     *overflow_recovery_attempted = true;
                     clear_provider_compaction_transaction(
@@ -3098,6 +3239,12 @@ impl MeshRunner {
                 }
                 Err(error) => {
                     round_log.provider_failed(provider_started.elapsed().as_millis() as u64);
+                    crate::runtime::gwlog(&format!(
+                        "  provider error [{}] after {}s (turn ends): {}",
+                        spec.name,
+                        provider_started.elapsed().as_secs(),
+                        first_line(&format!("{error:#}"))
+                    ));
                     if let Some(final_response) =
                         provider_failure_after_evidence(&error, &tool_results)
                     {
@@ -3311,6 +3458,18 @@ impl MeshRunner {
                                         "unfinished task list", &feedback);
                                     continue;
                                 }
+                                if let Some((label, feedback)) = finish_gate_feedback(
+                                    &self.main_session_id,
+                                    addr,
+                                    &final_response.final_markdown,
+                                    tool_results.as_slice(),
+                                    contacted_coworkers,
+                                    handoff_promise_checked,
+                                    late_steer_rounds,
+                                ) {
+                                    push_round_feedback(&mut session, &mut native_tool_messages, None, label, &feedback);
+                                    continue;
+                                }
                                 return Ok(SliceExit::Final(final_response));
                             }
                         }
@@ -3416,6 +3575,18 @@ impl MeshRunner {
                             "final response",
                             &feedback,
                         );
+                        continue;
+                    }
+                    if let Some((label, feedback)) = finish_gate_feedback(
+                        &self.main_session_id,
+                        addr,
+                        &final_response.final_markdown,
+                        tool_results.as_slice(),
+                        contacted_coworkers,
+                        handoff_promise_checked,
+                        late_steer_rounds,
+                    ) {
+                        push_round_feedback(&mut session, &mut native_tool_messages, None, label, &feedback);
                         continue;
                     }
                     return Ok(SliceExit::Final(final_response));
@@ -3993,9 +4164,11 @@ impl MeshRunner {
                                 questions: ask.questions.clone(),
                                 approval: ask.approval.clone(),
                             });
-                            let _ = tokio::time::timeout(
-                                std::time::Duration::from_secs(crate::tools::passes::REQUEST_WAIT_SECONDS),
+                            let _ = await_answer_unless_user_writes(
                                 rx,
+                                std::time::Duration::from_secs(crate::tools::passes::REQUEST_WAIT_SECONDS),
+                                &self.main_session_id,
+                                &addr.label(),
                             )
                             .await;
                             if crate::tools::passes::needs_unlock() {
@@ -4098,6 +4271,18 @@ impl MeshRunner {
                                         "final_answer",
                                         &feedback,
                                     );
+                                    continue;
+                                }
+                                if let Some((_label, feedback)) = finish_gate_feedback(
+                                    &self.main_session_id,
+                                    addr,
+                                    &final_response.final_markdown,
+                                    tool_results.as_slice(),
+                                    contacted_coworkers,
+                                    handoff_promise_checked,
+                                    late_steer_rounds,
+                                ) {
+                                    push_round_feedback(&mut session, &mut native_tool_messages, call_id, "final_answer", &feedback);
                                     continue;
                                 }
                                 return Ok(SliceExit::Final(final_response));
@@ -4300,6 +4485,7 @@ impl MeshRunner {
                                                 body: transport,
                                             },
                                         );
+                                        contacted_coworkers.insert(agent.to_ascii_lowercase());
                                         Self::push_tool_outcome(&mut session,&mut native_tool_messages,call_id,"agent_control",&forensic_input,true,&format!("Message queued for `{agent}` at {} priority; it will be first at the next safe model boundary.",input.priority.label()));
                                     }
                                     AgentControlAction::Resume => {
@@ -4501,6 +4687,8 @@ impl MeshRunner {
                                             }
                                             .to_string(),
                                         });
+                                        contacted_coworkers.insert(base.to_ascii_lowercase());
+                                        contacted_coworkers.insert(target_name.to_ascii_lowercase());
                                         delivered.push(format!("{base} (running)"));
                                         continue;
                                     }
@@ -4533,6 +4721,8 @@ impl MeshRunner {
                                         Some(&operation_id),
                                     )?;
                                     if !should_route {
+                                        contacted_coworkers.insert(base.to_ascii_lowercase());
+                                        contacted_coworkers.insert(target_name.to_ascii_lowercase());
                                         delivered.push(format!("{base} (already accepted)"));
                                         continue;
                                     }
@@ -4557,6 +4747,12 @@ impl MeshRunner {
                                     // deliver it when that coworker next runs. Starting a
                                     // background job here would silently turn messaging
                                     // back into delegation.
+                                    contacted_coworkers.insert(base.to_ascii_lowercase());
+                                    contacted_coworkers.insert(target_name.to_ascii_lowercase());
+                                    // Wake a gateway run that is already in flight
+                                    // for this conversation: it adopts the accepted
+                                    // message now instead of only at the next run.
+                                    crate::runtime::postbox::nudge_gateway(&self.main_session_id);
                                     delivered.push(format!("{base} (inbox)"));
                                 }
                                 let forensic_input = serde_json::to_string(&call.input)
@@ -4727,6 +4923,7 @@ impl MeshRunner {
                                                         }),
                                                         status: "queued".to_string(),
                                                     });
+                                                    contacted_coworkers.insert(base.to_ascii_lowercase());
                                                     self.emit(CliEvent::GatewayNotice(format!(
                                                         "talk → {}: \"{}\" (injected into its running turn)",
                                                         agent_display_name(&base),
@@ -4864,6 +5061,8 @@ impl MeshRunner {
                                         // Mode 1 takes the foreground route
                                         // below and cannot be bypassed by an
                                         // owner final emitted before the reply.
+                                        contacted_coworkers.insert(message.to.label().to_ascii_lowercase());
+                                        contacted_coworkers.insert(talk.to.trim().to_ascii_lowercase());
                                         if is_background_spawn {
                                             self.spawn_background(message.clone());
                                             Self::push_tool_ack(
@@ -5143,11 +5342,13 @@ impl MeshRunner {
                                     // typing a login takes seconds. Past the
                                     // window the card stays open and a late
                                     // answer wakes this coworker with the id.
-                                    match tokio::time::timeout(
+                                    match await_answer_unless_user_writes(
+                                        rx,
                                         std::time::Duration::from_secs(
                                             crate::tools::passes::REQUEST_WAIT_SECONDS,
                                         ),
-                                        rx,
+                                        &self.main_session_id,
+                                        &addr.label(),
                                     )
                                     .await
                                     {

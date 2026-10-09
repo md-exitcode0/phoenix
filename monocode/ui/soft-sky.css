@@ -923,8 +923,24 @@ html:root[data-skin="phoenix"] #termPanel .term-tab[aria-selected="true"]{backgr
 /* Progress belongs to the scrolling conversation, never to the composer. */
 html:root[data-skin="phoenix"] #conversationTail{display:flex;flex-direction:column;gap:14px;padding:12px 0 8px;min-width:0}
 html:root[data-skin="phoenix"] #conversationTail:not(:has(>#conversationThinking:not([hidden]))){display:none}
-html:root[data-skin="phoenix"] #conversationThinking{align-self:flex-start;width:40px;height:40px;margin:0 0 0 4px}
-html:root[data-skin="phoenix"] #conversationThinking canvas{width:40px;height:40px}
+/* Status pill: what the agent is doing right now, in plain words. Same
+   30px glass capsule language as the header pills; soft ~2.5s pulse. */
+html:root[data-skin="phoenix"] #conversationThinking{
+  align-self:flex-start;display:inline-flex;align-items:center;gap:8px;box-sizing:border-box;
+  max-width:min(100%,420px);min-height:30px;margin:0 0 0 4px;padding:0 13px 0 11px;border-radius:999px;
+  background:var(--glass-1);border:1px solid var(--glass-line);color:var(--soft-ink-2);
+  font:500 12px/1 var(--soft-font);white-space:nowrap;
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  animation:phoenix-status-pulse 2.5s ease-in-out infinite;
+}
+html:root[data-skin="phoenix"] #conversationThinking .status-pill-label{overflow:hidden;text-overflow:ellipsis;min-width:0}
+html:root[data-skin="phoenix"] #conversationThinking .status-pill-dot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--soft-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--soft-accent) 18%,transparent)}
+html:root[data-skin="phoenix"] #conversationThinking[data-mode="waiting"]{animation-duration:3.5s;color:var(--soft-ink-3,var(--soft-ink-2))}
+html:root[data-skin="phoenix"] #conversationThinking[data-mode="waiting"] .status-pill-dot{background:transparent;box-shadow:inset 0 0 0 1.5px var(--soft-accent)}
+html:root[data-skin="phoenix"][data-theme="light"] #conversationThinking{background:rgb(255 255 255 / 72%);border-color:rgb(255 255 255 / 60%)}
+@keyframes phoenix-status-pulse{0%,100%{opacity:1}50%{opacity:.58}}
+@media (prefers-reduced-motion:reduce){html:root[data-skin="phoenix"] #conversationThinking{animation:none}}
+html:root[data-motion="minimal"] #conversationThinking{animation:none!important}
 html:root[data-skin="phoenix"] #taskBlock{margin:0!important;width:100%;box-sizing:border-box}
 html:root[data-skin="phoenix"] #conversationFeed :is(.reasoning-cluster,.reasoning-subgroup,.commentary-line,.agent-update){display:none!important}
 

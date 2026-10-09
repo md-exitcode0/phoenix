@@ -224,6 +224,14 @@ pub(super) fn provider_failure_after_evidence(
     }
     let formatted_error = format!("{error:#}");
     let cause = first_line(&formatted_error);
+    // Tell whoever receives this receipt (the user, or a coworker that may
+    // re-delegate) what will and will not help, so the same oversized step is
+    // not simply asked for again.
+    let cause = if is_response_size_limit_error(error) {
+        format!("{cause}\n\nThe model's reply was larger than Phoenix accepts in one response (usually one very large file write). Retrying the same step will fail the same way; ask for the output in smaller parts.")
+    } else {
+        cause.to_string()
+    };
     Some(FinalResponse {
         summary: "Provider unavailable after tool evidence was collected".to_string(),
         final_markdown: format!(
@@ -317,6 +325,16 @@ pub(super) fn is_transient_provider_error(error: &anyhow::Error) -> bool {
     .iter()
     .any(|marker| text.contains(marker))
 }
+
+/// The provider stream was larger than Phoenix accepts (typed limit error, or
+/// its rendered text after fallback/context layers). Not transient: resending
+/// the same request regenerates the same oversized reply.
+pub(super) fn is_response_size_limit_error(error: &anyhow::Error) -> bool {
+    crate::providers::fallback::is_response_size_limit_error(error, &format!("{error:#}"))
+}
+
+/// Fed back to the model once when its reply was too large to receive.
+pub(super) const OVERSIZED_REPLY_FEEDBACK: &str = "Your last reply was too large for Phoenix to receive, so it was discarded and nothing from it ran (no file was written). Do not repeat it in one step. Redo it in smaller parts: keep each tool call's content under about 50 KB, e.g. write the file's first section, then add the remaining sections with further edits. Keep your text replies short.";
 
 /// Context exhaustion is recoverable by compaction, but it is not a transport
 /// retry: resending the same prompt cannot help. Providers use several different

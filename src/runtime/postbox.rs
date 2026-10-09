@@ -719,9 +719,15 @@ pub fn rehome_orphan_steers(session_id: &str, owner: &str) -> usize {
             }
             // Group-room deliveries belong to their exact member lane; the
             // room watcher settles them (start a turn or retire an FYI).
-            let (room, other): (Vec<_>, Vec<_>) =
-                notes.drain(..).partition(is_room_steer);
-            *notes = room;
+            // A coworker note written BY the owner to this lane stays here:
+            // moving it into the owner's own lane turned "Avery → Leon" into
+            // a message from Avery to herself and Leon never saw it. It is
+            // drained by the recipient's next turn in this session.
+            let (keep, other): (Vec<_>, Vec<_>) = notes.drain(..).partition(|note| {
+                is_room_steer(note)
+                    || crate::runtime::mailbox::same_agent_identity(&note.from, &owner)
+            });
+            *notes = keep;
             orphans.extend(other);
         }
         sbox.steer.retain(|_, notes| !notes.is_empty());
@@ -1582,6 +1588,55 @@ pub fn steer(session_id: &str, agent: &str, mut note: SteerNote) {
     });
     // Outside `with_box`: `notify` takes the same non-reentrant lock.
     notify(session_id, &event);
+    // A gateway run blocked on a long coworker turn must notice a message
+    // parked for an agent that has no live turn right now (an owner waiting on
+    // a coworker's reply); otherwise the message waits for that coworker.
+    nudge_gateway(session_id);
+}
+
+fn gateway_nudges() -> &'static Mutex<HashMap<String, std::sync::Arc<tokio::sync::Notify>>> {
+    static NUDGES: OnceLock<Mutex<HashMap<String, std::sync::Arc<tokio::sync::Notify>>>> =
+        OnceLock::new();
+    NUDGES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// The wake signal of this session's in-flight gateway run. `notify_one`
+/// stores a permit, so a nudge sent while the run is busy elsewhere is seen
+/// the next time it waits.
+pub fn gateway_nudge(session_id: &str) -> std::sync::Arc<tokio::sync::Notify> {
+    gateway_nudges()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .entry(session_id.to_string())
+        .or_insert_with(|| std::sync::Arc::new(tokio::sync::Notify::new()))
+        .clone()
+}
+
+/// New input for this session that a running gateway should adopt now: a
+/// parked user steer or a coworker message accepted for an idle recipient.
+pub fn nudge_gateway(session_id: &str) {
+    gateway_nudge(session_id).notify_one();
+}
+
+/// Lanes holding at least one one-to-one user message (not a room delivery).
+pub fn user_steer_lanes(session_id: &str) -> Vec<String> {
+    with_box(session_id, |sbox| {
+        sbox.steer
+            .iter()
+            .filter(|(_, notes)| notes.iter().any(|note| note.from == "user" && !is_room_steer(note)))
+            .map(|(lane, _)| lane.clone())
+            .collect()
+    })
+}
+
+/// Is a one-to-one user message waiting in this agent's lane?
+pub fn has_pending_user_steer(session_id: &str, agent: &str) -> bool {
+    let base = base_agent(agent).to_string();
+    with_box(session_id, |sbox| {
+        sbox.steer
+            .get(&base)
+            .is_some_and(|notes| notes.iter().any(|note| note.from == "user" && !is_room_steer(note)))
+    })
 }
 
 /// Drain pending steer notes for one specialist (called at its round top).

@@ -50,9 +50,8 @@
 :root[data-skin="phoenix"] body.inspection-stacked:not(.inspection-expanded) #inspectionSidebar {top:34px;border-bottom:1px solid var(--mc-line)}
 /* The brand is a crisp mark, including while hovered in the compact rail. */
 :root[data-skin="phoenix"] .phoenix-raster-logo {filter:none!important;transform:none!important}
-#conversationThinking {align-self:center;width:64px;height:64px;flex:none}
+#conversationThinking {align-self:flex-start;display:inline-flex;align-items:center;gap:7px;flex:none;max-width:min(100%,420px);padding:6px 12px 6px 10px;border-radius:999px;font-size:12px;line-height:1.2}
 #conversationThinking[hidden] {display:none!important}
-#conversationThinking canvas {display:block;width:64px;height:64px}
 #conversationDetailToggle {border:0;background:transparent;color:var(--ink-soft);font:inherit;font-size:11px;padding:4px 7px;border-radius:5px;white-space:nowrap;-webkit-app-region:no-drag}
 #conversationDetailToggle:hover {background:var(--mc-selection)}
 #conversationDetailToggle:focus-visible {outline:2px solid var(--accent);outline-offset:2px}

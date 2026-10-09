@@ -1419,6 +1419,49 @@ export function installConversationPreviews({
   }
   if(preview&&(previewShot==="soft"||new URLSearchParams(location.search).get("scene")==="soft")){runPreviewWhenDirectoryReady(()=>setTimeout(()=>{(previewShot==="group"?runSoftGroupPreview:runSoftChatPreview)();setTimeout(()=>{$("taskBlock").hidden=true;},400);},1200),0);}
   if(preview&&previewShot==="mike-repro"){runPreviewWhenDirectoryReady(runMikeReproPreview,200);}
+  // Mid-task arrivals stay in true order and the indicator follows the
+  // running turn: Avery's update, Leon's message landing mid-turn, the user's
+  // mid-task message, then Avery's reply to it, all below one another.
+  if(preview&&previewShot==="avery-handoff-proof"){runPreviewWhenDirectoryReady(async()=>{
+    const pillEl=()=>$("conversationThinking")||{hidden:true,textContent:"",dataset:{}},pause=(ms=60)=>new Promise(resolve=>setTimeout(resolve,ms)),feed=$("conversationFeed"),checks={};
+    clearFeed();replaceDisplayRows([],false);state.turnSocket=null;
+    const owner=state.item?.id||"school_coach",execution={turn_id:"avery-T1",task_id:"avery-T1",attempt_id:"avery-A1"};
+    renderStory({kind:"user",agent:owner,text:"please ask again, there was a mess",execution,event_sequence:1});
+    setWorking(true);
+    renderStory({kind:"tool",agent:owner,tool:"user_update",ok:true,detail:"Got it. I'll tell Leon you've fixed the bugs.",execution,event_sequence:2});await pause();
+    renderStory({kind:"tool_start",agent:owner,tool:"read",target:JSON.stringify({path:"/work/school-route-guide/school-guide.md"}),execution,event_sequence:3});await pause();
+    checks.pillShowsAction=!pillEl().hidden&&pillEl().textContent.trim()==="Reading school-guide.md";
+    // Leon's report reaches Avery's thread while her turn is still running.
+    const talk={role:"talk",from:"designer",to:owner,subject:"Website progress",body:"Real index.html and styles.css now written."};
+    if(appendDisplay("history",talk,true))renderDisplayEntry(state.displayRows.at(-1));
+    checks.activeTurnKept=state.activeTurnId==="avery-T1";
+    // The user's mid-task message, exactly as steerTurn records it.
+    const steerTurn=state.activeTurnId;
+    state.displayRows.push({source:"history",turn_id:steerTurn,value:{role:"user",turn_id:steerTurn,text:"oh and when the website is done, open it up in your browser for me please",steered:true,steer_id:"steer-1"}});
+    renderUser("oh and when the website is done, open it up in your browser for me please",[],null,{steered:true});await pause();
+    renderStory({kind:"tool",agent:owner,tool:"user_update",ok:true,detail:"Yep, I'll open the finished guide in my browser for you once it's ready.",execution,event_sequence:4});await pause();
+    renderStory({kind:"tool_start",agent:owner,tool:"message_agent",target:JSON.stringify({to:["designer"],subject:"Fixed"}),execution,event_sequence:5});await pause();
+    checks.pillMessaging=pillEl().textContent.trim().startsWith("Messaging ");
+    const order=()=>{const text=feed.textContent,at=s=>text.indexOf(s);const a=at("Got it. I'll tell Leon"),b=at("Real index.html"),c=at("open it up in your browser"),d=at("Yep, I'll open");return a>=0&&a<b&&b<c&&c<d;};
+    checks.liveOrder=order();
+    const rowText=state.displayRows.map(row=>JSON.stringify(row.value)).join("|"),ri=s=>rowText.indexOf(s);
+    checks.savedOrder=ri("Got it. I'll tell Leon")<ri("Real index.html")&&ri("Real index.html")<ri("open it up in your browser")&&ri("open it up in your browser")<ri("Yep, I'll open");
+    repaintConversation(null,false);await pause(120);
+    checks.repaintOrder=order();
+    document.title="READY avery-handoff-proof";document.documentElement.dataset.proof=JSON.stringify(checks);
+    if(new URLSearchParams(location.search).get("finish")==="1"){
+      // The fixture directory reports this agent as working; play the gateway.
+      const row=ui.activityFor(state.item),realStatus=row?.status;if(row)row.status="waiting_peer";
+      renderStory({kind:"settled",agent:owner,ok:true,execution,event_sequence:6});await pause(80);
+      checks.settledStopsWorking=!state.working;
+      checks.waitingPill=!pillEl().hidden&&pillEl().dataset.mode==="waiting"&&pillEl().textContent.trim()==="Waiting for a coworker";
+      if(row)row.status="idle";setWorking(false);await pause(40);
+      checks.idleRemovesPill=pillEl().hidden;
+      if(row)row.status=realStatus;
+      document.documentElement.dataset.proof=JSON.stringify(checks);
+    }
+  },200);}
+
   if(preview&&previewShot==="compact-errors-proof"){runPreviewWhenDirectoryReady(runCompactErrorsProof,160);}
   if(preview&&previewShot==="agent-components"){runPreviewWhenDirectoryReady(runAgentComponentsProof,160);}
   if(preview&&previewShot==="worker-presence-proof"){runPreviewWhenDirectoryReady(runWorkerPresenceProof,160);}

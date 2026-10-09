@@ -123,6 +123,17 @@ fn cooldown_for(message: &str) -> i64 {
     }
 }
 
+/// A reply larger than Phoenix accepts is decided by the REQUEST (what the
+/// model chose to write), not by the account. Rotating to the next account
+/// only regenerates the same multi-minute reply and fails again, so the chain
+/// stops at the first one. On 2026-10-09 each failed Avery round spent
+/// 13-14 minutes this way before the turn gave up.
+pub fn is_response_size_limit_error(error: &anyhow::Error, message: &str) -> bool {
+    crate::providers::is_response_body_limit_error(error)
+        || message.contains("byte limit (received body size)")
+        || message.contains("byte limit (advertised Content-Length)")
+}
+
 fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
@@ -203,7 +214,11 @@ impl FallbackProvider {
 
     fn account_failure(&self, index: usize, message: &str) -> String {
         let lower = message.to_ascii_lowercase();
-        let reason = if crate::config::auth_profile::is_oauth_login_rejected(message) {
+        let reason = if message.contains("byte limit (received body size)")
+            || message.contains("byte limit (advertised Content-Length)")
+        {
+            "reply too large for one response"
+        } else if crate::config::auth_profile::is_oauth_login_rejected(message) {
             "sign in again (saved login rejected; not a usage limit)"
         } else if lower.contains("401") || lower.contains("unauthorized") || lower.contains("invalid_api_key") {
             "authentication rejected (not a usage-limit result)"
@@ -380,6 +395,23 @@ impl FallbackProvider {
                     let message = format!("{error:#}");
                     failures.push(self.account_failure(index, &message));
                     let next = order.get(pos + 1).copied();
+                    // Record every account attempt in gateway.log. The
+                    // eprintln below reaches only the terminal, which left the
+                    // per-account causes of provider failures unrecorded.
+                    crate::runtime::gwlog(&format!(
+                        "  account fallback [{}]: `{}` failed: {}",
+                        self.role,
+                        self.links[index].label,
+                        first_line(&message)
+                    ));
+                    if is_response_size_limit_error(&error, &message) {
+                        // Decided by this request, not the account: do not
+                        // bench it and do not regenerate on the next one.
+                        return Err(error.context(format!(
+                            "{} reply was larger than Phoenix accepts in one response; not retried on other accounts",
+                            self.role
+                        )));
+                    }
                     if is_account_exhausted_error(&message) {
                         self.bench(index, &message, next);
                     } else if let Some(next_index) = next {
@@ -431,6 +463,23 @@ impl FallbackProvider {
                     let message = format!("{error:#}");
                     failures.push(self.account_failure(index, &message));
                     let next = order.get(pos + 1).copied();
+                    // Record every account attempt in gateway.log. The
+                    // eprintln below reaches only the terminal, which left the
+                    // per-account causes of provider failures unrecorded.
+                    crate::runtime::gwlog(&format!(
+                        "  account fallback [{}]: `{}` failed: {}",
+                        self.role,
+                        self.links[index].label,
+                        first_line(&message)
+                    ));
+                    if is_response_size_limit_error(&error, &message) {
+                        // Decided by this request, not the account: do not
+                        // bench it and do not regenerate on the next one.
+                        return Err(error.context(format!(
+                            "{} reply was larger than Phoenix accepts in one response; not retried on other accounts",
+                            self.role
+                        )));
+                    }
                     if is_account_exhausted_error(&message) {
                         self.bench(index, &message, next);
                     } else if let Some(next_index) = next {
@@ -799,6 +848,28 @@ mod tests {
             "benched account not re-hit"
         );
         assert_eq!(alive_calls.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn oversized_reply_does_not_regenerate_on_every_account() {
+        let home = tempfile::tempdir().unwrap();
+        let _home = crate::config::test_env::PhoenixHomeGuard::set_private(home.path());
+        let (big, big_calls, _) = link(
+            "account-1",
+            Some("OpenAI Codex SSE response exceeded the 4194304 byte limit (received body size)"),
+            None,
+        );
+        let (other, other_calls, _) = link("account-2", None, None);
+        let chain = FallbackProvider::new("school_coach", vec![big, other]);
+        let error = chain.complete(request()).await.unwrap_err();
+        let text = format!("{error:#}");
+        assert!(text.contains("larger than Phoenix accepts"), "{text}");
+        assert!(text.contains("byte limit"), "{text}");
+        assert_eq!(big_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(other_calls.load(Ordering::SeqCst), 0, "same request must not be regenerated");
+        // Not an account problem: the first account is not benched.
+        chain.complete(request()).await.unwrap_err();
+        assert_eq!(big_calls.load(Ordering::SeqCst), 2);
     }
 
     #[tokio::test]

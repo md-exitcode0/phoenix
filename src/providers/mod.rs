@@ -63,7 +63,7 @@ impl fmt::Display for ResponseBodyLimitError {
 
 impl std::error::Error for ResponseBodyLimitError {}
 
-fn response_limit_error(label: &str, limit: usize, advertised: bool) -> anyhow::Error {
+pub(crate) fn response_limit_error(label: &str, limit: usize, advertised: bool) -> anyhow::Error {
     anyhow::Error::new(ResponseBodyLimitError {
         label: label.to_string(),
         limit,

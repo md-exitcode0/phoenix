@@ -23,7 +23,16 @@ const PUBLIC_OPENAI_RESPONSES_BASE_URL: &str = "https://api.openai.com/v1";
 const CHATGPT_CODEX_BASE_URL: &str = "https://chatgpt.com/backend-api/codex";
 const MAX_NATIVE_COMPACTION_WIRE_BYTES: usize = 20 * 1024 * 1024;
 const MAX_NATIVE_COMPACTION_RESPONSE_BYTES: usize = 16 * 1024 * 1024;
+/// Ceiling for ONE not-yet-terminated SSE frame. Parsed frames are dropped
+/// from the buffer as soon as they are dispatched, so this bounds memory per
+/// frame instead of capping the whole reply. (It used to cap the whole raw
+/// stream: every token delta repeats a ~200-byte JSON envelope, so one long
+/// legitimate reply, such as a single large `write`, crossed 4 MiB of
+/// transport bytes after minutes of streaming and was thrown away.)
 const MAX_CODEX_SSE_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
+/// Ceiling for the whole SSE transport body. Still bounds a broken or
+/// malicious endpoint, but sits far above any real model reply.
+const MAX_CODEX_SSE_TOTAL_BYTES: usize = super::MAX_PROVIDER_RESPONSE_BYTES;
 
 // The subscription route scopes usage to the account claim in the OAuth
 // token. Decode only for routing; the server still validates the signature.
@@ -912,10 +921,17 @@ impl OpenAICodexProvider {
         // limit bounds memory, but a healthy stream has no total wall-clock cap.
         const HEARTBEAT_EVERY: Duration = Duration::from_secs(15);
         const LABEL: &str = "OpenAI Codex SSE response";
-        super::ensure_response_content_length(&resp, max_stream_bytes, LABEL)?;
+        const FRAME_LABEL: &str = "OpenAI Codex SSE frame";
+        // `max_stream_bytes` bounds one pending frame; the total transport
+        // body gets the (much larger) provider-wide ceiling. Never let the
+        // total ceiling drop below the per-frame one (tests pass tiny limits).
+        let max_total_bytes = MAX_CODEX_SSE_TOTAL_BYTES.max(max_stream_bytes);
+        super::ensure_response_content_length(&resp, max_total_bytes, LABEL)?;
         let started = std::time::Instant::now();
         let mut last_beat = started;
+        // Only the unparsed tail lives here; dispatched frames are drained.
         let mut raw: Vec<u8> = Vec::new();
+        let mut total_bytes: usize = 0;
         let mut output_text = String::new();
         let mut reasoning_text = String::new();
         let mut final_response: Option<Value> = None;
@@ -929,7 +945,11 @@ impl OpenAICodexProvider {
             let Some(chunk) = chunk else {
                 break;
             };
-            super::extend_bounded_response_body(&mut raw, &chunk, max_stream_bytes, LABEL)?;
+            total_bytes = total_bytes
+                .checked_add(chunk.len())
+                .filter(|total| *total <= max_total_bytes)
+                .ok_or_else(|| super::response_limit_error(LABEL, max_total_bytes, false))?;
+            raw.extend_from_slice(&chunk);
             // Scan each byte once, retaining incomplete frames across network
             // chunks (including split UTF-8 and CRLF delimiters). Dispatch
             // complete frames now, not after the HTTP response closes.
@@ -945,17 +965,27 @@ impl OpenAICodexProvider {
                     frame_start = scan;
                 }
             }
+            // Drop dispatched frames so a long healthy stream does not keep
+            // (and get capped on) bytes that were already parsed.
+            if frame_start > 0 {
+                raw.drain(..frame_start);
+                scan -= frame_start;
+                frame_start = 0;
+            }
+            if raw.len() > max_stream_bytes {
+                return Err(super::response_limit_error(FRAME_LABEL, max_stream_bytes, false));
+            }
             if last_beat.elapsed() >= HEARTBEAT_EVERY {
                 let progress = format!(
                         "  model streaming… {} KB in {}s",
-                        raw.len() / 1024,
+                        total_bytes / 1024,
                         started.elapsed().as_secs()
                     );
                 super::stream_progress_observed(session, observer, &progress);
                 last_beat = std::time::Instant::now();
             }
         }
-        let raw_len = raw.len();
+        let raw_len = total_bytes;
         // Preserve compatibility with a final frame lacking a blank line.
         if frame_start < raw.len() {
             let frame = std::str::from_utf8(&raw[frame_start..])
@@ -1952,6 +1982,50 @@ mod tests {
     #[test]
     fn codex_stream_keeps_a_bounded_response_size() {
         assert_eq!(MAX_CODEX_SSE_RESPONSE_BYTES, 4 * 1024 * 1024);
+        assert!(MAX_CODEX_SSE_TOTAL_BYTES > MAX_CODEX_SSE_RESPONSE_BYTES);
+    }
+
+    /// A long healthy reply is many small delta frames. Their transport bytes
+    /// add up far past the per-frame ceiling; that must not discard the reply
+    /// (Avery lost two multi-minute generations this way on 2026-10-09).
+    #[tokio::test]
+    async fn sse_reader_accepts_long_stream_of_small_frames_past_frame_limit() {
+        let mut body = String::new();
+        let mut expected = String::new();
+        for i in 0..200 {
+            let delta = format!("chunk{i:03};");
+            expected.push_str(&delta);
+            body.push_str(&format!(
+                "data: {}\n\n",
+                serde_json::json!({"type": "response.output_text.delta", "delta": delta})
+            ));
+        }
+        body.push_str("data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"usage\":{}}}\n\n");
+        assert!(body.len() > 4096);
+        let mut raw =
+            b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n"
+                .to_vec();
+        raw.extend_from_slice(body.as_bytes());
+        let response = local_response(raw).await;
+        let value = OpenAICodexProvider::read_stream_with_limit(response, "model", None, 4096)
+            .await
+            .expect("small frames under the per-frame limit must be accepted");
+        assert_eq!(value["output_text"], expected);
+    }
+
+    #[tokio::test]
+    async fn sse_reader_still_rejects_one_oversized_frame() {
+        let big = "x".repeat(8192);
+        let raw = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\ndata: {}",
+            serde_json::json!({"type": "response.output_text.delta", "delta": big})
+        )
+        .into_bytes();
+        let response = local_response(raw).await;
+        let error = OpenAICodexProvider::read_stream_with_limit(response, "model", None, 4096)
+            .await
+            .unwrap_err();
+        assert!(super::super::is_response_body_limit_error(&error));
     }
 
     #[test]
