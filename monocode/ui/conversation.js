@@ -1450,7 +1450,7 @@
   }
   const pendingOwnedStories=new Map();
   function ownedStoryTurn(value){return String(value?.execution?.turn_id||"");}
-  function ownedStoryEventKey(value){return value?.execution&&value.event_sequence!=null?JSON.stringify([value.execution.task_id,value.execution.attempt_id,value.event_sequence,value.kind,value.agent_id||value.agent||value.from||""]):"";}
+  function ownedStoryEventKey(value){return value?.execution&&value.event_sequence!=null?JSON.stringify([value.execution.task_id,value.execution.attempt_id,value.event_sequence,value.kind,canonicalAgentId(value.agent_id||value.agent||value.from||"")]):"";}
   function ownedStoryHasBoundary(event){return state.displayRows.some((row)=>isAuthoredBoundaryEntry(row)&&displayTurnId(row)===ownedStoryTurn(event));}
   function deferOwnedStory(event,replay){
     const key=conversationIdentity(),pending=pendingOwnedStories.get(key)||[];
@@ -1698,6 +1698,7 @@
     }
     if(["commentary","narration"].includes(role)&&state.displayRows.some(candidate=>candidate.source!==source&&equivalentDisplayRows(candidate,entry)))return false;
     const lastEvent=ownedStoryEventKey(last?.value),entryEvent=ownedStoryEventKey(entry.value);
+    if(entryEvent&&state.displayRows.some(candidate=>ownedStoryEventKey(candidate.value)===entryEvent))return false;
     const receiptRole=role==="tool"||role==="tool_start";
     if(last&&(!receiptRole||(lastEvent&&entryEvent&&lastEvent===entryEvent))&&(!lastEvent||!entryEvent||lastEvent===entryEvent)&&displaySemantic(last)===displaySemantic(entry))return false;
     // A terminal answer has exactly one transport owner. Story, Done, and
@@ -2719,6 +2720,7 @@
     const feed = $("conversationFeed");
     const ownerTurn=state.renderingTurnId||state.activeTurnId;
     const sameTurn=(node)=>!ownerTurn||node?.dataset.turnId===ownerTurn;
+    if(state.recoveredWorkCluster?.isConnected&&sameTurn(state.recoveredWorkCluster)&&canonicalAgentId(state.recoveredWorkCluster.dataset.agent)===canonicalAgentId(agent))return state.recoveredWorkCluster;
     if(state.item?.kind==="group"){
       const boundary=[...feed.querySelectorAll(':scope > .user-message:not([data-queued-pending="true"])')].at(-1);
       const inRequest=node=>ownerTurn?sameTurn(node):(!boundary||Boolean(boundary.compareDocumentPosition(node)&Node.DOCUMENT_POSITION_FOLLOWING));
@@ -3019,7 +3021,7 @@
     const kit=window.PhoenixAgentKit,wasOpen=row.classList.contains("open"),target=humanTarget(event.target,event.tool),visual=toolVisual(event.tool),failure=event.ok===false,detail=toolResultDetail(event),diff=event.diff?safeRuntimeCopy(event.diff):"",imagePath=generatedImagePath(event),webResults=webSearchResultMarkup(event),visibleDetail=webResults?"":detail,hasDetail=Boolean(visibleDetail||diff||imagePath||webResults),open=hasDetail&&(wasOpen||detailedConversationView());
     const status=running?"running":failure?"error":"success",isEdit=EDIT_TOOLS.has(String(event.tool||"").toLowerCase());
     row.className=`work-tool ${isEdit?"file-diff":"tool-result"} tone-${visual.tone}${running?" running":""}${failure?" failed":""}${open?" open":""}`;row.dataset.state=status;
-    row.dataset.tool=String(event.tool||"");row.dataset.toolLabel=label;row.dataset.toolTarget=target;row.dataset.toolDiff=diff;row.dataset.copyText=visibleDetail||diff||"";
+    row.dataset.toolCallId=String(event.call_id||event.tool_call_id||"");row.dataset.tool=String(event.tool||"");row.dataset.toolLabel=label;row.dataset.toolTarget=target;row.dataset.toolDiff=diff;row.dataset.copyText=visibleDetail||diff||"";
     const chevron=hasDetail?kit.icon("chevronDown","tr-chevron"):"",copy=visibleDetail||diff?`<button type="button" class="tool-detail-copy tr-action" aria-label="${isEdit?"Copy diff":"Copy result"}" title="${isEdit?"Copy diff":"Copy result"}">${kit.icon("copy")}</button>`:"";
     if(isEdit){
       const {additions,deletions}=diffCounts(diff);
@@ -3686,6 +3688,27 @@
     if (value?.StoryReplay) window.PhoenixFluffies?.wireInput(value.StoryReplay, { ...context, replay:true });
     if (value?.Story) window.PhoenixFluffies?.wireInput(value.Story, context);
   }
+  function renderRecoveredStory(event){
+    const feed=$("conversationFeed"),turnId=ownedStoryTurn(event)||state.activeTurnId,agent=canonicalAgentId(event.agent_id||event.agent||state.item?.id||"phoenix");
+    const answer=[...feed.querySelectorAll(':scope > .agent-message,:scope > .group-message')].find(node=>node.dataset.turnId===turnId&&node.dataset.publicReply==='true'&&(state.item?.kind!=='group'||node.dataset.speaker===agent));
+    if(!answer)return false;
+    const bookmark=conversationScrollBookmark(),existing=new Set(feed.children);
+    const trace=[...feed.querySelectorAll('.work-cluster')].reverse().find(node=>node.dataset.turnId===turnId&&canonicalAgentId(node.dataset.agent)===agent&&(node.compareDocumentPosition(answer)&Node.DOCUMENT_POSITION_FOLLOWING));
+    const keys=['painting','renderingTurnId','replayWorkCluster','turnStatus','activeTools','toolRows','shimmerClusters','recoveredWorkCluster'];
+    const saved=Object.fromEntries(keys.map(key=>[key,state[key]]));
+    state.painting=true;state.renderingTurnId=turnId;state.replayWorkCluster=trace;state.recoveredWorkCluster=trace;state.turnStatus=trace;
+    state.activeTools=new Map();state.toolRows=[];state.shimmerClusters=new Set();
+    try{
+      const pending=event.kind==='tool'&&trace?[...trace.querySelectorAll('.work-tool[data-state="unknown"],.work-tool.running')].filter(row=>row.dataset.tool===String(event.tool||'')&&row.dataset.toolTarget===humanTarget(event.target,event.tool)):[];
+      const callId=String(event.call_id||event.tool_call_id||''),matching=callId?pending.find(row=>row.dataset.toolCallId===callId):pending.length===1?pending[0]:null;
+      if(matching){paintToolRow(matching,event,humanTool(event.tool,false,event.target));updateTraceSubgroup(matching.closest('.trace-subgroup'));}
+      else renderStory(event,true);
+      for(const node of [...feed.children])if(node!==conversationTail&&!existing.has(node))feed.insertBefore(node,answer);
+      const recovered=[...feed.querySelectorAll('.work-cluster')].filter(node=>node.dataset.turnId===turnId&&canonicalAgentId(node.dataset.agent)===agent);
+      recovered.forEach(node=>settleWorkCluster(node,false));attachWorkToggle(answer,trace||recovered.at(-1));
+    }finally{Object.assign(state,saved);syncMessageGroups();restoreConversationScroll(bookmark);}
+    return true;
+  }
   function renderStory(event, replay = false) {
     if (!event?.kind) return;
     window.PhoenixFluffies?.wireInput(event, fluffyContext(replay));
@@ -3737,8 +3760,8 @@
         return;
       }
       if(placement==="before_answer"){
-      if(!replay&&["tool_start","tool"].includes(event.kind)&&/^browser_(?!close$)/i.test(String(event.tool||"")))autoRevealAgentBrowser(event);
-      if(replay)state.replayNeedsRepaint=true;else repaintConversation(conversationScrollBookmark(),false);
+      // Late receipts belong to finished work and cannot reopen its browser.
+      if(!renderRecoveredStory(event)){if(replay)state.replayNeedsRepaint=true;else repaintOwnedTurn(ownedStoryTurn(event)||state.activeTurnId);}
       return;
     }}
     // Handoffs, returns, and inline questions remain visible collaboration

@@ -10,12 +10,13 @@ function extract(name) {
   return end<0?tail:tail.slice(0,end+1);
 }
 const calls=[],painted=[];
-const state={browserOwnerId:"rory",browserSurfaceGeneration:3,browserBoundKey:"agent:rory",browserTabs:[{id:"chosen",active:true}],browserFrameUrl:"about:blank",item:{id:"phoenix"}};
+const state={browserOwnerId:"rory",browserSurfaceGeneration:3,browserBoundKey:"agent:rory",browserTabs:[{id:"chosen",active:true}],browserFrameUrl:"about:blank",item:{kind:"agent",id:"rory"}};
 let flush=async()=>{},invoke=async(command,args)=>({supported:true,tabs:[{id:args.targetId,active:true,url:args.url}]});
 const context=vm.createContext({state,
   flushBrowserTyping:()=>flush(),
   ui:{invoke:async(command,args)=>{calls.push({command,...args});return invoke(command,args);}},
   renderInspectionBrowserTabs:surface=>painted.push(surface),applyBrowserLocation:()=>{},
+  conversationKeyOf:item=>`${item.kind}:${item.id}`,
   canonicalAgentId:id=>id||"",ownedStoryTurn:row=>row?.execution?.turn_id||"",
   isAuthoredBoundaryEntry:entry=>entry.value?.kind==="user"||entry.value?.role==="user",
 });

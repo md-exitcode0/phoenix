@@ -115,6 +115,45 @@ export function installConversationPreviews({
   targetName,
   syncBrowserAddress
 }) {
+  async function runConversationRecoveryProof(){
+    const checks={},feed=$("conversationFeed"),pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+    try{
+      clearFeed();replaceDisplayRows([],false);state.activeTurnId="";state.turnSocket=null;
+      const owner=state.item.id,profile=ui.profileFor(state.item),execution={turn_id:'recovery-current',task_id:'recovery-current',attempt_id:'recovery-attempt'};
+      renderStory({kind:'user',text:'An older request',turn_id:'recovery-old'});renderStory({kind:'answer',agent:owner,markdown:'The older answer stays in place.'});
+      const older=[...feed.children];
+      renderStory({kind:'user',agent:owner,text:'Check this one and give me the result.',execution,event_sequence:1});
+      setWorking(true);
+      renderStory({kind:'tool_start',agent:owner,tool:'read',target:'verified.txt',call_id:'recovery-read',execution,event_sequence:2});
+      renderStory({kind:'answer',agent:owner,markdown:'The requested result is ready.',execution,event_sequence:3});
+      const final=[...feed.querySelectorAll('.agent-message')].at(-1),prompt=[...feed.querySelectorAll('.user-message')].at(-1),late={kind:'tool',agent:owner,tool:'read',target:'verified.txt',call_id:'recovery-read',ok:true,detail:'The file was verified.',execution,event_sequence:4};
+      renderStory(late);
+      checks.lateReceiptKeepsMessages=older.every(n=>n.isConnected)&&final.isConnected&&prompt.isConnected;
+      const count=state.displayRows.length;
+      renderStory({...late,agent:`${profile.display_name} (${owner})`});
+      checks.liveAndJournalReceiptShownOnce=state.displayRows.length===count&&feed.querySelectorAll('.work-tool[data-tool="read"][data-state="success"]').length===1;
+      const trace=feed.querySelector('.work-cluster[data-turn-id="recovery-current"]');
+      checks.receiptStaysBeforeFinal=Boolean(trace&&final.isConnected&&(trace.compareDocumentPosition(final)&Node.DOCUMENT_POSITION_FOLLOWING));
+      const inspectionBefore=[state.inspectionOpen,state.inspectionTab,state.browserOwnerId];
+      renderStory({kind:'tool',agent:owner,tool:'browser_navigate',target:'https://example.invalid/completed',ok:true,execution,event_sequence:5});
+      await pause(20);
+      checks.lateBrowserReceiptKeepsPanel=JSON.stringify(inspectionBefore)===JSON.stringify([state.inspectionOpen,state.inspectionTab,state.browserOwnerId]);
+      renderStory({kind:'settled',agent:owner,ok:true,execution,event_sequence:6});
+      checks.completionStopsActivity=!state.working&&!feed.querySelector('.work-cluster.live,.work-tool.running');
+      const modes=['chat','compact','detailed'];
+      for(const mode of modes){document.documentElement.dataset.conversationView=mode;ui.setTheme('light');await pause(20);ui.setTheme('dark');await pause(20);checks[`themeKeeps${mode}`]=document.documentElement.dataset.conversationView===mode;}
+      document.documentElement.dataset.conversationView='chat';
+      renderStory({kind:'user',text:'A saved question response',turn_id:'recovery-question-saved'});
+      renderStory({kind:'ask_pending',id:'recovery-ask',agent:owner,questions:[{question:'Continue?',options:['Yes']}],status:'pending'});
+      renderStory({kind:'answer',agent:owner,markdown:'The final answer belongs here even while a question is pending.',awaiting_input:true});
+      repaintConversation(null,false);
+      const publicReply=[...feed.querySelectorAll('[data-public-reply="true"]')].find(n=>n.dataset.turnId==='recovery-question-saved');
+      checks.savedFinalWithQuestionVisible=Boolean(publicReply&&getComputedStyle(publicReply).display!=='none'&&publicReply.textContent.includes('final answer belongs here'));
+      closeApproval();setWorking(false);await pause(520);
+    }catch(error){checks.fixture=false;document.documentElement.dataset.previewLoadError=String(error);}
+    document.documentElement.dataset.conversationAcceptanceChecks=JSON.stringify(checks);
+    const failed=Object.entries(checks).filter(([,value])=>!value).map(([name])=>name);document.title=failed.length?`FAIL conversation recovery: ${failed.join(', ')}`:'PASS conversation recovery';
+  }
   async function runCleanConversationProof() {
     const checks={},feed=$("conversationFeed"),tail=$("conversationTail"),sleep=ms=>new Promise(r=>setTimeout(r,ms));
     try {
@@ -784,7 +823,7 @@ export function installConversationPreviews({
       checks.historicalCompactionKeepsCurrentUsage=state.usage.used===90000&&state.usageBySession.get(state.sessionId)?.used===90000;
       renderStory({kind:"context_compaction",agent:"phoenix",status:"started",execution:scope("owned-old"),event_sequence:10},true);
       const oldCompactions=[...$("conversationFeed").querySelectorAll('[data-turn-id="owned-old"] .context-compaction')];
-      checks.historicalStartDoesNotClaimSuccess=oldCompactions.some((row)=>row.dataset.status==="started"&&!row.classList.contains("running")&&row.textContent.includes("completion not recorded"));
+      checks.postAnswerHousekeepingStaysHidden=oldCompactions.length===0;
       checks.compactionReplayPreservesLiveTool=Boolean(liveTool?.isConnected&&liveTool.classList.contains("running"));
       renderStory({kind:"commentary",agent:"phoenix",text:"Unloaded historical output",execution:scope("owned-unloaded"),event_sequence:8},true);
       checks.unloadedOutputDeferred=!$("conversationFeed").textContent.includes("Unloaded historical output")&&(pendingOwnedStories.get(conversationIdentity())||[]).length===1;
@@ -1305,6 +1344,7 @@ export function installConversationPreviews({
   if (preview&&new URLSearchParams(location.search).get("shot")==="conversation-acceptance") {
     runPreviewWhenDirectoryReady(runConversationAcceptance,120);
   }
+  if(preview&&previewShot==="conversation-recovery"){runPreviewWhenDirectoryReady(runConversationRecoveryProof,120);}
   if(preview&&previewShot==="clean-conversation-proof"){runPreviewWhenDirectoryReady(runCleanConversationProof,200);}
   if(preview&&previewShot==="owned-journal-acceptance"){
     runPreviewWhenDirectoryReady(runOwnedJournalAcceptance,120);

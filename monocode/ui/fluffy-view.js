@@ -100,7 +100,7 @@
    copy();e.studio.querySelector('.fluffy-editor-error').hidden=true;
   }catch(error){if(request!==e.request||!e.studio.isConnected)return;e.initializing=false;const note=e.studio.querySelector('.fluffy-editor-error');note.hidden=false;note.textContent='Animation could not load. Choose another color or reopen Configure.';diagnostics.lastError=String(error)}
  }
- function reconcileRegistry(){if(dead||!root.PhoenixUI?.state.view)return;const view=PhoenixUI.state.view;for(const row of view.activities||[]){if(row.item?.kind==='agent')activity.registry({agentId:row.item.id,sessionId:row.canonical_session_id,status:row.status,label:row.activity_label});else if(row.item?.kind==='group'&&row.status==='idle'){for(const member of view.directory.members||[]){if(member.group_id!==row.item.id)continue;const current=activity.snapshot(member.agent_id);if(current.sessionId===row.canonical_session_id)activity.registry({agentId:member.agent_id,sessionId:row.canonical_session_id,status:'idle'});}}}for(const id of new Set([...document.querySelectorAll('.company-row .fluffy-token[data-fluffy-agent]')].map(token=>token.dataset.fluffyAgent)))syncSidebarSnapshot(activity.snapshot(id));mirrorSelected(active?.player?.api);}
+ function reconcileRegistry(){if(dead||!root.PhoenixUI?.state.view)return;const view=PhoenixUI.state.view;for(const row of view.activities||[]){if(row.item?.kind==='agent')root.PhoenixFluffies.activity.registry({agentId:row.item.id,sessionId:row.canonical_session_id,status:row.status,label:row.activity_label});else if(row.item?.kind==='group'&&row.status==='idle'){for(const member of view.directory.members||[]){if(member.group_id!==row.item.id)continue;const current=activity.snapshot(member.agent_id);if(current.sessionId===row.canonical_session_id)root.PhoenixFluffies.activity.registry({agentId:member.agent_id,sessionId:row.canonical_session_id,status:'idle'});}}}for(const id of new Set([...document.querySelectorAll('.company-row .fluffy-token[data-fluffy-agent]')].map(token=>token.dataset.fluffyAgent)))syncSidebarSnapshot(activity.snapshot(id));mirrorSelected(active?.player?.api);}
  function eventAgentId(event,context){
   const profiles=root.PhoenixUI?.state.view?.directory?.agents||[],owner=context.owner||{};
   const explicit=String(event.agent_id||'').trim(),supplied=String(explicit||event.agent||(owner.kind==='agent'?owner.id:'')).trim();
@@ -120,7 +120,7 @@
    if(context.replay||context.painting||event.historical)return false;
    const row=root.PhoenixUI?.activityFor({kind:'agent',id});
    if(!row||row.canonical_session_id!==context.sessionId)return false;
-   return activity.registry({agentId:id,sessionId:context.sessionId,status:row.status,label:row.activity_label,kind:event.kind,event});
+   return root.PhoenixFluffies.activity.registry({agentId:id,sessionId:context.sessionId,status:row.status,label:row.activity_label,kind:event.kind,event});
   }
   const input={agentId:id,sessionId:context.sessionId||'',execution:scope,sequence:event.event_sequence,replay:context.replay||context.painting,historical:event.historical,kind:event.kind,event};
   if(event.kind==='commentary'||event.kind==='thinking'||event.kind==='reasoning'||event.kind==='narration'||event.kind==='notice')return false;
@@ -150,11 +150,11 @@
    if(scope.turn_id!==turn||!key||PhoenixFluffyActivity.scopeKey(current.execution)!==key||event.execution&&PhoenixFluffyActivity.scopeKey(event.execution)!==key)return false;
   }else if(current.execution||current.registryTurnId!==turn||event.execution)return false;
   // Completion never answers a pending ask or converts a queued turn to success.
-  if(kind==='turn_completed'&&(current.waitingReason||['waiting_user','waiting_peer','queued','waiting','provider_wait'].includes(row.status)))return activity.registry({agentId:id,sessionId:context.sessionId,status:row.status,label:row.activity_label});
+  if(kind==='turn_completed'&&(current.waitingReason||['waiting_user','waiting_peer','queued','waiting','provider_wait'].includes(row.status)))return root.PhoenixFluffies.activity.registry({agentId:id,sessionId:context.sessionId,status:row.status,label:row.activity_label});
   if(scope)return activity.ingest({agentId:id,sessionId:context.sessionId,execution:scope,kind,event});
   // The foreground request supplies only its actual bound turn ID. No task or
   // attempt identity is manufactured for the supported legacy transport.
-  return activity.registry({agentId:id,sessionId:context.sessionId,status:row.status,label:row.activity_label,kind,event:{...event,turn_id:turn}});
+  return root.PhoenixFluffies.activity.registry({agentId:id,sessionId:context.sessionId,status:row.status,label:row.activity_label,kind,event:{...event,turn_id:turn}});
  }
  // Tokens drawn before the family registry loaded fell back to the butter
  // poster; once it is ready, show each token in its own colour.

@@ -56,7 +56,7 @@
    if(dead||input.replay||input.historical||input.source==='history'||!input.agentId)return null;
    const a=entry(input.agentId),key=scopeKey(input.execution);if(!key||a.retired.has(key))return null;
    if(!a.key){if(!begin({...input,sequence:undefined}))return null}
-   if(key!==a.key||a.terminal||String(input.sessionId||'')!==a.sessionId)return null;
+   if(key!==a.key||a.terminal||a.registryTerminal||String(input.sessionId||'')!==a.sessionId)return null;
    if(input.sequence!=null){const n=Number(input.sequence);if(!Number.isSafeInteger(n)||n<0||n<=a.sequence)return null;a.sequence=n}
    return a;
   }
@@ -97,9 +97,22 @@
     if(seenRegistryEvents.has(input.event))return false;
     seenRegistryEvents.add(input.event);
    }
-   if(a.sessionId&&a.sessionId!==session){a.retiredSessions.add(a.sessionId);resetTools(a);a.waiting=null;a.registryTurn='';a.registrySequence=-1;a.registryTerminal=false}
+   if(a.sessionId&&a.sessionId!==session){a.retiredSessions.add(a.sessionId);if(a.key)a.retired.add(a.key);a.key='';a.execution=null;a.sequence=-1;a.terminal=false;resetTools(a);a.waiting=null;a.registryStatus='';a.registryTurn='';a.registrySequence=-1;a.registryTerminal=false}
    a.sessionId=session;
    const started=kind==='user'||kind==='turn_started';
+   const authoredBoundary=started&&event.steered!==true&&(!a.execution||turn!==a.execution.turn_id);
+   const registryWake=!kind&&(a.terminal||a.registryTerminal)&&previousStatus==='idle'&&runningStatus(status);
+   // A completed structured execution outranks a delayed directory snapshot.
+   // Only a new authored turn or an observed idle-to-working boundary retires it.
+   if((a.terminal||a.execution)&&(authoredBoundary||registryWake)){
+    if(a.key)a.retired.add(a.key);
+    a.key='';a.execution=null;a.sequence=-1;a.terminal=false;
+    a.registryTerminal=false;a.waiting=null;resetTools(a);
+   }
+   if(a.terminal){
+    a.registryStatus=status;
+    return !kind&&status==='idle'?emit(a,'idle','native_registry'):false;
+   }
    if(started&&event.steered!==true&&(!turn||turn!==a.registryTurn)){
     if(a.registryTurn)a.retiredRegistryTurns.add(a.registryTurn);
     a.registryTurn=turn;a.registrySequence=-1;a.registryTerminal=false;a.waiting=null;resetTools(a);
