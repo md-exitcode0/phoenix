@@ -5131,6 +5131,8 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   }
   function renderQueue(){
     const shownQueueIds=new Set(state.displayRows.map((entry)=>entry.value?.queued_id).filter(Boolean));
+    const shownAnswerIds=new Set([...$("conversationFeed").querySelectorAll(".answer-resume-message[data-ask-id]")].map(node=>node.dataset.askId));
+    for(const row of state.queue||[])if(row.state!=="failed"&&row.origin?.kind==="ask_answer"&&shownAnswerIds.has(String(row.origin.ask_id||"")))shownQueueIds.add(row.queue_id);
     // A prompt already on screen as a bubble is not repeated in the drawer,
     // even when the gateway queued it without this window knowing its id
     // (the agent was still busy when it was sent).
@@ -5446,13 +5448,23 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   // A card whose decision was already made elsewhere (a sibling card, another
   // window, a turn that ended) is obsolete, not failed.
   const OBSOLETE_ASK=/no longer pending|already (?:answered|resolved)|different saved decision|no active participant|continuation is unavailable|submission is unavailable/i;
+  const pendingAskSubmissions=new Map(),pendingVaultUnlocks=new Map();
+  function askScopeIsCurrent(card){return !card._conversationScope||card._conversationScope.identity===conversationIdentity();}
   async function submitAsk(card,answer){
+    const id=String(card.dataset.askId||""),pending=pendingAskSubmissions.get(id);
+    if(pending)return pending;
+    const submission=sendAskAnswer(card,answer);
+    pendingAskSubmissions.set(id,submission);
+    try{return await submission;}finally{if(pendingAskSubmissions.get(id)===submission)pendingAskSubmissions.delete(id);}
+  }
+  async function sendAskAnswer(card,answer){
     const token=activeSelectionToken(),scope=card._conversationScope;
     // The question keeps its original owner across cached views and callbacks.
-    if(scope&&scope.identity!==conversationIdentity()){
+    if(!askScopeIsCurrent(card)){
       ui.toast("Open the conversation that asked this question to answer it.",true);return;
     }
     const session_id=scope?.sessionId||state.sessionId,owner=scope?.owner||canvasConversationOwner();
+    card.setAttribute("aria-busy","true");
     card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);
     try{
       await rpc({AnswerAsk:{ask_id:card.dataset.askId,answer,session_id,owner}},8000,token?.signal);
@@ -5461,11 +5473,34 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
       if(!selectionIsCurrent(token))return;
       if(card._askState?.decision&&OBSOLETE_ASK.test(String(error?.message||error))){resolveAskDisplay(card,answer,"answered");return;}
       card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);ui.toast(error.message,true);
-    }
+    }finally{card.removeAttribute("aria-busy");card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);}
   }
   async function dismissAsk(card){const token=activeSelectionToken(),session_id=state.sessionId,owner=canvasConversationOwner();card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);try{await rpc({DismissAsk:{ask_id:card.dataset.askId,session_id,owner}},8000,token?.signal);if(!selectionIsCurrent(token))return;card._askState.answers=card._askState.questions.map(()=>"Not now");resolveAskDisplay(card,"Not now","dismissed");}catch(error){if(!selectionIsCurrent(token))return;card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);ui.toast(error.message,true);}}
   function recordAskAnswer(card,answer){const model=card._askState;model.answers[model.index]=answer;if(model.index<model.questions.length-1){model.index+=1;renderApprovalQuestion(card);card.querySelector(".approval-question").focus?.();return;}submitAsk(card,formatAskAnswers(model));}
-  async function unlockApprovalVault(card){const input=card.querySelector("[data-vault-password]"),password=input.value;if(password.length<12){input.reportValidity();return;}card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);try{await rpc({Vault:{action:"unlock_with_password",master_password:password}},20000);input.value="";card._askState.answers[card._askState.index]="Unlocked";await submitAsk(card,"A: Unlock here\nPasses is unlocked for this Phoenix session. Continue the blocked action now.");}catch(error){card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);input.focus();ui.toast(error.message,true);}}
+  async function unlockApprovalVault(card){
+    const id=String(card.dataset.askId||""),pending=pendingVaultUnlocks.get(id);
+    if(pending)return pending;
+    if(!askScopeIsCurrent(card)){ui.toast("Open the conversation that requested this unlock to continue.",true);return;}
+    const input=card.querySelector("[data-vault-password]"),password=input.value;
+    if(password.length<12){input.reportValidity();return;}
+    const token=activeSelectionToken();
+    card.setAttribute("aria-busy","true");
+    card.querySelectorAll("button,input").forEach((item)=>item.disabled=true);
+    const operation=(async()=>{
+      try{
+        await rpc({Vault:{action:"unlock_with_password",master_password:password}},20000,token?.signal);
+        input.value="";
+        if(!selectionIsCurrent(token)||!askScopeIsCurrent(card))return;
+        card._askState.answers[card._askState.index]="Unlocked";
+        await submitAsk(card,"A: Unlock here\nPasses is unlocked for this Phoenix session. Continue the blocked action now.");
+      }catch(error){
+        if(!selectionIsCurrent(token))return;
+        card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);input.focus();ui.toast(error.message,true);
+      }finally{card.removeAttribute("aria-busy");card.querySelectorAll("button,input").forEach((item)=>item.disabled=false);}
+    })();
+    pendingVaultUnlocks.set(id,operation);
+    try{return await operation;}finally{if(pendingVaultUnlocks.get(id)===operation)pendingVaultUnlocks.delete(id);}
+  }
   function closeApproval(){window.PhoenixQuestionDrafts?.persistAll();$("approvalStack").replaceChildren();syncApprovalStack();}
   function answerApproval(button){const card=button.closest(".approval-card"),model=card._askState,answer=button.dataset.askOption;if(model.questions[model.index].multi_select){const selected=model.multiSelections[model.index];selected.has(answer)?selected.delete(answer):selected.add(answer);renderApprovalQuestion(card);return;}
     if(!model.decision){const index=model.index;model.answers[index]=answer;model.customAnswers[index]="";renderApprovalQuestion(card);clearTimeout(model.advanceTimer);if(index<model.questions.length-1)model.advanceTimer=setTimeout(()=>{if(card.isConnected&&model.index===index){model.index+=1;renderApprovalQuestion(card);card.querySelector(".approval-question")?.focus?.({preventScroll:true});}},240);return;}
@@ -6720,7 +6755,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     $("inspectionResize").onpointerdown=beginInspectionResize;$("inspectionResize").onpointermove=moveInspectionResize;$("inspectionResize").onpointerup=endInspectionResize;$("inspectionResize").onpointercancel=endInspectionResize;$("inspectionResize").onlostpointercapture=endInspectionResize;$("inspectionResize").onkeydown=(event)=>{if(!["ArrowLeft","ArrowRight"].includes(event.key))return;event.preventDefault();applyInspectionWidth(state.inspectionWidth+(event.key==="ArrowLeft"?16:-16),true);};
     $("inspectionSourcesGrid").onclick=(event)=>{const index=event.target.closest("[data-source-card]")?.dataset.sourceCard,source=conversationSources()[Number(index)];if(source)openImageInspector(source);};
     $("imageCommentToggle").onclick=()=>setImageCommentMode(!state.imageCommentMode);$("imageCommentCancel").onclick=clearImageComments;$("imageCommentSend").onclick=()=>sendCommentedComposer().catch((error)=>ui.toast(error.message||String(error),true));$("imageCommentSave").onclick=()=>saveImageComment().catch((error)=>ui.toast(error.message||String(error),true));$("imageRemoveTab").onclick=()=>closeInspectionImageTab();$("imageResizeToggle").onclick=toggleImageActualSize;$("inspectionImageStage").onclick=placeImageComment;$("imageCommentText").oninput=(event)=>{if(!state.imageCommentDraft)return;const input=event.currentTarget;state.imageCommentDraft.text=input.value;$("imageCommentSave").disabled=!state.imageCommentDraft.text.trim();requestAnimationFrame(()=>{input.scrollLeft=input.scrollWidth;});};$("imageCommentText").onkeydown=(event)=>{if(event.key==="Enter"&&!event.isComposing){event.preventDefault();saveImageComment().catch((error)=>ui.toast(error.message||String(error),true));}};
-    $("approvalStack").onclick=(event)=>{const button=event.target.closest("button");if(button)approvalAction(button);};$("approvalStack").onsubmit=(event)=>{if(event.target.matches(".approval-vault")){event.preventDefault();unlockApprovalVault(event.target.closest(".approval-card"));}};$("approvalStack").oninput=(event)=>{if(!event.target.matches(".approval-inline-custom [data-ask-custom-input]"))return;const card=event.target.closest(".approval-card"),model=card._askState;model.customAnswers[model.index]=event.target.value;model.answers[model.index]=null;model.multiSelections[model.index].clear();card.querySelectorAll(".qa-option.selected").forEach((option)=>{option.classList.remove("selected");option.setAttribute("aria-checked","false");});card.querySelector("[data-ask-continue]").disabled=!event.target.value.trim();};$("approvalStack").onkeydown=(event)=>{if(event.key!=="Enter"||!event.target.matches("[data-ask-custom-input]"))return;event.preventDefault();const card=event.target.closest(".approval-card");if(event.target.closest(".approval-inline-custom")){const value=event.target.value.trim();if(value)recordAskAnswer(card,value);return;}approvalAction(card.querySelector("[data-ask-custom-save]"));};$("queueList").onclick=(event)=>{const b=event.target.closest("[data-queue]");if(b)queueAction(b);};
+    $("approvalStack").onclick=(event)=>{const button=event.target.closest("button");if(button)approvalAction(button);};$("approvalStack").onsubmit=(event)=>{if(event.target.matches(".approval-vault")){event.preventDefault();event.stopPropagation();unlockApprovalVault(event.target.closest(".approval-card"));}};$("approvalStack").oninput=(event)=>{if(!event.target.matches(".approval-inline-custom [data-ask-custom-input]"))return;const card=event.target.closest(".approval-card"),model=card._askState;model.customAnswers[model.index]=event.target.value;model.answers[model.index]=null;model.multiSelections[model.index].clear();card.querySelectorAll(".qa-option.selected").forEach((option)=>{option.classList.remove("selected");option.setAttribute("aria-checked","false");});card.querySelector("[data-ask-continue]").disabled=!event.target.value.trim();};$("approvalStack").onkeydown=(event)=>{if(event.key!=="Enter"||!event.target.matches("[data-ask-custom-input]"))return;event.preventDefault();event.stopPropagation();if(event.repeat||event.isComposing)return;const card=event.target.closest(".approval-card");if(event.target.closest(".approval-inline-custom")){const value=event.target.value.trim();if(value)recordAskAnswer(card,value);return;}approvalAction(card.querySelector("[data-ask-custom-save]"));};$("queueList").onclick=(event)=>{const b=event.target.closest("[data-queue]");if(b)queueAction(b);};
     $("queueBlock").addEventListener("toggle",()=>{if($("queueBlock").hidden)return;state.queueExpandedBySession.set(conversationIdentity(),$("queueBlock").open);});
     $("taskBlock").addEventListener("toggle",()=>{if($("taskBlock").hidden)return;state.taskPlanExpanded=$("taskBlock").open;localStorage.setItem("phoenix-task-plan-expanded",state.taskPlanExpanded?"1":"0");});
     $("teachAgentButton").onclick=openTeach;$("cancelTeaching").onclick=cancelBrowserFlow;$("finishTeaching").onclick=finishBrowserFlow;

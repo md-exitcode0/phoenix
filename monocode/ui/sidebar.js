@@ -1450,7 +1450,14 @@ window.__TAURI__?.event?.listen?.("open-conversation", (event) => {
   const kind = String(event.payload?.kind || ""), id = String(event.payload?.id || "");
   if (!kind || !id) return;
   const known = (state.view?.activities || []).find((row) => row.item?.kind === kind && row.item?.id === id)?.item;
-  selectItem(known || { kind, id });
+  const item=known || {kind,id};
+  // Finishing a question must not lose focus to an unrelated notification.
+  // Offer its destination explicitly; never replay it after the submission.
+  const focusedRequest=document.activeElement?.closest?.(".approval-card"),busyRequest=document.querySelector("#approvalStack .approval-card[aria-busy='true']");
+  if(!sameItem(item,state.selected)&&(focusedRequest||busyRequest)){
+    notify({title:`Open ${displayName(item)||"conversation"}`,body:"You’re answering another coworker. Open this notification when you’re ready.",item,key:`open:${kind}:${id}`});return;
+  }
+  selectItem(item);
 });
 let zoomWheelAt = 0;
 addEventListener("wheel", (event) => {
