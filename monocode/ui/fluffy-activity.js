@@ -81,7 +81,7 @@
    }
    if(kind==='failure'||kind==='error'||(kind==='execution_ended'&&event.error))return terminal(a,'error','turn_error');
    if(kind==='stopped'||kind==='canceled')return terminal(a,'idle','stopped');
-   if(['settled','turn_completed','execution_ended'].includes(kind))return terminal(a,event.ok===false?'idle':'success',event.ok===false?'stopped':'turn_completed');
+   if(['settled','turn_completed','execution_ended','return'].includes(kind))return terminal(a,event.ok===false?'idle':'success',event.ok===false?'stopped':'turn_completed');
    return false;
   }
   // The native registry remains useful without inventing an execution envelope.
@@ -92,6 +92,16 @@
    const a=entry(input.agentId),session=String(input.sessionId),status=String(input.status||''),label=String(input.label||''),event=input.event||{},kind=input.kind||event.kind,turn=String(event.turn_id||''),previousStatus=a.registryStatus;
    const sequence=input.sequence??event.event_sequence;
    if(sequence!=null&&(!Number.isSafeInteger(Number(sequence))||Number(sequence)<0))return false;
+   // The company registry reports the coworker's actual work state, even
+   // when that work was delegated from a different conversation.
+   if(input.authoritative&&!kind&&status==='idle'&&a.sessionId===session){
+    a.registryStatus='idle';
+    if(a.waiting)return holdWaiting(a);
+    return terminal(a,'idle','native_registry_idle',true);
+   }
+   // A fresh company idle-to-working edge can start new work in the
+   // coworker's own chat after a review in another conversation ended.
+   if(input.authoritative&&!kind&&previousStatus==='idle'&&runningStatus(status))a.retiredSessions.delete(session);
    if(a.retiredSessions.has(session)||turn&&a.retiredRegistryTurns.has(turn))return false;
    if(input.event&&typeof input.event==='object'){
     if(seenRegistryEvents.has(input.event))return false;

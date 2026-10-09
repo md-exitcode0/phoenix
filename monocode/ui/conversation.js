@@ -896,15 +896,19 @@
     if(!nodes.length)return; // Keep paged-out history out of the live tail.
     const bookmark=conversationScrollBookmark(),marker=document.createComment("owned turn");
     nodes[0].before(marker);
-    const preserved=detachChildren(feed);
+    // A late receipt repairs only its own turn. Keep every other message and
+    // focused control attached throughout, including an unsent inline answer.
     nodes.forEach((node)=>node.remove());
+    const preserved=new Set(feed.children);
     const keys=["activeTurnId","replayWorkCluster","turnStatus","feedHasAgent","activeTools","toolRows","shimmerClusters","activeGroupAgentIds","painting"];
     const saved=Object.fromEntries(keys.map((key)=>[key,state[key]]));
     state.activeTurnId=turnId;state.replayWorkCluster=null;state.turnStatus=null;state.feedHasAgent=false;
     state.activeTools=new Map();state.toolRows=[];state.shimmerClusters=new Set();state.painting=true;
     try{state.displayRows.filter((entry)=>displayTurnId(entry)===turnId).forEach(renderDisplayEntry);}
     finally{
-      const replacement=detachChildren(feed);marker.replaceWith(replacement);feed.insertBefore(preserved,conversationTail);
+      const replacement=document.createDocumentFragment();
+      for(const node of [...feed.children])if(node!==conversationTail&&!preserved.has(node))replacement.append(node);
+      marker.replaceWith(replacement);
       Object.assign(state,saved);renderPromptRail();restoreConversationScroll(bookmark);
     }
   }
@@ -2660,7 +2664,7 @@
       cluster.dataset.disclosureReady="true";
     }cluster.style.setProperty("--agent-accent",ui.profileColor(profile||currentProfile()));
     if(!state.painting&&state.working){cluster.classList.add("live");cluster.dataset.startedAt ||= String(state.turnStartedAt||Date.now());}
-    if(header){header.hidden=false;header.setAttribute("aria-label",`${name} activity`);header.title=`${name} activity`;header.querySelector(".group-work-avatar").innerHTML=ui.avatarSvg(profile||{agent_id:agent,display_name:name,color:ui.profileColor(currentProfile())});header.querySelector("strong").textContent=name;const detail=header.querySelector("small");if(detail&&!detail.textContent.startsWith("→"))detail.textContent=cluster.classList.contains("live")?"Working":"";}
+    if(header){header.hidden=false;header.setAttribute("aria-label",`${name} activity`);header.title=`${name} activity`;const avatarKey=JSON.stringify([agent,name,profile?.metadata_json,profile?.color]);if(header.dataset.avatarKey!==avatarKey){header.dataset.avatarKey=avatarKey;header.querySelector(".group-work-avatar").innerHTML=ui.avatarSvg(profile||{agent_id:agent,display_name:name,color:ui.profileColor(currentProfile())});}const nameNode=header.querySelector("strong");if(nameNode.textContent!==name)nameNode.textContent=name;const detail=header.querySelector("small");if(detail&&!detail.textContent.startsWith("→"))detail.textContent=cluster.classList.contains("live")?"Working":"";}
     if(cluster.classList.contains("team-work-row")){
       const status=[...$("conversationFeed").querySelectorAll(".group-execution-strip")].find(row=>row.dataset.turnId===cluster.dataset.turnId)?.querySelector(`[data-group-status-agent="${CSS.escape(agent)}"]`);
       if(status)cluster.dataset.teamState=status.dataset.state;
@@ -2990,7 +2994,7 @@
   let conversationDetailMode=null;
   function setToolRowDisclosure(row,open) {
     const summary=row?.querySelector(".work-tool-summary"),detail=row?.querySelector(".work-tool-detail"),hasDetail=Boolean(detail);
-    const expanded=Boolean(open&&hasDetail);row?.classList.toggle("open",expanded);summary?.setAttribute("aria-expanded",String(expanded));if(detail)detail.hidden=!expanded;
+    const expanded=Boolean(open&&hasDetail);if(expanded)row._renderToolDetail?.();row?.classList.toggle("open",expanded);summary?.setAttribute("aria-expanded",String(expanded));if(detail)detail.hidden=!expanded;
   }
   function syncConversationDetail() {
     const feed=$("conversationFeed"),mode=document.documentElement.dataset.conversationView;
@@ -3023,14 +3027,21 @@
     row.className=`work-tool ${isEdit?"file-diff":"tool-result"} tone-${visual.tone}${running?" running":""}${failure?" failed":""}${open?" open":""}`;row.dataset.state=status;
     row.dataset.toolCallId=String(event.call_id||event.tool_call_id||"");row.dataset.tool=String(event.tool||"");row.dataset.toolLabel=label;row.dataset.toolTarget=target;row.dataset.toolDiff=diff;row.dataset.copyText=visibleDetail||diff||"";
     const chevron=hasDetail?kit.icon("chevronDown","tr-chevron"):"",copy=visibleDetail||diff?`<button type="button" class="tool-detail-copy tr-action" aria-label="${isEdit?"Copy diff":"Copy result"}" title="${isEdit?"Copy diff":"Copy result"}">${kit.icon("copy")}</button>`:"";
+    let summary,renderDetail;
     if(isEdit){
       const {additions,deletions}=diffCounts(diff);
-      row.innerHTML=`<button type="button" class="work-tool-summary fd-trigger" aria-expanded="${open}" ${hasDetail?"":"data-empty=\"true\""}>${kit.icon("fileCode","fd-icon")}<span class="work-tool-copy fd-file"><strong class="work-tool-name sr-only">${escape(label)}</strong><small>${escape(target||label)}</small></span><span class="fd-counts">${additions?`<b>+${additions}</b>`:""}${deletions?`<i>−${deletions}</i>`:""}</span><span class="fd-state" aria-label="${running?"Applying changes":failure?"Edit failed":"Changes applied"}">${running?kit.icon("loader","spin"):failure?kit.icon("x"):kit.icon("check")}</span>${chevron}</button>${hasDetail?`<div class="work-tool-detail tr-body" ${open?"":"hidden"}><div class="tr-well">${diff?`<div class="tr-viewport fd-viewport">${fileDiffMarkup(diff)}</div>`:""}${visibleDetail&&!diff?`<div class="tr-viewport"><pre class="tr-output">${escape(visibleDetail)}</pre></div>`:""}${copy?`<div class="tr-foot fd-foot">${copy}</div>`:""}</div></div>`:""}`;
-      return row;
+      summary=`<button type="button" class="work-tool-summary fd-trigger" aria-expanded="${open}" ${hasDetail?"":"data-empty=\"true\""}>${kit.icon("fileCode","fd-icon")}<span class="work-tool-copy fd-file"><strong class="work-tool-name sr-only">${escape(label)}</strong><small>${escape(target||label)}</small></span><span class="fd-counts">${additions?`<b>+${additions}</b>`:""}${deletions?`<i>−${deletions}</i>`:""}</span><span class="fd-state" aria-label="${running?"Applying changes":failure?"Edit failed":"Changes applied"}">${running?kit.icon("loader","spin"):failure?kit.icon("x"):kit.icon("check")}</span>${chevron}</button>`;
+      renderDetail=()=>`<div class="tr-well">${diff?`<div class="tr-viewport fd-viewport">${fileDiffMarkup(diff)}</div>`:""}${visibleDetail&&!diff?`<div class="tr-viewport"><pre class="tr-output">${escape(visibleDetail)}</pre></div>`:""}${copy?`<div class="tr-foot fd-foot">${copy}</div>`:""}</div>`;
+    }else{
+      const kindIcon={terminal:"terminal",request:"braces",custom:"wrench"}[toolKind(event.tool)];
+      summary=`<button type="button" class="work-tool-summary tr-trigger" aria-expanded="${open}" ${hasDetail?"":"data-empty=\"true\""}><span class="work-tool-icon tr-icon" aria-hidden="true">${kit.icon(kindIcon)}</span><span class="work-tool-copy tr-text"><strong class="work-tool-name tr-title">${escape(label)}</strong>${target?`<small class="tr-tool">${escape(target)}</small>`:`<small class="tr-tool">${escape(String(event.tool||""))}</small>`}</span><span class="tr-status s-${status}">${toolStatusIcon(status)}<span>${toolStatusCopy(status)}</span></span>${chevron}</button>`;
+      renderDetail=()=>`<div class="tr-well"><div class="tr-viewport">${imagePath?`<div class="tool-image-preview" data-image-path="${escape(imagePath)}"><span>Loading preview…</span></div>`:""}${webResults}${visibleDetail?`<pre class="tr-output">${escape(visibleDetail)}</pre>`:""}${diff?`<pre class="tr-output">${escape(diff)}</pre>`:""}</div>${copy?`<div class="tr-foot">${copy}<span class="tr-foot-status">${toolStatusCopy(status)}</span></div>`:""}</div>`;
     }
-    const kindIcon={terminal:"terminal",request:"braces",custom:"wrench"}[toolKind(event.tool)];
-    row.innerHTML=`<button type="button" class="work-tool-summary tr-trigger" aria-expanded="${open}" ${hasDetail?"":"data-empty=\"true\""}><span class="work-tool-icon tr-icon" aria-hidden="true">${kit.icon(kindIcon)}</span><span class="work-tool-copy tr-text"><strong class="work-tool-name tr-title">${escape(label)}</strong>${target?`<small class="tr-tool">${escape(target)}</small>`:`<small class="tr-tool">${escape(String(event.tool||""))}</small>`}</span><span class="tr-status s-${status}">${toolStatusIcon(status)}<span>${toolStatusCopy(status)}</span></span>${chevron}</button>${hasDetail?`<div class="work-tool-detail tr-body" ${open?"":"hidden"}><div class="tr-well"><div class="tr-viewport">${imagePath?`<div class="tool-image-preview" data-image-path="${escape(imagePath)}"><span>Loading preview…</span></div>`:""}${webResults}${visibleDetail?`<pre class="tr-output">${escape(visibleDetail)}</pre>`:""}${diff?`<pre class="tr-output">${escape(diff)}</pre>`:""}</div>${copy?`<div class="tr-foot">${copy}<span class="tr-foot-status">${toolStatusCopy(status)}</span></div>`:""}</div></div>`:""}`;
-    if(imagePath)hydrateGeneratedImage(row,imagePath);
+    // A collapsed receipt needs only its summary. Large diffs and previews
+    // enter the DOM when opened, rather than burdening every background update.
+    row.innerHTML=summary+(hasDetail?'<div class="work-tool-detail tr-body" hidden></div>':'');
+    row._renderToolDetail=()=>{const body=row.querySelector('.work-tool-detail');if(!body||body.dataset.rendered)return;body.innerHTML=renderDetail();body.dataset.rendered='true';if(imagePath&&!isEdit)hydrateGeneratedImage(row,imagePath);};
+    setToolRowDisclosure(row,open);
     return row;
   }
   function appendCompletedToolRow(list,event,label) {
@@ -3800,10 +3811,6 @@
       case "thinking": case "reasoning": renderThinking(event.agent, event.text); break;
       case "tool_start": case "tool":
         renderTool(event,replay);
-        // Some background/group transports expose only the completed receipt.
-        // Either edge is sufficient proof that this coworker's managed browser
-        // exists and belongs in the selected conversation's right sidebar.
-        if(!replay&&!state.painting&&/^browser_(?!close$)/i.test(String(event.tool||""))&&(event.kind==="tool_start"||event.ok!==false))autoRevealAgentBrowser(event);
         break;
       case "context_compaction": renderContextCompaction(event,replay); break;
       case "receipt": renderReceipt(event); break;
@@ -4671,7 +4678,6 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     socket.onmessage=(message)=>{if(state.subscription!==socket||!selectionIsCurrent(token))return;state.lastJournalEventAt=Date.now();try{const value=JSON.parse(message.data);consumeFluffyWire(value,fluffyContext());if(consumeVolumeWorkerLifecycle(value))return;if(value.StoryReplay)renderStory(value.StoryReplay,true);else if(value==="Pong"||value?.Pong!==undefined){if(state.replayNeedsRepaint){state.replayNeedsRepaint=false;repaintConversation(conversationScrollBookmark(),false);syncRestoredWorkVisibility();}if(!state.historyHydrating)catchUpConversation(token,{quiet:true});return;}else if(value.Story){
       const event=value.Story,disposition=journalStoryDisposition(event);
       if(disposition==="render")renderStory(event);
-      else if(disposition==="browser")autoRevealAgentBrowser(normalizeGroupOperationalAgent(event));
     }}catch{}};
     socket.onclose=()=>{if(state.subscription===socket&&selectionIsCurrent(token))setTimeout(()=>{if(selectionIsCurrent(token))subscribeJournal(token);},3000);};
   }
@@ -5879,23 +5885,8 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
   async function dropComposerImages(event){const files=draggedComposerImages(event.dataTransfer);setComposerDropTarget(false);if(!files.length)return;event.preventDefault();event.stopPropagation();const target=composerIngressTarget();await addAttachments(files);if(composerIngressCurrent(target))$("composerInput").focus();}
 
   function browserStoryOwner(event){return canonicalAgentId(event?.agent||targetAgent()||state.item?.id||"phoenix")||"phoenix";}
-  // Settings covers the conversation, so an agent's browser popping open
-  // there shows beside the wrong page. Hold the reveal until Settings closes
-  // and show it in that agent's conversation instead.
-  let deferredBrowserReveal=null;
-  window.addEventListener("phoenix:settings-visibility",(event)=>{if(event.detail?.open||!deferredBrowserReveal)return;const pending=deferredBrowserReveal;deferredBrowserReveal=null;if(conversationIdentity()===pending.identity)autoRevealAgentBrowser(pending.event);});
-  function autoRevealAgentBrowser(event){
-    const identity=conversationIdentity(),owner=browserStoryOwner(event);
-    // In one coworker's chat, only that coworker's own browser opens. A
-    // delegate's browsing (Theo working for Tibo) stays in the delegate's chat.
-    if(state.item?.kind==="agent"){
-      const self=agentProfile(state.item.id==="orchestrator"?"phoenix":state.item.id)?.agent_id||state.item.id;
-      const who=agentProfile(owner==="orchestrator"?"phoenix":owner)?.agent_id||owner;
-      if(who&&self&&who!==self)return;
-    }
-    if(document.body.classList.contains("settings-open")){deferredBrowserReveal={identity,event};return;}
-    queueMicrotask(async()=>{if(conversationIdentity()!==identity)return;try{await openBrowser(owner,"browse");}catch(error){if(conversationIdentity()===identity)ui.toast(`Could not show ${agentLabel(owner)}'s browser: ${error.message||error}`,true);}});
-  }
+  // Agent browser activity updates history and tabs in the background. Only
+  // explicit user controls may reveal the browser workspace.
   function setAttachmentMenuOpen(open){const expanded=Boolean(open);if(globalThis.phoenixLiquidAttachmentMenu?.setOpen)globalThis.phoenixLiquidAttachmentMenu.setOpen(expanded);else $("attachmentMenu").classList.toggle("open",expanded);return expanded;}
   function closeAttachmentMenu(){const wasOpen=$("attachmentMenu").classList.contains("open");setAttachmentMenuOpen(false);return wasOpen;}
   function toggleAttachmentMenu(){setAttachmentMenuOpen(!$("attachmentMenu").classList.contains("open"));}
@@ -6805,7 +6796,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
       const toolCopy=event.target.closest(".tool-detail-copy");
       if(toolCopy){const row=toolCopy.closest(".work-tool"),text=row?.dataset.copyText||"",label=toolCopy.getAttribute("aria-label");if(text)navigator.clipboard?.writeText(text).catch(()=>{});toolCopy.classList.add("copied");toolCopy.innerHTML=window.PhoenixAgentKit.icon("check");toolCopy.setAttribute("aria-label","Copied");clearTimeout(toolCopy._copyTimer);toolCopy._copyTimer=setTimeout(()=>{if(toolCopy.isConnected){toolCopy.classList.remove("copied");toolCopy.innerHTML=window.PhoenixAgentKit.icon("copy");toolCopy.setAttribute("aria-label",label==="Copied"?"Copy result":label);}},1600);return;}
       const tool=event.target.closest(".work-tool-summary");
-      if(tool){if(tool.dataset.empty==="true")return;const row=tool.closest(".work-tool"),open=row.classList.toggle("open"),detail=row.querySelector(".work-tool-detail");tool.setAttribute("aria-expanded",String(open));if(detail)detail.hidden=!open;return;}
+      if(tool){if(tool.dataset.empty==="true")return;const row=tool.closest(".work-tool");setToolRowDisclosure(row,!row.classList.contains("open"));return;}
     });
     $("conversationPromptRail").onkeydown = (event) => {
       const buttons = [...$("conversationPromptRail").querySelectorAll("button")];

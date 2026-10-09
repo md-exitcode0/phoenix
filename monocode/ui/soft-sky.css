@@ -980,3 +980,8 @@ html:root[data-skin="phoenix"] #inspectionSidebar .inspection-tabbar,
 html:root[data-skin="phoenix"] #inspectionSidebar .inspection-tabbar *{-webkit-app-region:no-drag!important}
 html:root[data-skin="phoenix"] .modal-close{position:relative;z-index:1;pointer-events:auto!important}
 html:root[data-skin="phoenix"] .modal-close>*{pointer-events:none}
+
+/* Primary labels need opaque contrast on the transparent sky canvas. */
+html:root[data-skin="phoenix"] .button.primary{background:var(--soft-ink)!important;color:var(--accent-contrast)!important;border-color:transparent!important}
+/* Reserve an action column so delete never covers a tool disclosure. */
+html:root[data-skin="phoenix"] #conversationFeed .work-cluster{padding-right:34px!important;box-sizing:border-box}
