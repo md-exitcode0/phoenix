@@ -83,6 +83,14 @@ try{
   assert.equal(await evaluate('document.getElementById("queueBlock").hidden'),true,'shown answer is not duplicated in queue');
   await evaluate(`__questions.state.queue[0].state='failed';__questions.renderQueue();`);
   assert.equal(await evaluate('document.getElementById("queueBlock").hidden'),false,'failed continuation stays reviewable');
+  await evaluate(`__questions.state.queue[0].failure='Fixture submission receipt needs review';__questions.renderQueue();__questions.renderStory({kind:'notice',text:'A queued message could not run. Open the queue above the composer to review or remove it.'},true);__questions.renderStory({kind:'notice',text:'queued prompt failed: fixture duplicate'},true);`);
+  assert.equal(await evaluate('document.querySelectorAll("#conversationFeed > .notice-row").length'),0,'replayed queue failures do not create duplicate transcript warnings');
+  assert.equal(await evaluate('document.querySelectorAll("#queueList > .queue-row").length'),1,'the actual failed entry remains reviewable once');
+  assert.equal(await evaluate('document.querySelector("#queueBlock summary strong").textContent'),'Needs review','failure drawer is labelled as review instead of pending work');
+  assert.equal(await evaluate('document.querySelector("#queueList .queue-failure pre").textContent'),'Fixture submission receipt needs review','the original failure reason is preserved');
+  await evaluate(`{const feed=document.getElementById('conversationFeed');for(let i=0;i<2;i++){const node=document.createElement('article');node.className='notice-row';node.textContent='A queued message could not run. Open the queue above the composer to review or remove it.';feed.insertBefore(node,document.getElementById('conversationTail'));}__questions.state.queue=[];__questions.renderQueue();}`);
+  assert.equal(await evaluate('document.querySelectorAll("#conversationFeed > .notice-row").length'),0,'resolved queue entries clear existing obsolete warnings');
+  assert.equal(await evaluate('document.getElementById("queueBlock").hidden'),true,'an empty queue has no review warning or drawer');
 
   await evaluate(`document.documentElement.dataset.conversationView='compact';__questions.renderStory({kind:'tool',agent:'school_coach',tool:'str_replace',call_id:'large-diff-fixture',target:'fixture.txt',ok:true,diff:'@@ -1,1200 +1,1200 @@\\n'+Array.from({length:1200},(_,i)=>'+fixture line '+i).join('\\n')});window.__diffRow=[...document.querySelectorAll('.work-tool')].find(row=>row.dataset.toolCallId==='large-diff-fixture');`);
   assert.equal(await evaluate('__diffRow.querySelectorAll(".fd-line").length'),0,'collapsed large diffs do not populate the DOM');

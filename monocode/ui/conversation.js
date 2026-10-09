@@ -986,9 +986,16 @@
     return humanFailureDetail(value).slice(0,180)||"This coworker could not finish that part.";
   }
   const INTERNAL_NOTICE=/^(?:memory lookup is taking longer|memory preload|librarian |members reported; the group leader will converge next$)/;
+  function queueFailureNotice(value){
+    const text=String(value||"").trim().toLowerCase();
+    return /^a queued message (?:could not run|needs review)\b/.test(text)
+      ||(/^(?:queued prompt|queued group turn)\b/.test(text)&&/failed|could not|stopped/.test(text));
+  }
   function visibleNotice(value) {
     const text=String(value||"").trim(),lower=text.toLowerCase();if(!text)return null;
-    if(lower.startsWith("queued prompt")||lower.startsWith("queued group turn"))return /failed|could not|stopped/.test(lower)?"A queued message needs review. Open the queue above the composer to inspect the saved reason before removing it or sending a new request.":null;
+    // Queue failures have one actionable owner: the current queue drawer.
+    // A saved notice is not evidence that an entry still exists there.
+    if(queueFailureNotice(text)||lower.startsWith("queued prompt")||lower.startsWith("queued group turn"))return null;
     if(lower.startsWith("queued message ready")||lower.startsWith("late popup answer queued")||lower.startsWith("popup answer queued")||lower.startsWith("provider-native context")||lower.startsWith("context auto-compacted")||lower.startsWith("context overflow recovered")||lower.startsWith("context overflow could not commit")||lower.startsWith("checkpoint ")||lower.startsWith("talk →")||lower==="after barrier"||lower.includes(" · trace "))return null;
     // Internal runtime status (a slow memory preload, warm-ups) is diagnostics,
     // not conversation: log it, never show it as a transcript row.
@@ -3908,7 +3915,7 @@
           if (notificationEnabled("completions")) ui.notify({ title:`${event.project_name} finished`, body:event.summary, item:event.owner_kind&&event.owner_id?{kind:event.owner_kind,id:event.owner_id}:itemForConversationLabel(event.project_name), external:true,key:`completion:${key}` });
         }
         break;
-      case "notice": {if(providerRetry){if(!replay&&!state.painting)renderProviderRetry(event.text,targetAgent()||state.item?.id||"phoenix");break;}if(renderWorkerBatchNotice(event))break;const text=visibleNotice(event.text);if(text)feedNode("notice-row",escape(text));break;}
+      case "notice": {if(providerRetry){if(!replay&&!state.painting)renderProviderRetry(event.text,targetAgent()||state.item?.id||"phoenix");break;}if(queueFailureNotice(event.text)){if(!replay&&!state.painting){const token=activeSelectionToken();clearTimeout(state.queueRefreshTimer);state.queueRefreshTimer=setTimeout(()=>refreshQueue(token),100);}break;}if(renderWorkerBatchNotice(event))break;const text=visibleNotice(event.text);if(text)feedNode("notice-row",escape(text));break;}
       case "usage": {
         // Nested coworkers can report usage into the same story. Only mark the
         // turn as having an authoritative live sample when this event actually
@@ -5183,6 +5190,8 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
     return `<span class="queue-review-note">Review this conversation before sending the request again. Removing this entry does not undo work or mark the task complete.</span>${detail?`<details class="queue-failure"><summary>Why this needs review</summary><pre>${escape(detail)}</pre></details>`:""}`;
   }
   function renderQueue(){
+    const feed=$("conversationFeed"),stale=[...feed.querySelectorAll(":scope > .notice-row")].filter(node=>queueFailureNotice(node.textContent));
+    if(stale.length){const bookmark=conversationScrollBookmark(feed);stale.forEach(node=>node.remove());restoreConversationScroll(bookmark);}
     const shownQueueIds=new Set(state.displayRows.map((entry)=>entry.value?.queued_id).filter(Boolean));
     const shownAnswerIds=new Set([...$("conversationFeed").querySelectorAll(".answer-resume-message[data-ask-id]")].map(node=>node.dataset.askId));
     for(const row of state.queue||[])if(row.state!=="failed"&&row.origin?.kind==="ask_answer"&&shownAnswerIds.has(String(row.origin.ask_id||"")))shownQueueIds.add(row.queue_id);
@@ -5205,6 +5214,7 @@ if(!switched)await browserCommand({action:"switch_tab",tab_id:tabId});await refr
       block.open=state.queueExpandedBySession.get(identity)!==false;
     }
     $("queueCount").textContent=rows.length;
+    $("queueBlock").querySelector("summary strong").textContent=rows.some(row=>row.state==="failed")?"Needs review":"Queued";
     $("queuePreview").textContent=rows[0]?.preview||"";
     // Steering converts a waiting prompt into an interrupt for the turn already
     // running. The runtime rejects it for group discussions, which keep their

@@ -40,3 +40,13 @@ conversation script was `20261008t`. Live compact/chat/compact switches stayed
 at the latest message (zero bottom slack after both switches); an older message
 kept an identical 120 px viewport offset through both switches. Avery remained
 idle. No agent messages were sent by verification.
+
+A later screenshot exposed two historical queue-failure notices even though the
+live queue was empty and Avery was idle. Queue notices now refresh the queue on
+live delivery instead of creating transcript warning rows. Only actual failed
+entries appear in the labelled Needs review drawer, with their original failure
+reason and removal control. Replay cannot create stale actionable warnings;
+refresh also removes any existing obsolete warning nodes without deleting the
+saved transcript or error records. The real Chromium fixture verifies repeated
+notice replay, a single real failed entry, retained failure details, and clearing
+both warning nodes and the drawer when the queue becomes empty.
